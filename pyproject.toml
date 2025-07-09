@@ -28,4 +28,4 @@ jumpdiaq-gui = "jumpdiaq.gui.index_tabs:main"
 [tool.setuptools.dynamic]
 version = {attr = "jumpdiaq.__version__"}
 dependencies = {file = ["requirements/requirements.txt"]}
-optional-dependencies.stable = { file = ["requirements/requirements_gui.txt"] }
+optional-dependencies.gui = { file = ["requirements/requirements_gui.txt"] }
