@@ -1,0 +1,2 @@
+recursive-include jumpdiaq/gui/assets *
+recursive-include jumpdiaq/bruker_ext *

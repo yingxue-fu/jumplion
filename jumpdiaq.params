@@ -22,8 +22,8 @@ out_dir = chengrp_20250701
 [optional]
 # General settings
 log_level = 5                      # Level of log messages
-use_saved_rts = 1                  # Use existing precursor RTs (and IMs), 0 = false, 1 = true
-use_saved_xic = 1                  # Use existing XIC files, 0 = false, 1 = true
+use_saved_rts = 0                  # Use existing precursor RTs (and IMs), 0 = false, 1 = true
+use_saved_xic = 0                  # Use existing XIC files, 0 = false, 1 = true
 use_xic_report = 0                 # Use existing XIC quant report file, 0 = false, 1 = true
 
 # ID results processing

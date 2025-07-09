@@ -25,6 +25,12 @@ jumpdiaq-gui = "jumpdiaq.gui.index_tabs:main"
 "Homepage" = "https://github.com/yingxue-fu/jumpdiaq"
 "Issues" = "https://github.com/yingxue-fu/jumpdiaq/issues"
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"jumpdiaq.gui.assets" = ["*"]
+
 [tool.setuptools.dynamic]
 version = {attr = "jumpdiaq.__version__"}
 dependencies = {file = ["requirements/requirements.txt"]}

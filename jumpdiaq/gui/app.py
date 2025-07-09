@@ -6,6 +6,7 @@ import dash_bootstrap_components as dbc
 
 dbc_css = "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates/dbc.css"
 app = dash.Dash(__name__, 
+                assets_folder="assets",
                 suppress_callback_exceptions=True,
                 external_stylesheets=[dbc.themes.BOOTSTRAP, 
                                       dbc.icons.FONT_AWESOME,
