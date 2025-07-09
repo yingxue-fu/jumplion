@@ -30,6 +30,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "jumpdiaq.gui.assets" = ["*"]
+"jumpdiaq.bruker_ext" = ["*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "jumpdiaq.__version__"}
