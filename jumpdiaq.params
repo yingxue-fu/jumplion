@@ -28,8 +28,8 @@ use_xic_report = 0                 # Use existing XIC quant report file, 0 = fal
 
 # ID results processing
 min_runs_quant = 1                 # Minimum number of runs a precursor must be identified in to be quantified
-min_runs_model = 3                 # Minimum number of runs a precursor must be identified in to be used for building RT/IM prediction model
-min_runs_cal = 9                   # Minimum number of runs a precursor must be identified in to be used for mass calibration
+min_runs_model = 2                 # Minimum number of runs a precursor must be identified in to be used for building RT/IM prediction model
+min_runs_cal = 3                   # Minimum number of runs a precursor must be identified in to be used for mass calibration
 min_qvalue_cal = 0.0001            # Minimum Q-value (FDR) for a precursor to be used for mass calibration
 max_mass_cal = 5000                # Maximum number of precursors used for mass calibration
 

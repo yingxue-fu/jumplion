@@ -1,5 +1,7 @@
 # builtin
+import os
 import sys
+import shutil
 import platform  # os info
 import psutil    # cpu and memory info
 import gc
@@ -33,9 +35,9 @@ def main():
     from jumpdiaq.library import Library
     from jumpdiaq.run import Run
     from jumpdiaq.id_results_processing import (process_id_results, 
-                                             get_precursor_locations, 
-                                             get_protein_info, 
-                                             calculate_protein_coverage)
+                                                get_precursor_locations, 
+                                                get_protein_info, 
+                                                calculate_protein_coverage)
 
     #
     MSFiles = args.ms_files
@@ -72,6 +74,10 @@ def main():
     logger.info(f"System: {system} {release}, {architecture}")
     logger.info(f"CPU: {cores} Cores, {threads} Threads")
     logger.info(f"Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total)\n")
+    
+    if os.path.isfile(sys.argv[1]):
+        # copy parameter file
+        shutil.copy(sys.argv[1], Path(OutDir) /'jumpdiaq.params')
     
     report_file = Path(OutDir) / 'xic_quan_report.parquet'
     if UseXICReport:
