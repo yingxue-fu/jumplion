@@ -1,0 +1,39 @@
+Metadata-Version: 2.4
+Name: jumpdiaq
+Version: 0.1.0
+Summary: A software for DIA-MS quantification
+Author-email: Yingxue Fu <yingxue.fu@stjude.org>
+License-Expression: Apache-2.0
+Project-URL: Homepage, https://github.com/yingxue-fu/jumpdiaq
+Project-URL: Bug Tracker, https://github.com/yingxue-fu/jumpdiaq/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: numba
+Requires-Dist: pandas
+Requires-Dist: polars
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: timsrust_pyo3
+Requires-Dist: pyteomics
+Requires-Dist: biopython
+Requires-Dist: pyarrow
+Requires-Dist: tqdm
+Requires-Dist: psutil
+Requires-Dist: scipy
+Requires-Dist: lxml
+Provides-Extra: gui
+Requires-Dist: dash; extra == "gui"
+Requires-Dist: dash-bootstrap-components; extra == "gui"
+Requires-Dist: dash-bootstrap-templates; extra == "gui"
+Requires-Dist: dash-bio; extra == "gui"
+
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jun  6 12:01:27 2025
+
+@author: yfu
+"""
+

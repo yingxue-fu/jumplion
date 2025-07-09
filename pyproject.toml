@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jumpdiaq"
+requires-python = ">=3.12"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+authors = [
+  { name="Yingxue Fu", email="yingxue.fu@stjude.org" },
+]
+description = "A software for DIA-MS quantification"
+readme = "README.md"
+license = "Apache-2.0"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+
+[project.scripts]
+jumpdiaq = "jumpdiaq.main:main"
+jumpdiaq-gui = "jumpdiaq.gui.index_tabs:main"
+
+[project.urls]
+"Homepage" = "https://github.com/yingxue-fu/jumpdiaq"
+"Issues" = "https://github.com/yingxue-fu/jumpdiaq/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "jumpdiaq.__version__"}
+dependencies = {file = ["requirements/requirements.txt"]}
+optional-dependencies.stable = { file = ["requirements/requirements_gui.txt"] }

@@ -1,0 +1,87 @@
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 7rem;
+    padding: 2rem 1rem;
+    z-index: 1050;
+    transition: width 0.3s ease-in-out;
+    background-color: #EEEDE9;
+  }
+
+  /* when the user hovers on the sidebar, expand it */
+  .sidebar:hover {
+    width: 21rem;
+    opacity: 0.99;
+  }
+
+  /* make sure the contents of the navlink don't wrap when navbar collapses */
+  .sidebar .nav-link {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    color: #40484E;
+  }
+
+  /* fix the width of the icons */
+  .sidebar .nav-link i {
+    width: 1.2rem;
+  }
+
+  /* hide the navlink labels by default */
+  .sidebar .nav-link span {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.1s ease-in-out;
+  }
+
+  /* when the sidebar is hovered, reveal the labels */
+  .sidebar:hover .nav-link span {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* container for the sidebar header. make sure the contents don't wrap when
+   * the sidebar is collapsed.
+   */
+  .sidebar-header {
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  @font-face {
+    font-family: "garamond";
+    }
+
+  .nav-link.active{
+    background-color: #0084d6 !important;
+    color: #40484E !important;
+    box-shadow: 0 2px 4px 0 rgba(32, 121, 255, 0.308) !important;
+  }
+
+  .nav-link.active:hover{
+    color: #40484E !important;
+  }
+
+  .nav-link:hover {
+    color:  #0084d6 !important;
+  }
+
+  .image_title {
+    display: flex;
+    flex-direction: row;
+    column-gap: 4px;
+    align-items: center;
+  }
+
+  .icon_title {
+    display: flex;
+    flex-direction: row;
+    column-gap: 20px;
+    align-items: center;
+  }
+

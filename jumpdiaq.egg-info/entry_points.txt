@@ -1,0 +1,3 @@
+[console_scripts]
+jumpdiaq = jumpdiaq.main:main
+jumpdiaq-gui = jumpdiaq.gui.index_tabs:main

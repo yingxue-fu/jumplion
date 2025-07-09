@@ -1,0 +1,17 @@
+numpy
+numba
+pandas
+polars
+matplotlib
+seaborn
+timsrust_pyo3
+pyteomics
+biopython
+pyarrow
+tqdm
+psutil
+scipy
+lxml
+
+
+
