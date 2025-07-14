@@ -36,6 +36,7 @@ def process_id_results(id_file,
     # read id report file
     logging.info(f"Reading identification report file: {id_file}")
     required_columns = ['Run', 'Precursor.Id', 'RT', 'Q.Value']
+    is_tims = False
     if get_extension(ms_files[0]) == 'd':
         is_tims = True
         required_columns = required_columns + ['IM']

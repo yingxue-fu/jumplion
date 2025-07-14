@@ -12,6 +12,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg') # This line must come before importing pyplot
 # local
+import jumpdiaq
 from jumpdiaq.arguments import parse_arguments, setup_logger, close_logger
 from jumpdiaq.utils import remove_extension, get_file_name
 from jumpdiaq.summarization import (quantify_precursors, 
@@ -27,7 +28,7 @@ def main():
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     
     if len(sys.argv) < 2:
-        print("Type jumpdiaq -h to show help message!")
+        print("\nUsage: jumpdiaq params.file\n")
         sys.exit(1)
     
     # read arguments
@@ -67,13 +68,15 @@ def main():
     SaveMemory = True if mem_available < 64 else False
     
     logger = setup_logger(LogLevel, False, OutDir)
-    logger.info("=====================================")
-    logger.info("+         JUMPdiaq (v0.1.0)         +")
-    logger.info("+         Author: Yingxue Fu        +")
-    logger.info("=====================================\n")
-    logger.info(f"System: {system} {release}, {architecture}")
-    logger.info(f"CPU: {cores} Cores, {threads} Threads")
-    logger.info(f"Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total)\n")
+    logger.info("===============================================")
+    logger.info(f"             JUMPdiaq (v{jumpdiaq.__version__})               ")
+    logger.info("                                            ")
+    logger.info(f" System: {system} {release}, {architecture} ")
+    logger.info(f" CPU: {cores} Cores, {threads} Threads ")
+    logger.info(f" Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total) ")
+    logger.info("                                            ")
+    logger.info(" Contact: Yingxue Fu, yingxue.fu@stjude.org  ")
+    logger.info("===============================================\n")
     
     if os.path.isfile(sys.argv[1]):
         # copy parameter file

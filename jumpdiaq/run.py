@@ -12,7 +12,7 @@ from jumpdiaq.utils import (C13delta, fExclude, E, INF,
                             remove_extension, 
                             get_file_name, 
                             progress_bar)
-from jumpdiaq.read_ms_files import load_mzml_data, load_timsTOF_data
+from jumpdiaq.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
 from jumpdiaq.calibration import (split_into_rt_bins, 
                                   predicted_mz, 
                                   predicted_mz_parallel, 
@@ -408,11 +408,13 @@ class Run:
         logging.info(f"Loading data from file {self.file_path}")
         
         ext = get_extension(ms_file_path)
-        if ext == 'mzml':
-            self.ms1x, self.ms2x = load_mzml_data(ms_file_path)
+        if ext == 'raw':
+            self.ms1x, self.ms2x = load_thermo_raw(ms_file_path)
+        elif ext == 'mzml':
+            self.ms1x, self.ms2x = load_mzml(ms_file_path)
         elif ext == 'd':
             self.tims = True
-            self.ms1x, self.ms2x = load_timsTOF_data(ms_file_path)
+            self.ms1x, self.ms2x = load_timsTOF_d(ms_file_path)
         
         ms1_cnt = len(self.ms1x)
         ms2_cnt = len(self.ms2x)
