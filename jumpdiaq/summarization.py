@@ -270,12 +270,8 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
     ms1_ms2_quality_table.write_parquet(Path(out_dir) / f"{id_col}_quality_ms1_ms2_summ_table.parquet")
     
     if quant_source == 'ms1':
-        ms1_quant_table.write_parquet(Path(out_dir) / f"{id_col}_quant_summ_table.parquet")
-        ms1_quality_table.write_parquet(Path(out_dir) / f"{id_col}_quality_summ_table.parquet")
         return ms1_quant_table, ms1_quality_table
     elif quant_source == 'ms2':
-        ms2_quant_table.write_parquet(Path(out_dir) / f"{id_col}_quant_summ_table.parquet")
-        ms2_quality_table.write_parquet(Path(out_dir) / f"{id_col}_quality_summ_table.parquet")
         return ms2_quant_table, ms2_quality_table
     elif quant_source == 'ms1_ms2':
         # Keep only the row with the highest Average per Precursor.Id
@@ -283,17 +279,12 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
             ms1_ms2_quality_table
             .filter(pl.col("Average") == pl.col("Average").max().over("Precursor.Id"))
         )
-        
         # Filter quant table to keep only rows matching filtered quality table
         ms1_ms2_quant_table = ms1_ms2_quant_table.filter(
             pl.col("Precursor.Id_MS_type").is_in(
                 ms1_ms2_quality_table.get_column("Precursor.Id_MS_type").implode()
             )
         )
-    
-        ms1_ms2_quant_table.write_parquet(Path(out_dir) / f"{id_col}_quant_summ_table.parquet")
-        ms1_ms2_quality_table.write_parquet(Path(out_dir) / f"{id_col}_quality_summ_table.parquet")
-
         return ms1_ms2_quant_table, ms1_ms2_quality_table
 
 

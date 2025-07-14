@@ -146,7 +146,9 @@ def main():
                                                 xic_quant_cutoff=0.0, 
                                                 quant_source='ms1_ms2',
                                                 out_dir=OutDir)
-
+    prec_quant_table.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table.parquet")
+    prec_quality_table.write_parquet(Path(OutDir) / "Precursor.Id_quality_summ_table.parquet")
+    
     # Normalization
     # NormSpecies='HUMAN'
     # NormMethod='median'
@@ -159,9 +161,7 @@ def main():
                                                   norm_species=NormSpecies, 
                                                   norm_method=NormMethod, 
                                                   trim_percentage=TrimPercentage)
-    
-    prec_quant_table.write_csv(Path(OutDir) / "Precursor_Quan_table.csv")
-    prec_quant_table_norm.write_csv(Path(OutDir) / "Precursor_Quan_table_Norm.csv")
+    prec_quant_table_norm.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table_Norm.parquet")
     
     prot_quant_table, prot_quality_table = quantify_proteins(
                                                     prec_quant_table_norm, 

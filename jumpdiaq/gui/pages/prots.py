@@ -86,6 +86,8 @@ sidebar = html.Div(
                 ], style={'width': '100%', 'display': 'inline-block'}),
                 html.Hr(),
                 html.Label("Protein Summarization", style={"font-weight": "bold", 'marginBottom': '10px'}),
+                dbc.Switch(label='Show raw precursor intensity', id='show-raw', 
+                           value=False, className="d-inline-block"),
                 dbc.Switch(label='Substract row means', id='sub-row-means', 
                            value=False, className="d-inline-block"),
                 dbc.Switch(label='Show Summarization Value', id='show-summ', 
@@ -104,6 +106,7 @@ layout = html.Div(children=[
     dcc.Store(id='stored-prot-quant'),  # Store the protein quantification data
     dcc.Store(id='stored-prot-quality'),
     dcc.Store(id="stored-prot-prec-quant"),
+    dcc.Store(id="stored-prot-prec-quant-norm"),
     dcc.Store(id="stored-prot-prec-quality"),
     
     dbc.Row([
@@ -531,65 +534,67 @@ def update_benchmark_plot(data, species_input, ratio_1, ratio_2, ratio_3, group_
 
 @app.callback(
     [Output('stored-prot-prec-quant', 'data'),
+     Output('stored-prot-prec-quant-norm', 'data'),
      Output('stored-prot-prec-quality', 'data'),
      Output('selected-prot', 'data'),
-     #Output('prot-precursor-dropdown', 'options'),
      Output('stored-precursor-options', 'data')],
     Input('prot-quant-table', 'selected_rows'),
     State('stored-prot-quant', 'data'),
     State('stored-outdir', 'data'),
     State('stored-meta', 'data'),
-    #prevent_initial_call=True
 )
 def read_precs_data(selected_rows, data, outdir_path, meta):
     
     if not selected_rows or data is None or outdir_path is None:
-        return None, None, "", [], #[]#px.scatter(title="Select a row to visualize protein quantification data")
-    # outdir_path = r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250617"
-    # df = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250617\Protein.Group_Quan_maxLFQ_QT0.8.csv"))
-    # meta = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\sample_meta.csv"))
+        return None, None, None, "", []
+    # outdir_path = r"C:\Users\yfu\Downloads\miss_dia_test_data\exp480\test_20250714"
+    # df = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\exp480\test_20250714\Protein.Group_Quan_QT0.8.csv"))
+    # meta = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\exp480\sample_meta.csv"))
     df = pd.DataFrame(data)
     meta = pd.DataFrame(meta)
     selected_row = df.iloc[selected_rows[0]]
-    dataset_name = selected_row.get("Protein.Group", "")
+    selected_prot = selected_row.get("Protein.Group", "")
 
     # Assuming "file_name" column contains the name of the corresponding HDF file
     prec_quant_file = "Precursor.Id_quant_summ_table.parquet"
+    prec_quant_norm_file = "Precursor.Id_quant_summ_table_Norm.parquet"
     prec_quality_file = "Precursor.Id_quality_summ_table.parquet"
     prec_quant_path = os.path.join(outdir_path, prec_quant_file)
+    prec_quant_norm_path = os.path.join(outdir_path, prec_quant_norm_file)
     prec_quality_path = os.path.join(outdir_path, prec_quality_file)
     
     try:
-        # Convert to DataFrame
-        quant_df = pd.read_parquet(prec_quant_path, filters=[('Protein.Group', '==', dataset_name)])
-        
+        # read quant data
+        quant_df = pd.read_parquet(prec_quant_path, filters=[('Protein.Group', '==', selected_prot)])
         precursors = np.array(quant_df['Precursor.Id_MS_type'].tolist())
         precursors = np.unique(precursors)
-        # precursor_options = [{'label': precursor, 'value': precursor} 
-        #                      for precursor in precursors]
-        
         quant_df.set_index('Precursor.Id_MS_type', drop=True, inplace=True)
         quant_df = quant_df.loc[:, meta['Sample'].values.tolist()]
         quant_df.columns = extract_unique_parts(quant_df.columns.values.tolist())
         quant_df_long = quant_df.reset_index().melt(id_vars='Precursor.Id_MS_type', var_name='X', value_name='Y')
         
-        prot_title = dataset_name
+        # read quant norm data
+        quant_df_norm = pd.read_parquet(prec_quant_norm_path, filters=[('Protein.Group', '==', selected_prot)])
+        quant_df_norm.set_index('Precursor.Id_MS_type', drop=True, inplace=True)
+        quant_df_norm = quant_df_norm.loc[:, meta['Sample'].values.tolist()]
+        quant_df_norm.columns = extract_unique_parts(quant_df_norm.columns.values.tolist())
+        quant_df_norm_long = quant_df_norm.reset_index().melt(id_vars='Precursor.Id_MS_type', var_name='X', value_name='Y')
         
         # read quality data
-        quality_df = pd.read_parquet(prec_quality_path, filters=[('Protein.Group', '==', dataset_name)])
+        quality_df = pd.read_parquet(prec_quality_path, filters=[('Protein.Group', '==', selected_prot)])
         quality_df.set_index('Precursor.Id_MS_type', drop=True, inplace=True)
         quality_df = quality_df.loc[:, meta['Sample'].values.tolist()]
         quality_df.columns = extract_unique_parts(quality_df.columns.values.tolist())
         quality_df_long = quality_df.reset_index().melt(id_vars='Precursor.Id_MS_type', var_name='X', value_name='Y')
         
         return (quant_df_long.to_dict("records"), 
+                quant_df_norm_long.to_dict("records"), 
                 quality_df_long.to_dict("records"), 
-                prot_title, 
-                #precursor_options, 
+                selected_prot, 
                 precursors)
     except Exception as e:
-        logger.error(f"Error loading HDF file: {str(e)}")
-        return None, None, "", []#, []
+        logger.error(f"Error loading parquet file: {str(e)}")
+        return None, None, None, "", []
     
 
 # Callback to generate figure from selected row
@@ -597,19 +602,22 @@ def read_precs_data(selected_rows, data, outdir_path, meta):
     Output('prot-prec-quant-plot', 'figure'),
     Output('prot-prec-quality-plot', 'figure'),
     [Input('prot-quant-table', 'selected_rows'),
+     Input('show-raw', 'value'), 
      Input('sub-row-means', 'value'),
      Input('show-summ', 'value'),
-     #Input('prot-precursor-dropdown', 'value'),
      Input('stored-prot-prec-quant', 'data'),
+     Input('stored-prot-prec-quant-norm', 'data'),
      Input('stored-prot-prec-quality', 'data'),],  
     [State('stored-prot-quant', 'data'),
      State('stored-prot-quality', 'data')],
     prevent_initial_call=True  # Add this to prevent initial callback
 )
 def update_summ_plot(selected_rows, 
+                     show_raw_intensity, 
                      sub_row_means, 
                      show_summ_value, 
                      prec_quant_data, 
+                     prec_quant_norm_data, 
                      prec_quality_data,
                      quant_data, 
                      quality_data):
@@ -637,19 +645,12 @@ def update_summ_plot(selected_rows,
         quant_fig = go.Figure()
         quality_fig = go.Figure()
         
-        prec_quant_df = pd.DataFrame(prec_quant_data)
-        #prec_quant_df["precs"] = prec_quant_df["Precursor.Id_MS_type"].apply(lambda x: x.split("_")[0])
-        
+        if show_raw_intensity:
+            prec_quant_df = pd.DataFrame(prec_quant_data)
+        else:
+            prec_quant_df = pd.DataFrame(prec_quant_norm_data)
         prec_quality_df = pd.DataFrame(prec_quality_data)
-        #prec_quality_df["precs"] = prec_quality_df["Precursor.Id_MS_type"].apply(lambda x: x.split("_")[0])
         
-        # Filter by selected precursors
-        # if selected_precursors:
-        #     if isinstance(selected_precursors, str):
-        #         selected_precursors = [selected_precursors]
-        #     prec_quant_df = prec_quant_df[prec_quant_df["precs"].isin(selected_precursors)]
-        #     prec_quality_df = prec_quality_df[prec_quality_df["precs"].isin(selected_precursors)]
-            
         # Plot each tract as a connected scatter plot
         for tract_id, group in prec_quant_df.groupby("Precursor.Id_MS_type"):
             if sub_row_means:
