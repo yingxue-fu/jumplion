@@ -9,7 +9,9 @@ JUMPdiaq is an tool used for quantification of data-independent acquisition (DIA
 
 ### Installation
 
-
+`conda create -n jumpdiaq python=3.13`
+`conda activate jumpdiaq`
+`pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git"`
 
 ### Getting Started with JUMPdiaq
 
