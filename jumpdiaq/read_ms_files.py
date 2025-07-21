@@ -10,10 +10,12 @@ import pyteomics.mzml
 import timsrust_pyo3
 from timsrust_pyo3 import MSLevel
 # local
+from jumpdiaq.arguments import Arguments
 from jumpdiaq.utils import progress_bar
 from jumpdiaq.ext.alpharaw_thermo import RawFileReader
 from jumpdiaq.ext.alphatims_bruker import get_meta_bruker, get_mobility_mz
 
+args = Arguments()
 PEAK_MZ_DTYPE = np.float32
 PEAK_IM_DTYPE = np.float32
 PEAK_INTENSITY_DTYPE = np.float32
@@ -261,7 +263,9 @@ def load_thermo_raw(raw_file_path: str, centroided: bool = True):
 
     ms1_spectra = List()
     ms2_spectra = List()
-    for i in progress_bar(range(first_spectrum_number, last_spectrum_number + 1)):
+    for i in progress_bar(range(first_spectrum_number, last_spectrum_number + 1), 
+                          args.show_progress, 
+                          args.inter_progress):
         ms_order = rawfile.GetMSOrderForScanNum(i)
         rt = rawfile.RTFromScanNum(i)
         if not centroided:
@@ -352,7 +356,7 @@ def load_timsTOF_d(bruker_d_folder_name):
     
     ms1_idx = 0
     ms2_idx = 0
-    for i, frame in enumerate(progress_bar(frames)):
+    for i, frame in enumerate(progress_bar(frames, args.show_progress, args.inter_progress)):
         mzs = mz_values[frame.tof_indices].astype(PEAK_MZ_DTYPE)
         ims = np.repeat(mobility_values, np.diff(frame.scan_offsets)).astype(PEAK_IM_DTYPE)
         intensities = np.array(frame.intensities, dtype=PEAK_INTENSITY_DTYPE)

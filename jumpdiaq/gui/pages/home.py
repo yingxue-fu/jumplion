@@ -8,14 +8,18 @@ layout = html.Div([
         dbc.CardBody(
             [
                 html.H4("JUMPdiaq: a tool for DIA-MS data quantification", className="card-title"),
-                html.P("write something"),
-                dbc.Button("Start Analysis", id="start-analysis", color="primary"),
+                html.P("Schematic of JUMPdiaq workflow"),
+                html.P("[A figure]"),
+                dbc.Button("Read Manual", id="read-manual", color="info",
+                           style={"textTransform": "none"}, className="me-3"),
+                dbc.Button("Start Analysis", id="start-analysis", color="primary",
+                           style={"textTransform": "none"}),
             ]
         ),
         style={
-            "marginTop": "5rem",   
-            "marginLeft": "10rem",
-            "marginRight": "5rem"}  # Add left margin here
+            "marginTop": "3rem",   
+            "marginLeft": "8rem",
+            "marginRight": "3rem"}  # Add left margin here
     )
 ])
 

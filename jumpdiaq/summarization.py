@@ -9,7 +9,10 @@ import pandas as pd
 import polars as pl
 import matplotlib.pyplot as plt
 # local
+from jumpdiaq.arguments import Arguments
 from jumpdiaq.utils import progress_bar
+
+args = Arguments()
 
 def get_quant_quality_dfs(report_df, 
                           id_col,
@@ -99,7 +102,7 @@ def precursor_summarize(quant_df: pl.DataFrame,
     quant_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
     quality_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
 
-    for i, prec_id in enumerate(progress_bar(prec_ids)):
+    for i, prec_id in enumerate(progress_bar(prec_ids, args.show_progress, args.inter_progress)):
         quant_df_sub = quant_groups.get((prec_id,))
         if quant_df_sub is None:
             continue
@@ -300,7 +303,7 @@ def protein_summarize(prec_quant_table,
     quant_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
     quality_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
 
-    for i, prot_id in enumerate(progress_bar(prot_ids)):
+    for i, prot_id in enumerate(progress_bar(prot_ids, args.show_progress, args.inter_progress)):
         # prot_id = prot_ids[0]
         quant_df_sub = quant_groups.get((prot_id,))
         if quant_df_sub is None:

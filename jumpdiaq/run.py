@@ -578,7 +578,7 @@ class Run:
     def process(self):
         self.calibrate_mass()
         logging.info("Identifying optimal XIC for each precursor")
-        for entry in progress_bar(self.entries):   
+        for entry in progress_bar(self.entries, args.show_progress, args.inter_progress):   
             entry.get_optimal_xic(stage=1, n_xic_points=args.n_xic_points)
         self.export_xics()
 

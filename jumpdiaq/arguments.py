@@ -25,7 +25,7 @@ class Arguments:
     out_dir: str = ""
     
     # General settings
-    log_level: int = 4
+    log_level: int = 5
     use_saved_rts: int = 0
     use_saved_xic: int = 0
     use_xic_report: int = 0
@@ -35,14 +35,14 @@ class Arguments:
     min_runs_model: int = 2
     min_runs_cal: int = 3
     min_qvalue_cal: float = 0.0001
-    max_mass_cal: int = 3000
+    max_mass_cal: int = 5000
     
     # Mass calibration
     mass_calibration: int = 1    
-    mass_cal_acc: float = 50.0   # calibration mass accuracy
+    mass_cal_acc: float = 30.0   # calibration mass accuracy
     mass_cal_bins: int = 1
     mass_cal_bins_max: int = 1
-    fix_mass_acc: int = 1
+    fix_mass_acc: int = 0
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0
     individual_mass_acc: int = 0
@@ -77,6 +77,10 @@ class Arguments:
     norm_species: str = "HUMAN"
     norm_method: int = 0
     trim_percentage: int = 5
+    
+    # Internal use
+    show_progress: int = 1
+    inter_progress: int = 0    
     
     # only load files in specific formats
     ms_files: List[str] = field(default_factory=list)
@@ -172,6 +176,9 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--norm-method", type=int, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
+    optional_group.add_argument("--show-progress", type=int, help="")
+    optional_group.add_argument("--inter-progress", type=int, help="")
+    
     return parser
 
 
@@ -190,9 +197,8 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
             param_args = params_to_args(potential_param_file)
             # Combine with any other command line arguments (which will override params)
             args = param_args + args[1:]
-            print_cmds = ' '.join(args)
-            print(f"\nCommand: {print_cmds}\n")
-            
+    
+    command = 'jumpdiaq ' + ' '.join(args)
     parsed_args = parser.parse_args(args)
     
     # Update arguments from parsed arguments
@@ -234,7 +240,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
         if not report_file.exists():
             arguments.use_xic_report = 0
     
-    return arguments
+    return arguments, command
 
 
 def preprocess_params(param_file):

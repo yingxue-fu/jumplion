@@ -447,7 +447,9 @@ class Info:
     
             precursor_groups = df.partition_by("Precursor.Id", as_dict=True)
     
-            for precursor_id, subdf in progress_bar(precursor_groups.items()):
+            for precursor_id, subdf in progress_bar(precursor_groups.items(), 
+                                                    args.show_progress, 
+                                                    args.inter_progress):
                 # precursor_id = precursor_ids[3706]
                 # subdf = precursor_groups[(precursor_id,)]
                 # tempdf = subdf.to_pandas()
@@ -508,7 +510,7 @@ class Info:
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
         
         data_rows = []
-        for pr_index, v in progress_bar(self.map.items()):
+        for pr_index, v in progress_bar(self.map.items(), args.show_progress, args.inter_progress):
             # pr_index = 1
             # v = self.map[pr_index]
             # for each precursor, check overall optimal xic type

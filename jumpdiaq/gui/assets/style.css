@@ -3,8 +3,8 @@
     top: 0;
     left: 0;
     bottom: 0;
-    width: 7rem;
-    padding: 2rem 1rem;
+    width: 5rem;
+    padding: 2rem 1rem 1rem 1rem;
     z-index: 1050;
     transition: width 0.3s ease-in-out;
     background-color: #EEEDE9;
@@ -12,8 +12,8 @@
 
   /* when the user hovers on the sidebar, expand it */
   .sidebar:hover {
-    width: 21rem;
-    opacity: 0.99;
+    width: 12rem;
+    opacity: 0.9;
   }
 
   /* make sure the contents of the navlink don't wrap when navbar collapses */
@@ -85,3 +85,7 @@
     align-items: center;
   }
 
+.custom-tab.active {
+    background-color: white !important;
+    color: black !important;
+}

@@ -32,7 +32,7 @@ def main():
         sys.exit(1)
     
     # read arguments
-    args = parse_arguments(sys.argv[1:])  
+    args, cmd = parse_arguments(sys.argv[1:])  
     from jumpdiaq.library import Library
     from jumpdiaq.run import Run
     from jumpdiaq.id_results_processing import (process_id_results, 
@@ -69,15 +69,14 @@ def main():
     
     logger = setup_logger(LogLevel, False, OutDir)
     logger.info("===============================================")
-    logger.info(f"             JUMPdiaq (v{jumpdiaq.__version__})               ")
-    logger.info("                                            ")
+    logger.info(f" JUMPdiaq (v{jumpdiaq.__version__}) ")
+    logger.info(" ")
     logger.info(f" System: {system} {release}, {architecture} ")
     logger.info(f" CPU: {cores} Cores, {threads} Threads ")
     logger.info(f" Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total) ")
-    logger.info("                                            ")
-    logger.info(" Contact: Yingxue Fu, yingxue.fu@stjude.org  ")
     logger.info("===============================================\n")
     
+    logger.info(f"Command: {cmd}\n")
     if os.path.isfile(sys.argv[1]):
         # copy parameter file
         shutil.copy(sys.argv[1], Path(OutDir) /'jumpdiaq.params')

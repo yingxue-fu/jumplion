@@ -20,27 +20,31 @@ load_figure_template(["vizro", "vizro_dark"])
 
 sidebar = html.Div(
     [
-        html.H3("Precursor XICs"),
+        html.H3("Precursor Quantification"),
         html.Hr(),
         dbc.Nav(
             [   
                 html.Label(id='protein-label', style={"font-weight": "bold"}),
-                dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor",
-                             style={'marginTop': '10px'}),
+                dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor"),
                 html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
                 html.Label("For cross runs", style={"font-weight": "bold"}),
                 dbc.Switch(label='Show summarization value', id='show-prec-summ', 
                            value=False, className="d-inline-block", 
-                           style={'marginTop': '10px'}),
-                html.Hr(),
+                           style={'marginTop': '5px'}),
+                html.Br(),
                 html.Label("For individual run", style={"font-weight": "bold"}),
-                dcc.Dropdown(id='run-dropdown', placeholder="Select a Run", 
-                             style={'marginTop': '10px'}),
+                dcc.Dropdown(id='run-dropdown', placeholder="Select a Run"),
                 dbc.Switch(label='Show Interpolated MS1 XICs', id='show-ms1-inter', value=False, 
-                           className="d-inline-block", style={'marginTop': '10px'}),
+                           className="d-inline-block", style={'marginTop': '5px'}),
                 html.Div(id='show-prec-run', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
+                dbc.Button("Go back to Proteins", id="view-prot", 
+                           color="info",  
+                           style={"font-weight": "bold", 
+                                  "width": "150px", 
+                                  "marginTop": "5px",
+                                  "textTransform": "none"}),
             ],
             vertical=True,
             pills=True,
@@ -49,24 +53,13 @@ sidebar = html.Div(
     style=page_sidebar_style,
 )
 
-
 tabs_styles = {
-    'height': '45px',
-    'width': '400px',
-    'margin-top': '30px'
-}
-tab_style = {
-    'borderBottom': '1px solid #d6d6d6',
-    'padding': '6px',
+    'margin-top': '50px'
 }
 
-tab_selected_style = {
-    'borderTop': '1px solid #d6d6d6',
-    'borderBottom': '1px solid #d6d6d6',
-    'backgroundColor': '#119DFF',
-    'color': 'white',
-    'padding': '6px',
-    'fontWeight': 'bold'
+tab_label_style = {
+    "textTransform": "none",  # Prevent all caps
+    "textAlign": "center"
 }
 
 layout = html.Div(children=[
@@ -77,18 +70,17 @@ layout = html.Div(children=[
     dcc.Store(id='stored-precMS2quant'),
     dcc.Store(id='stored-precMS2quality'),
     dcc.Store(id='data-store'),  # Added for storing DataFrame
-    
     dbc.Row([
-        dbc.Col(sidebar, width=3, md={"size": 3, "offset": 1}),
+        dbc.Col(sidebar, width=4),
         dbc.Col([
-            dcc.Tabs([
-                dcc.Tab(label='Cross runs', children=[
+            dbc.Tabs([
+                dbc.Tab(label='Cross runs', children=[
                         html.Div([   
                             dcc.Graph(id="prec-quant-plot"),
                             dcc.Graph(id="prec-quality-plot"),
                             ], className="p-4")
-                ], style=tab_style, selected_style=tab_selected_style),
-                dcc.Tab(label='Individual run', children=[
+                ], label_style=tab_label_style),
+                dbc.Tab(label='Individual run', children=[
                     dbc.Row([
                         dbc.Col(html.Div(id='text-output', style={'fontSize': '18px'}), width=12)
                     ], style={'margin-top': '20px'}),
@@ -111,15 +103,15 @@ layout = html.Div(children=[
                                                                           "XIC Quant (Raw)", 
                                                                           "XIC Quant (Adj)"]],
                             data=[],
-                            row_selectable="multi",
-                            selected_rows=[],
+                            #row_selectable="multi",
+                            #selected_rows=[],
                             style_table={'overflowX': 'auto'},
                             style_cell={'textAlign': 'left', 'padding': '5px'},
                             style_header={'fontWeight': 'bold'},
                             page_size=10,
                         ), width=11, className="mx-auto"),
                     ], style={'margin-top': '15px'}),
-                    ], style=tab_style, selected_style=tab_selected_style)
+                    ], label_style=tab_label_style)
                 ], style=tabs_styles),
         ], width=8)
     ])

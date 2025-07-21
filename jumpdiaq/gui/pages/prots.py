@@ -31,84 +31,71 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(
             [
-                html.P("Select a quantification table"),
-                dcc.Dropdown(id='quant-table-selector', placeholder='Select a file', multi=False),
-                html.Button('Load Quantification Table', id='load-prot-quant', n_clicks=0, style={'margin-top': '10px'}),
+                html.Label("Select a quantification table", style={"font-weight": "bold"}),
+                dbc.Select(id='quant-table-selector', placeholder='Select a file'),
+                html.Label("Input meta file path", style={"font-weight": "bold", 'marginTop': '10px'}),
+                dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
+                          style={'width': '100%'}, persistence=True),
+                dbc.Button('Load Quantification Table', id='load-prot-quant', n_clicks=0, 
+                           style={'margin-top': '10px', "textTransform": "none"}),
                 html.Div(id='show-cutoff', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
-                html.Label("Overall Intensity", style={"font-weight": "bold"}),
-                html.P("Select a species"),
-                dcc.Dropdown(
+                html.Label("Protein Intensity Distribution", style={"font-weight": "bold"}),
+                dbc.Select(
                     id='species-input-violin',
                     options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'SCHPO', 'MOUSE', 'YEAST', 'ECOLI']],
-                    multi=False,
-                    placeholder='Species',
-                    searchable=True,
+                    placeholder="Select a species"
                 ),
-                html.Hr(),
-                html.Label("Protein Quantity Summarization", style={"font-weight": "bold", 'marginBottom': '10px'}),
-                dbc.Switch(label='Show raw precursor intensity', id='show-raw', 
-                           value=False, className="d-inline-block"),
-                dbc.Switch(label='Substract row means', id='sub-row-means', 
-                           value=False, className="d-inline-block"),
-                dbc.Switch(label='Show Summarization Value', id='show-summ', 
-                           value=False, className="d-inline-block"),
-                html.Hr(),
+                html.Br(),
+                html.Label("Protein Quantity Summarization", style={"font-weight": "bold", 'marginBottom': '5px'}),
+                dbc.Switch(label='Show raw precursor intensity', id='show-raw', value=False),
+                dbc.Switch(label='Substract row means', id='sub-row-means', value=False),
+                dbc.Switch(label='Show Summarization Value', id='show-summ', value=False),
+                html.Br(),
                 html.Label("Quantification Benchmark Plot", style={"font-weight": "bold"}),
-                html.P("Select one or more species"),
+                html.Label("Select species"),
                 dcc.Dropdown(
                     id='species-input-bench',
                     options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'SCHPO', 'MOUSE', 'YEAST', 'ECOLI']],
                     multi=True,
-                    placeholder='Species',
-                    searchable=True,
+                    placeholder="Select one or more species"
                 ),
-                html.P("Group A"),
-                dcc.Dropdown(id='group-A', multi=False, 
-                             placeholder="Group A", className = "dbc"),
-                html.P("Group B"),
-                dcc.Dropdown(id='group-B', multi=False, 
-                             placeholder="Group B", className = "dbc"),
-                html.Br(),
-                html.Label("Expected Ratios:"),
+                html.Label("Select groups for comparison", style={'marginTop': '5px'}),
+                dbc.Select(id='group-A', placeholder="Group A"),
+                dbc.Select(id='group-B', placeholder="Group B", style={'marginTop': '5px'}),
+                html.Label("Input expected ratios:", style={'marginTop': '5px'}),
                 dbc.Row([
-                    dbc.Col(dcc.Input(id="ratio-1", type="number", value=1.0, style={"width": "70px"}), width=3), 
-                    dbc.Col(dcc.Input(id="ratio-2", type="number", value=2.0, style={"width": "70px"}), width=3),
-                    dbc.Col(dcc.Input(id="ratio-3", type="number", value=0.25, style={"width": "70px"}), width=3),
-                ], className="mb-2"),
-                html.Div([
-                    html.Label("Point Size:"),
-                    dcc.Slider(
-                        id='point-size',
-                        min=0.1,
-                        max=1.0,
-                        step=0.1,
-                        value=0.5,
-                        marks={i/10: str(i/10) for i in range(1, 11)}
-                    ),
-                ], style={'width': '100%', 'display': 'inline-block'}),
-                html.Div([
-                    html.Label("Point Opacity:"),
-                    dcc.Slider(
-                        id='point-opacity',
-                        min=0.1,
-                        max=1.0,
-                        step=0.1,
-                        value=0.3,
-                        marks={i/10: str(i/10) for i in range(1, 11)}
-                    ),
-                ], style={'width': '100%', 'display': 'inline-block'}),
-                html.Div([
-                    html.Label("Y-axis Range:"),
-                    dcc.Slider(
-                        id='y-span',
-                        min=1,
-                        max=5,
-                        step=1,
-                        value=3,
-                        marks={i: str(i) for i in range(1, 6)}
-                    ),
-                ], style={'width': '100%', 'display': 'inline-block'}),
+                    dbc.Col(dbc.Input(id="ratio-1", type="number", value=1.0), width=4), 
+                    dbc.Col(dbc.Input(id="ratio-2", type="number", value=2.0), width=4),
+                    dbc.Col(dbc.Input(id="ratio-3", type="number", value=0.25), width=4),
+                ]),
+                html.Label("Point Size:", style={'marginTop': '5px'}),
+                dcc.Slider(
+                    id='point-size',
+                    min=0.1,
+                    max=1.0,
+                    step=0.1,
+                    value=0.5,
+                    marks={i/10: str(i/10) for i in range(1, 11)}
+                ),
+                html.Label("Point Opacity:", style={'marginTop': '5px'}),
+                dcc.Slider(
+                    id='point-opacity',
+                    min=0.1,
+                    max=1.0,
+                    step=0.1,
+                    value=0.3,
+                    marks={i/10: str(i/10) for i in range(1, 11)}
+                ),
+                html.Label("Y-axis Range:", style={'marginTop': '5px'}),
+                dcc.Slider(
+                    id='y-span',
+                    min=1,
+                    max=5,
+                    step=1,
+                    value=3,
+                    marks={i: str(i) for i in range(1, 6)}
+                ),
             ],
             vertical=True,
             pills=True,
@@ -118,6 +105,14 @@ sidebar = html.Div(
     style=page_sidebar_style,
 )
 
+tab_label_style = {
+    "textTransform": "none",  # Prevent all caps
+    "textAlign": "center"
+}
+
+tab_bar_style = {
+    "flexWrap": "nowrap",  # Prevent line wrapping
+}
 
 layout = html.Div(children=[
     dcc.Store(id='stored-prot-quant'),  # Store the protein quantification data
@@ -126,9 +121,8 @@ layout = html.Div(children=[
     dcc.Store(id="stored-prot-prec-quant-norm"),
     dcc.Store(id="stored-prot-prec-quality"),
     dcc.Store(id="stored-valid-prots"),
-    
     dbc.Row([
-        dbc.Col(sidebar, width=3, md={"size": 3, "offset": 1}),
+        dbc.Col(sidebar, width=4),
         dbc.Col([
             html.Br(),
             html.Div(children=[
@@ -165,23 +159,30 @@ layout = html.Div(children=[
                             
                         ),
                     ])
-                ], className="mx-auto")
+                ], style={"width": "97%"})
             ], className="dbc dbc-row-selectable"),
             dbc.Card(
                 [
                     dbc.CardHeader(html.H5("Protein quantification plots")),
                     dbc.CardBody(
                         [
-                            dcc.Tabs(
+                            dbc.Tabs(
                                 id="tabs",
-                                value="tab-1",
+                                active_tab="tab-1",
                                 children=[
-                                    dcc.Tab(label="Protein Intensity Distribution", value="tab-1"),
-                                    dcc.Tab(label="Protein Quantity Summarization", value="tab-2"),
-                                    dcc.Tab(label="Protein Quality Summarization", value="tab-3"),
-                                    dcc.Tab(label="Protein Coverage Plot", value="tab-4"),
-                                    dcc.Tab(label="Quantification Benchmark Plot", value="tab-5"),
-                                ]
+                                    dbc.Tab(label="Protein Intensity Distribution", 
+                                            tab_id="tab-1", label_style=tab_label_style),
+                                    dbc.Tab(label="Protein Quantity Summarization", 
+                                            tab_id="tab-2", label_style=tab_label_style),
+                                    dbc.Tab(label="Protein Quality Summarization", 
+                                            tab_id="tab-3", label_style=tab_label_style),
+                                    dbc.Tab(label="Protein Coverage Information", 
+                                            tab_id="tab-4", label_style=tab_label_style),
+                                    dbc.Tab(label="Quantification Benchmark Plot", 
+                                            tab_id="tab-5", label_style=tab_label_style,
+                                            className="custom-tab"),
+                                ],
+                                style=tab_bar_style
                             ),
                             html.Div(
                                 [   
@@ -196,6 +197,12 @@ layout = html.Div(children=[
                                     html.Div(
                                         [
                                             dcc.Graph(id="prot-prec-quant-plot"),
+                                            dbc.Button("Check Precursors", id="check-prec", 
+                                                       color="info",  
+                                                       style={"font-weight": "bold", 
+                                                              #"width": "120px", 
+                                                              "marginTop": "5px",
+                                                              "textTransform": "none"}),
                                         ],    
                                         id="tab-2-content",
                                     ),
@@ -203,6 +210,12 @@ layout = html.Div(children=[
                                     html.Div(
                                         [
                                             dcc.Graph(id="prot-prec-quality-plot"),
+                                            dbc.Button("Check Precursors", id="check-prec", 
+                                                       color="info",  
+                                                       style={"font-weight": "bold", 
+                                                              #"width": "120px", 
+                                                              "marginTop": "5px",
+                                                              "textTransform": "none"}),
                                         ],    
                                         id="tab-3-content",
                                     ), 
@@ -228,14 +241,14 @@ layout = html.Div(children=[
                                         id="tab-5-content",
                                     ),
                                 ],
-                                className="p-4"
+                                className="p-1"
                             )
                     ]
                 )
             ],
-            className="mx-auto"
+            style={"marginTop": "5px", "width": "97%"}
             ),
-        ], width=8, className="mx-auto")
+        ], width=8)
     ])
 ])
    
@@ -253,21 +266,6 @@ def list_quant_files(dir_path):
     quant_tables.extend(quant_files)
 
     return [{'label': f, 'value': f} for f in quant_tables]
-
-
-# Callback to read and store CSV file in DataFrame
-@app.callback(
-    Output('stored-meta', 'data'),
-    Input('stored-meta-path', 'data')
-)
-def read_meta(meta_path):
-    if meta_path is None:
-        return {}
-    try:
-        df = pd.read_csv(meta_path)
-        return df.to_dict('records')  
-    except Exception:
-        return {}
     
 
 # Callback to read the selected CSV file
@@ -276,24 +274,25 @@ def read_meta(meta_path):
      Output('prot-quant-table', 'columns'),
      Output('stored-prot-quant', 'data'),
      Output('stored-prot-quality', 'data'),
-     Output('show-cutoff', 'children')],
+     Output('show-cutoff', 'children'),
+     Output('stored-meta', 'data')],
     Input('load-prot-quant', 'n_clicks'),
     State('quant-table-selector', 'value'),
     State('stored-outdir', 'data'),
-    State('stored-meta', 'data'),
+    State('meta-path', 'value'),
     prevent_initial_call=True
 )
-def load_quant_table(n_clicks, selected_table, outdir_path, meta):
+def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
     
-    if not selected_table or not outdir_path:
-        return None, [], None, None, ""
+    if not selected_table or not outdir_path or not meta_path:
+        return None, [], None, None, "", {}
 
     quant_csv_path = os.path.join(outdir_path, selected_table)
     quality_csv_path = os.path.join(outdir_path, "Protein.Group_Quan_Quality.csv")
-
+    
     try:
         quant_df = pd.read_csv(quant_csv_path)
-        meta = pd.DataFrame(meta)
+        meta = pd.read_csv(meta_path)
         quant_df = quant_df.loc[:, quant_df.columns[0:12].values.tolist() + meta['Sample'].values.tolist() + [quant_df.columns[-1]]]
         quant_df.columns = (
             quant_df.columns[0:12].values.tolist() + 
@@ -314,11 +313,12 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta):
                 [{'name': col, 'id': col} for col in quant_df_to_show.columns], 
                 quant_df.to_dict('records'), 
                 quality_df.to_dict('records'),
-                f"Using quality cutoff: {cutoff}")
+                f"Using quality cutoff: {cutoff}",
+                meta.to_dict('records'))
 
     except Exception as e:
         logger.error(f"Error loading quantification table: {str(e)}")
-        return None, [], None, None, ""
+        return None, [], None, None, "", {}
 
 
 @app.callback(
@@ -416,7 +416,7 @@ def update_violin_plot(data, species_input):
     Output("tab-3-content", "style"),
     Output("tab-4-content", "style"),
     Output("tab-5-content", "style"),
-    Input("tabs", "value")
+    Input("tabs", "active_tab")
 )
 def toggle_tab(tab):
     styles = {"display": "none"}

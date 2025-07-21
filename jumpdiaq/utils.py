@@ -28,23 +28,26 @@ name_of_loss = ["noloss", "H2O", "NH3", "CO", "unknown", "unknown"]
 loss_none, loss_H2O, loss_NH3, loss_CO, loss_N, loss_other = np.arange(6)
 Loss = np.array([0.0, 18.011113035, 17.026548, 27.994915, 0.0, 0.0], dtype=np.float32)
 
-def progress_bar(iterable, console=True, leave=True, steps=5):
-    total = len(iterable)
 
-    if console:
-        for item in tqdm(iterable, total=total, leave=leave):
+def progress_bar(iterable, show=True, intermittent=False):
+    total = len(iterable)
+    disable = not show
+    if not intermittent:
+        for item in tqdm(iterable, total=total, disable=disable, leave=True):
             yield item
     else:
+        steps=5
         percent_points = [int(round(p)) for p in 
                           [i * 100 / (steps - 1) for i in range(1, steps)]]
         milestones = sorted({int(total * p / 100) for p in percent_points})
 
-        with tqdm(total=total, leave=leave) as pbar:
+        with tqdm(total=total, disable=disable, leave=False) as pbar:
             for count, item in enumerate(iterable, 1):
                 yield item
                 if count in milestones:
                     pbar.n = count
                     pbar.refresh()
+
 
 def fast_trim(string):
     return string.strip()
