@@ -82,10 +82,13 @@ app.layout = html.Div([
      Input("tab-precs", "n_clicks"),
      Input("read-manual", "n_clicks"),
      Input("start-analysis", "n_clicks"),
+     Input("start-analysis-manual", "n_clicks"),
      Input("view-prot", "n_clicks"),
-     Input("check-prec", "n_clicks")]
+     Input("view-prot-prec", "n_clicks"),
+     Input("check-prec-quantity", "n_clicks"),
+     Input("check-prec-quality", "n_clicks"),]
 )
-def switch_tabs(n1, n2, n3, n4, n5, start_click, read_click, view_prot, check_prec):
+def switch_tabs(n1, n2, n3, n4, n5, read_click, start_click, start_click_manual, view_prot, view_prot_prec, check_prec_quant, check_prec_quality):
     ctx = callback_context
     if not ctx.triggered:
         return [{"display": "block"}, 
@@ -99,9 +102,9 @@ def switch_tabs(n1, n2, n3, n4, n5, start_click, read_click, view_prot, check_pr
     return [
         {"display": "block"} if clicked == "tab-home" else {"display": "none"},
         {"display": "block"} if clicked in ["tab-manual", "read-manual"] else {"display": "none"},
-        {"display": "block"} if clicked in ["tab-params", "start-analysis"] else {"display": "none"},
-        {"display": "block"} if clicked in ["tab-prots", "view-prot"] else {"display": "none"},
-        {"display": "block"} if clicked in ["tab-precs", "check-prec"] else {"display": "none"},
+        {"display": "block"} if clicked in ["tab-params", "start-analysis", "start-analysis-manual"] else {"display": "none"},
+        {"display": "block"} if clicked in ["tab-prots", "view-prot", "view-prot-prec"] else {"display": "none"},
+        {"display": "block"} if clicked in ["tab-precs", "check-prec-quantity", "check-prec-quality"] else {"display": "none"},
     ]
 
 

@@ -197,7 +197,7 @@ layout = html.Div(children=[
                                     html.Div(
                                         [
                                             dcc.Graph(id="prot-prec-quant-plot"),
-                                            dbc.Button("Check Precursors", id="check-prec", 
+                                            dbc.Button("Check Precursors", id="check-prec-quantity", 
                                                        color="info",  
                                                        style={"font-weight": "bold", 
                                                               #"width": "120px", 
@@ -210,7 +210,7 @@ layout = html.Div(children=[
                                     html.Div(
                                         [
                                             dcc.Graph(id="prot-prec-quality-plot"),
-                                            dbc.Button("Check Precursors", id="check-prec", 
+                                            dbc.Button("Check Precursors", id="check-prec-quality", 
                                                        color="info",  
                                                        style={"font-weight": "bold", 
                                                               #"width": "120px", 

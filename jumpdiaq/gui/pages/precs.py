@@ -39,7 +39,7 @@ sidebar = html.Div(
                            className="d-inline-block", style={'marginTop': '5px'}),
                 html.Div(id='show-prec-run', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
-                dbc.Button("Go back to Proteins", id="view-prot", 
+                dbc.Button("Go back to Proteins", id="view-prot-prec", 
                            color="info",  
                            style={"font-weight": "bold", 
                                   "width": "150px", 

@@ -47,7 +47,7 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(toc_links, vertical=True, pills=True),
         html.Hr(),
-        dbc.Button("Start Analysis", id="start-analysis", color="primary",
+        dbc.Button("Start Analysis", id="start-analysis-manual", color="primary",
                    style={"textTransform": "none"}),
     ],
     style=page_sidebar_style,
@@ -59,7 +59,7 @@ layout = html.Div(children=[
         dbc.Col(sidebar, width=4),
         # Main Markdown content
         dbc.Col([
-            dcc.Markdown(modified_md, dangerously_allow_html=True, style={'lineHeight': '1.8'}),
-        ], width=8)
+            dcc.Markdown(markdown_text, dangerously_allow_html=True, style={'lineHeight': '1.8'}),
+        ], width=8, style={'marginTop': '40px'})
     ])
 ])
