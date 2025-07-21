@@ -60,25 +60,19 @@ sidebar = html.Div(
                 html.Br(),
                 dbc.Row([
                     dbc.Col([
-                        html.Div([
-                            dbc.Button("Run", id="run-button", 
-                                       color="primary",  
-                                       style={"font-weight": "bold", 
-                                              "width": "120px", 
-                                              }),
-                            html.Div(
-                                dbc.Spinner(color="primary", size="sm", type="grow", id="run-spinner"),
-                                id="spinner-container",
-                                style={"display": "none", "marginLeft": "10px"}
-                            )
-                        ], style={"display": "flex", "alignItems": "center"})
+                        dbc.Button("Run", id="run-button", 
+                                   color="primary",  
+                                   style={"font-weight": "bold", "width": "120px"}),
+                        html.Div(
+                            dbc.Spinner(color="primary", size="sm", type="grow", id="run-spinner"),
+                            id="spinner-container",
+                            style={"display": "none", "marginLeft": "10px"}
+                        )
                     ], width=7),
                     dbc.Col(
                         dbc.Button("Stop", id="stop-button", 
                                    color="danger", 
-                                   style={"font-weight": "bold", 
-                                          "width": "120px", 
-                                          }),
+                                   style={"font-weight": "bold", "width": "120px"}),
                         width=5, style={"textAlign": "right"}
                     )
                 ]),
@@ -86,140 +80,148 @@ sidebar = html.Div(
             ],
             vertical=True,
         ),
-        html.Div(
-            [
-                dbc.Button("Settings", id="param-button",
-                           color="secondary", outline=True, 
-                           n_clicks=0, className="mt-1",
-                           style={'width': '120px', "textTransform": "none"}
-                ),
-                dbc.Collapse(
-                    dbc.Card([
-                        dbc.CardHeader(html.Label("Parameters", style={"font-weight": "bold"})),
-                        dbc.CardBody([
-                            html.P('General settings', style={"font-weight": "bold"}, className="mt-1 mb-0"),
-                            dbc.Row([
-                                dbc.Col(html.Label("log_level"), width=8),  
-                                dbc.Col(dbc.Input(id="log-level", 
-                                                  type="number", 
-                                                  value=5, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("use_saved_xic"), width=8),  
-                                dbc.Col(dbc.Checklist(id="use-saved-xic",
-                                                      options=[{"label": "Enabled", "value": "yes"}],
-                                                      value=["no"],
-                                                      inline=True), 
-                                        width=4, style={"text-align": "right"}),  
-                            ], className="mt-0 mb-1"),
-                            html.P('ID results processing', style={"font-weight": "bold"}, className="mt-1 mb-0"),
-                            dbc.Row([
-                                dbc.Col(html.Label("min_runs_quant"), width=8),  
-                                dbc.Col(dbc.Input(id="min-runs-quant", 
-                                                  type="number", 
-                                                  value=3, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("min_runs_model"), width=8),  
-                                dbc.Col(dbc.Input(id="min-runs-model", 
-                                                  type="number", 
-                                                  value=3, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("min_runs_cal"), width=8),  
-                                dbc.Col(dbc.Input(id="min-runs-cal", 
-                                                  type="number", 
-                                                  value=6, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            html.P('XIC extraction', style={"font-weight": "bold"}, className="mt-1 mb-0"),
-                            dbc.Row([
-                                dbc.Col(html.Label("mass_calibration"), width=8),  
-                                dbc.Col(dbc.Checklist(id="mass-calibration",
-                                                      options=[{"label": "Enabled", "value": "yes"}],
-                                                      value=["yes"],
-                                                      inline=True), 
-                                        width=4, style={"text-align": "right"}),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("fix_mass_acc"), width=8),  
-                                dbc.Col(dbc.Checklist(id="fix-mass-acc",
-                                                      options=[{"label": "Enabled", "value": "yes"}],
-                                                      value=["no"],
-                                                      inline=True), 
-                                        width=4, style={"text-align": "right"}),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("mass_acc_ms2"), width=8),  
-                                dbc.Col(dbc.Input(id="mass-acc-ms2", 
-                                                  type="number", 
-                                                  value=15, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("mass_acc_ms1"), width=8),  
-                                dbc.Col(dbc.Input(id="mass-acc-ms1", 
-                                                  type="number", 
-                                                  value=15, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("optimal_xic_source"), width=8),  
-                                dbc.Col(dbc.Input(id="optimal-xic-source", 
-                                                  type="number", 
-                                                  value=0, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("int_removal"), width=8),  
-                                dbc.Col(dbc.Checklist(id="int-removal",
-                                                      options=[{"label": "Enabled", "value": "yes"}],
-                                                      value=["yes"],
-                                                      inline=True), 
-                                        width=4, style={"text-align": "right"}),  
-                            ], className="mt-0 mb-1"),
-                            html.P('Normalization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
-                            dbc.Row([
-                                dbc.Col(html.Label("norm_species"), width=8),  
-                                dbc.Col(dbc.Input(id="norm-species", 
-                                                  type="text", 
-                                                  value='HUMAN', 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("norm_method"), width=8),  
-                                dbc.Col(dbc.Input(id="norm-method", 
-                                                  type="number", 
-                                                  value=0, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                            dbc.Row([
-                                dbc.Col(html.Label("trim_percentage"), width=8),  
-                                dbc.Col(dbc.Input(id="trim-percentage", 
-                                                  type="number", 
-                                                  value=5, 
-                                                  style={"width": "80px", "height": "20px"}), 
-                                        width=4),  
-                            ], className="mt-0 mb-1"),
-                        ])
-                    ], className="mt-1"),
-                    id="param-collapse",
-                    is_open=False,
-                ),
-            ]
-        ),
+        html.Div([
+            dbc.Row([
+                dbc.Col([
+                    dbc.Button("Settings", id="param-button",
+                               color="secondary", outline=True, 
+                               n_clicks=0, className="mt-1",
+                               style={'width': '120px', "textTransform": "none"}
+                    )
+                ], width=7),
+                dbc.Col(
+                    dbc.Button("View Results", id="view-prot", 
+                               color="info", className="mt-1",
+                               style={"width": "120px", "textTransform": "none"}),
+                    width=5, style={"textAlign": "right"}
+                )
+            ]),
+            dbc.Collapse(
+                dbc.Card([
+                    dbc.CardHeader(html.Label("Parameters", style={"font-weight": "bold"})),
+                    dbc.CardBody([
+                        html.P('General settings', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("log_level"), width=8),  
+                            dbc.Col(dbc.Input(id="log-level", 
+                                              type="number", 
+                                              value=5, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("use_saved_xic"), width=8),  
+                            dbc.Col(dbc.Checklist(id="use-saved-xic",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["no"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        html.P('ID results processing', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("min_runs_quant"), width=8),  
+                            dbc.Col(dbc.Input(id="min-runs-quant", 
+                                              type="number", 
+                                              value=3, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("min_runs_model"), width=8),  
+                            dbc.Col(dbc.Input(id="min-runs-model", 
+                                              type="number", 
+                                              value=3, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("min_runs_cal"), width=8),  
+                            dbc.Col(dbc.Input(id="min-runs-cal", 
+                                              type="number", 
+                                              value=6, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        html.P('XIC extraction', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("mass_calibration"), width=8),  
+                            dbc.Col(dbc.Checklist(id="mass-calibration",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["yes"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("fix_mass_acc"), width=8),  
+                            dbc.Col(dbc.Checklist(id="fix-mass-acc",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["no"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("mass_acc_ms2"), width=8),  
+                            dbc.Col(dbc.Input(id="mass-acc-ms2", 
+                                              type="number", 
+                                              value=15, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("mass_acc_ms1"), width=8),  
+                            dbc.Col(dbc.Input(id="mass-acc-ms1", 
+                                              type="number", 
+                                              value=15, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("optimal_xic_source"), width=8),  
+                            dbc.Col(dbc.Input(id="optimal-xic-source", 
+                                              type="number", 
+                                              value=0, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("int_removal"), width=8),  
+                            dbc.Col(dbc.Checklist(id="int-removal",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["yes"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        html.P('Normalization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("norm_species"), width=8),  
+                            dbc.Col(dbc.Input(id="norm-species", 
+                                              type="text", 
+                                              value='HUMAN', 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("norm_method"), width=8),  
+                            dbc.Col(dbc.Input(id="norm-method", 
+                                              type="number", 
+                                              value=0, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("trim_percentage"), width=8),  
+                            dbc.Col(dbc.Input(id="trim-percentage", 
+                                              type="number", 
+                                              value=5, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                    ])
+                ], className="mt-1"),
+                id="param-collapse",
+                is_open=False,
+            ),
+        ]),
         html.Hr(),
     ],
     style=page_sidebar_style,
@@ -298,12 +300,6 @@ layout = html.Div(children=[
                             ], style={"display": "flex", "alignItems": "center"})
                     ])
                 ], body=False, style={"marginTop": "5px", "width": "97%"}),
-                dbc.Button("View Results", id="view-prot", 
-                           color="info",  
-                           style={"font-weight": "bold", 
-                                  "width": "120px", 
-                                  "marginTop": "5px",
-                                  "textTransform": "none"}),
             ]),
         ], width=8)
     ])

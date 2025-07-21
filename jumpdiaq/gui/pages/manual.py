@@ -26,9 +26,10 @@ def generate_toc_and_markdown(md_text):
             anchor = re.sub(r"[^\w\- ]", "", title).strip().lower().replace(" ", "-")
             
             # TOC link (with indentation)
-            toc_links.append(
-                dbc.NavLink(title, href=f"#{anchor}", external_link=True, className=f"ms-{(level - 1) * 2}")
-            )
+            if level <= 3:
+                toc_links.append(
+                    dbc.NavLink(title, href=f"#{anchor}", external_link=True, className=f"ms-{(level - 1) * 2}")
+                )
             
             # Use HTML heading with id
             modified_lines.append(f'<h{level} id="{anchor}">{title}</h{level}>')
