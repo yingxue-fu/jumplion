@@ -4,7 +4,7 @@
 <h1 align="center" style="margin-top: -0px; font-size: 20px">JUMPdiaq</h1>
 
 JUMPdiaq is an tool used for quantification of data-independent acquisition (DIA) proteomics data.
-<img src="GUI/GUI%20window.png" width=1022></br>  
+<img src="jumpdiaq/gui/assets/gui.png" width=1022></br>  
 
 
 ### Installation
