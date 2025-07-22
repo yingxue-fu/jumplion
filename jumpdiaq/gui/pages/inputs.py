@@ -323,17 +323,15 @@ log_queue = queue.Queue()
 process_running = False
 process_start_time = None
 
-def run_jumpdiaq_process(cmd_args):
+def run_jumpdiaq_process(config_path):
     global log_queue, current_process, process_running, process_start_time
     
     process_running = True
     process_start_time = time.time()
     
-    cmd = 'jumpdiaq ' + cmd_args
-    
     # Non-blocking I/O approach
     process = subprocess.Popen(
-        cmd, 
+        ['jumpdiaq', '--config-file', config_path], 
         stdout=subprocess.PIPE, 
         stderr=subprocess.PIPE, 
         text=True, 
@@ -745,7 +743,7 @@ def run_jumpdiaq(
     logger.info(f"Config file created at {config_path}")
     
     #
-    run_jumpdiaq_process(f"--config-file {config_path}")
+    run_jumpdiaq_process(config_path)
     
     return outdir, {"auto_scroll": True, "user_scrolled": False}
 
