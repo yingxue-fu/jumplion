@@ -1,10 +1,10 @@
 # builtin
-from pathlib import Path
 import re
+import logging
+from pathlib import Path
+from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional
 from collections import defaultdict
-import logging
-from dataclasses import dataclass, field
 # external
 import numpy as np
 import polars as pl
@@ -368,7 +368,7 @@ class XICQuant:
     index: int = 0  # Index of the product ion in the library
     mz: float = 0.0
     quantity: List[float] = field(default_factory=lambda: [0.0] * 2)  
-    corr: List[float] = field(default_factory=lambda: [0.0] * 2)  
+    corr: List[float] = field(default_factory=lambda: [0.0] * 2)
 
 @dataclass
 class QuantEntry:
@@ -395,7 +395,7 @@ class QuantEntry:
 
     ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(nIsotops + 1)])
     ms2_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxFr)])
-    
+
 class Info:
     def __init__(self):
         self.lib: Optional[Library] = None
@@ -478,8 +478,8 @@ class Info:
                 qe.ms1 = xic_rows.select(ms1_cols).to_numpy()
                 qe.ms2 = xic_rows.select(ms2_cols).to_numpy()
                 qe.ms1_i = xic_rows.select(ms1_i_cols).to_numpy()
-                qe.ms1_rt = xic_rows['ms1_rt'].to_numpy()#.flatten()
-                qe.ms2_rt = xic_rows['ms2_rt'].to_numpy()#.flatten()
+                qe.ms1_rt = xic_rows['ms1_rt'].to_numpy()
+                qe.ms2_rt = xic_rows['ms2_rt'].to_numpy()
                 
                 qe.RT = qe.ms2_rt[qe.apex]
                 qe.IM = 0.0 # todo 

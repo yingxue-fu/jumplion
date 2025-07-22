@@ -25,19 +25,18 @@ sidebar = html.Div(
         dbc.Nav(
             [   
                 html.Label(id='protein-label', style={"font-weight": "bold"}),
-                dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor"),
+                dbc.Select(id='precursor-dropdown', placeholder="Select a Precursor"),
                 html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
-                html.Hr(),
+                html.Br(),
                 html.Label("For cross runs", style={"font-weight": "bold"}),
                 dbc.Switch(label='Show summarization value', id='show-prec-summ', 
                            value=False, className="d-inline-block", 
                            style={'marginTop': '5px'}),
                 html.Br(),
                 html.Label("For individual run", style={"font-weight": "bold"}),
-                dcc.Dropdown(id='run-dropdown', placeholder="Select a Run"),
+                dbc.Select(id='run-dropdown', placeholder="Select a Run"),
                 dbc.Switch(label='Show Interpolated MS1 XICs', id='show-ms1-inter', value=False, 
                            className="d-inline-block", style={'marginTop': '5px'}),
-                html.Div(id='show-prec-run', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
                 dbc.Button("Go back to Proteins", id="view-prot-prec", 
                            color="info",  
@@ -82,14 +81,17 @@ layout = html.Div(children=[
                 ], label_style=tab_label_style),
                 dbc.Tab(label='Individual run', children=[
                     dbc.Row([
-                        dbc.Col(html.Div(id='text-output', style={'fontSize': '18px'}), width=12)
+                        dbc.Col(html.Div(id='text-output', style={'fontSize': '18px'}), width=11)
                     ], style={'margin-top': '20px'}),
                     dbc.Row([
-                        dbc.Col(dcc.Graph(id='xic-plot-ms1'), width=8),
+                        dbc.Col(html.Div(id='show-prec-run', style={'color': 'green'}), width=11)
+                    ], style={'margin-top': '20px'}),
+                    dbc.Row([
+                        dbc.Col(dcc.Graph(id='xic-plot-ms1'), width=7),
                         dbc.Col(dcc.Graph(id='xic-plot-ms1-c'), width=4)
                     ], style={'margin-top': '5px'}),
                     dbc.Row([
-                        dbc.Col(dcc.Graph(id='xic-plot-ms2'), width=8),
+                        dbc.Col(dcc.Graph(id='xic-plot-ms2'), width=7),
                         dbc.Col(dcc.Graph(id='xic-plot-ms2-c'), width=4)
                     ], style={'margin-top': '5px'}),
                     dbc.Row([
@@ -103,8 +105,6 @@ layout = html.Div(children=[
                                                                           "XIC Quant (Raw)", 
                                                                           "XIC Quant (Adj)"]],
                             data=[],
-                            #row_selectable="multi",
-                            #selected_rows=[],
                             style_table={'overflowX': 'auto'},
                             style_cell={'textAlign': 'left', 'padding': '5px'},
                             style_header={'fontWeight': 'bold'},
@@ -531,7 +531,7 @@ def update_XIC_plots_table(selected_run: str,
         # Extract relevant data
         title = html.Div([f"     {selected_precursor}"])
         
-        prec_run_info = f"Showing XICs of precursor {selected_precursor} in run {selected_run}."
+        prec_run_info = f"     {selected_run}"
         
         # Define template based on switch state
         template = "vizro" #if switch_on else "vizro_dark"
