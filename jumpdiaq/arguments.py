@@ -2,6 +2,7 @@
 import sys
 import os
 import time
+import re
 import argparse
 import configparser
 from typing import List, Optional
@@ -176,10 +177,19 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--norm-method", type=int, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
-    optional_group.add_argument("--show-progress", type=int, help="")
-    optional_group.add_argument("--inter-progress", type=int, help="")
+    # 
+    parser.add_argument("--config-file", type=str, help="Path to a configuration file")
+    parser.add_argument("--show-progress", type=int, help="")
+    parser.add_argument("--inter-progress", type=int, help="")
     
     return parser
+
+
+def parse_config_file(file_path: str) -> List[str]:
+    with open(file_path, 'r') as file:
+        content = file.read()
+    # Replace newlines with spaces and split into arguments
+    return re.sub(r'\n|\r', ' ', content).split()
 
 
 def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
@@ -189,7 +199,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
     
     parser = create_parser()
     
-    # Check if first argument might be a parameter file
+    # Use a parameter file
     if len(args) > 0 and not args[0].startswith('-'):
         potential_param_file = args[0]
         if os.path.isfile(potential_param_file):
@@ -197,6 +207,15 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
             param_args = params_to_args(potential_param_file)
             # Combine with any other command line arguments (which will override params)
             args = param_args + args[1:]
+    
+    # Use a config file
+    first_pass_args, _ = parser.parse_known_args(args)
+    if first_pass_args.config_file:
+        if not Path(first_pass_args.config_file).exists():
+            print(f"Warning: Config file {first_pass_args.config_file} not found.")
+        else:
+            config_args = parse_config_file(first_pass_args.config_file)
+            args = config_args
     
     command = 'jumpdiaq ' + ' '.join(args)
     parsed_args = parser.parse_args(args)

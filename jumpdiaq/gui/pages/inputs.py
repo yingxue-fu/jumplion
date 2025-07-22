@@ -2,10 +2,10 @@
 import os
 import time
 import platform
-from pathlib import Path
 import subprocess
 import queue
 import threading
+from pathlib import Path
 # external
 import dash
 from dash import html, dcc, ctx, Input, Output, State
@@ -669,11 +669,13 @@ def run_jumpdiaq(
     
     # Add report file
     if idreport:
-        cmd_args.append("--id-report " + str(Path(idreport)))
+        cmd_args.append("--id-report")
+        cmd_args.append(str(Path(idreport)))
     
     # Add library file
     if speclib:
-        cmd_args.append("--spec-lib " + str(Path(speclib)))
+        cmd_args.append("--spec-lib ")
+        cmd_args.append(str(Path(speclib)))
     
     if fastas and fasta_path:
         cmd_args.append("--fastas")
@@ -686,47 +688,64 @@ def run_jumpdiaq(
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)  # Create directory if missing
         outdir = str(outdir)
-        cmd_args.append("--out-dir " + outdir)
+        cmd_args.append("--out-dir")
+        cmd_args.append(outdir)
     
     # 
-    cmd_args.append("--log-level " + str(log_level))
+    cmd_args.append("--log-level")
+    cmd_args.append(str(log_level))
     
     # 
     if use_saved_xic == 'Yes':
-        cmd_args.append("--use-saved-xic 1") 
+        cmd_args.append("--use-saved-xic")
+        cmd_args.append("1")
     
-    cmd_args.append("--min-runs-quant " + str(min_runs_quant))
-    cmd_args.append("--min-runs-model " + str(min_runs_model))
-    cmd_args.append("--min-runs-cal " + str(min_runs_cal))
+    cmd_args.append("--min-runs-quant")
+    cmd_args.append(str(min_runs_quant))
+    cmd_args.append("--min-runs-model")
+    cmd_args.append(str(min_runs_model))
+    cmd_args.append("--min-runs-cal")
+    cmd_args.append(str(min_runs_cal))
     
     if mass_calibration == 'No':
-        cmd_args.append("--mass-calibration 0")
+        cmd_args.append("--mass-calibration")
+        cmd_args.append("0")
         
     if fix_mass_acc == 'Yes':
-        cmd_args.append("--fix-mass-acc 1")
-        cmd_args.append("--mass-acc-ms2 " + str(mass_acc_ms2))
-        cmd_args.append("--mass-acc-ms1 " + str(mass_acc_ms1))
+        cmd_args.append("--fix-mass-acc")
+        cmd_args.append("1")
+        cmd_args.append("--mass-acc-ms2")
+        cmd_args.append(str(mass_acc_ms2))
+        cmd_args.append("--mass-acc-ms1")
+        cmd_args.append(str(mass_acc_ms1))
         
-    cmd_args.append("--optimal-xic-source " + str(optimal_xic_source))
+    cmd_args.append("--optimal-xic-source")
+    cmd_args.append(str(optimal_xic_source))
     
     # Add interference removal option
     if int_removal == 'No':
-        cmd_args.append("--int-removal 0") 
+        cmd_args.append("--int-removal") 
+        cmd_args.append("0")
     
-    cmd_args.append("--norm-species " + str(norm_species))
-    cmd_args.append("--norm-method " + str(norm_method))
-    cmd_args.append("--trim-percentage " + str(trim_percentage))
+    cmd_args.append("--norm-species")
+    cmd_args.append(str(norm_species))
+    cmd_args.append("--norm-method")
+    cmd_args.append(str(norm_method))
+    cmd_args.append("--trim-percentage") 
+    cmd_args.append(str(trim_percentage))
+    
+    #
+    cmd_args.append("--show-progress")
+    cmd_args.append("0")
     
     # Write config to file
     config_path = os.path.join(outdir, "jumpdiaq_config.txt")
     with open(config_path, 'w') as f:
         f.write('\n'.join(cmd_args))
-    
     logger.info(f"Config file created at {config_path}")
     
     #
-    cmd_args.append("--show-progress 0")
-    run_jumpdiaq_process(' '.join(cmd_args))
+    run_jumpdiaq_process(f"--config-file {config_path}")
     
     return outdir, {"auto_scroll": True, "user_scrolled": False}
 
