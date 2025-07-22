@@ -1,11 +1,21 @@
 # builtin
 import re
+import socket
 # external
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+
+def get_local_ip():
+    try:
+        # Connect to an external address (Google DNS) without sending data
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"  # Fallback to localhost
 
 def extract_unique_parts(strings):
     if not strings:
