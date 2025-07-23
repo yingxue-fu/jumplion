@@ -834,7 +834,7 @@ def stop_process(n_clicks):
 # Callback: Update the msfile options when the directory path changes
 @app.callback(
     Output('msfile-selector', 'options'),
-    Input('msfile-path', 'value')  # Trigger when path changes
+    Input('msfile-path', 'value'),  # Trigger when path changes
 )
 def list_ms_files(dir_path):
     if not dir_path or not os.path.isdir(dir_path):
@@ -855,7 +855,8 @@ def list_ms_files(dir_path):
                      if os.path.isdir(os.path.join(dir_path, d)) and d.endswith('.d')]
     ms_files.extend(d_directories)
     
-    return [{'label': f, 'value': f} for f in ms_files.sort()]
+    ms_files.sort()
+    return [{'label': f, 'value': f} for f in ms_files]
 
 # Callback: Update the msfile options when the directory path changes
 @app.callback(
