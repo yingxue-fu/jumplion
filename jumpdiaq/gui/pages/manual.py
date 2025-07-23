@@ -9,7 +9,7 @@ from jumpdiaq.gui.app import page_sidebar_style
 
 
 # Load markdown content
-markdown_path = pathlib.Path(__file__).parent.parent.parent.parent / "README.md"
+markdown_path = pathlib.Path(__file__).parent.parent / "README.md"
 with open(markdown_path, 'r', encoding='utf-8') as f:
     markdown_text = f.read()
 
@@ -48,7 +48,7 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(toc_links, vertical=True, pills=True),
         html.Hr(),
-        dbc.Button("Start Analysis", id="start-analysis-manual", color="primary",
+        dbc.Button("Start Analysis", id="start-analysis-manual", color="info",
                    style={"textTransform": "none"}),
     ],
     style=page_sidebar_style,

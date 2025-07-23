@@ -27,21 +27,22 @@ sidebar = html.Div(
                 dbc.Card([
                     dbc.CardBody([
                         html.Div(id='msfile-selector', style={
-                            'maxHeight': '200px',
+                            'maxHeight': '168px',
                             'height': '100%',
                             'width': '100%',
                             'overflowY': 'auto',
-                            'backgroundColor': '#f8f9fa',
-                            'border': '1px solid #ccc',
-                            'borderRadius': '5px',
-                            'padding': '10px',
+                            #'gap': '10px',
+                            #'backgroundColor': '#f8f9fa',
+                            'border': '0px solid #ccc',
+                            #'borderRadius': '5px',
+                            'padding': '8px',
                             'flex': '1',
                             'display': 'flex',
                             'flexDirection': 'column',
                             'fontSize': '14px'
                         })
                     ], style={'height': '100%', 'display': 'flex', 
-                              'flexDirection': 'column', 'padding': 0})
+                              'flexDirection': 'column', 'padding': 1})
                 ], className="p-0 mt-1", style={'height': '100%', 'width': '100%'}),
                 dbc.Row([
                     dbc.Col([
@@ -120,12 +121,6 @@ sidebar = html.Div(
                                style={'width': '120px', "textTransform": "none"}
                     )
                 ], width=7),
-                dbc.Col(
-                    dbc.Button("View Results", id="view-prot", 
-                               color="info", className="mt-1",
-                               style={"width": "120px", "textTransform": "none"}),
-                    width=5, style={"textAlign": "right"}
-                )
             ]),
             dbc.Collapse(
                 dbc.Card([
@@ -244,7 +239,7 @@ sidebar = html.Div(
                             dbc.Col(dbc.Input(id="norm-species", 
                                               type="text", 
                                               value='HUMAN', 
-                                              style={"width": "80px", "height": "20px"}), 
+                                              style={"width": "80px", "height": "20px", "fontSize": "14px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
@@ -336,14 +331,17 @@ layout = html.Div(children=[
                                 "fontSize": "14px"
                                 }, 
                             readOnly=True)
-                    ])
+                    ], style={'padding': 8})
                 ], style={"width": "97%"}),
                 # Progress bar section
                 dbc.Card([
                     dbc.CardHeader([
                         html.Div([
                             html.Span("Status:", style={"marginRight": "5px", "marginLeft": "5px"}),
-                            html.Span(id="process-status", children="Ready")
+                            html.Span(id="process-status", children="Ready"),
+                            dbc.Button("Go to Results", id="view-prot", 
+                                       color="info", className="mt-1",
+                                       style={"width": "150px", "textTransform": "none", "marginLeft": "auto"})
                             ], style={"display": "flex", "alignItems": "center"})
                     ])
                 ], body=False, style={"marginTop": "5px", "width": "97%"}),
@@ -369,6 +367,12 @@ def list_ms_files(msfile_path):
     
     return ms_files
 
+def get_spacing_for_filename(filename, base_width=30):
+    """Estimate spacing needed based on filename length"""
+    char_count = len(filename)
+    estimated_lines = max(1, char_count // base_width)
+    return f"{8 + (estimated_lines - 1) * 4}px"
+
 @app.callback(
     Output('msfile-selector', 'children'),
     Input('msfile-path', 'value'),
@@ -381,18 +385,25 @@ def msfile_checkboxes(path, select_clicks, clear_clicks):
         if not files:
             return html.Div("No valid MS files found in the path.")
 
-    triggered = ctx.triggered_id
-    checked = triggered == 'select-all-msfiles'
-
-    return [
-        dbc.Checkbox(
-            label=f,
-            value=checked,
-            id={'type': 'msfile-check', 'filename': f},
-            className="mt-1 mb-2",
-            style={'display': 'block', 'whiteSpace': 'normal', 'wordBreak': 'break-all'}
-        ) for f in files
-    ]
+        triggered = ctx.triggered_id
+        checked = triggered == 'select-all-msfiles'
+    
+        return [
+            dbc.Checkbox(
+                label=f,
+                value=checked,
+                id={'type': 'msfile-check', 'filename': f},
+                style={
+                    'display': 'block', 
+                    'whiteSpace': 'normal', 
+                    'wordBreak': 'break-all',
+                    'marginBottom': get_spacing_for_filename(f),
+                    'lineHeight': '1.0',
+                },
+            ) for f in files
+        ]
+    else:
+        return html.Div("Input the path to show availabe files.")
 
 @app.callback(
     Output('selected-msfiles', 'data'),
@@ -721,9 +732,6 @@ def update_process_state(log_value, n_intervals, process_state):
             return status_text, process_state
         
         return dash.no_update, dash.no_update
-
-
-
 
 
 # Callback to load available CSV files from the directory

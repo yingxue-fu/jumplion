@@ -36,7 +36,8 @@ sidebar = html.Div(
                 html.Label("Input meta file path", style={"font-weight": "bold", 'marginTop': '10px'}),
                 dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
                           style={'width': '100%'}, persistence=True),
-                dbc.Button('Load Quantification Table', id='load-prot-quant', n_clicks=0, 
+                dbc.Button('Load Quantification Table', 
+                           id='load-prot-quant', n_clicks=0, color='info',
                            style={'margin-top': '10px', "textTransform": "none"}),
                 html.Div(id='show-cutoff', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
@@ -817,7 +818,11 @@ def update_summ_plot(selected_prot,
 )
 def update_sequence_viewer(selected_prot, data):
     if not ctx.triggered or not selected_prot or not data:
-        return None, None
+        return (html.Div("Select a protein to show its coverage information", 
+                        style={'fontSize': '20px', 
+                               'marginTop': '15px',
+                               'marginLeft': '20px'}), 
+                None)
     
     # Retrieve selected row data
     df = pd.DataFrame(data)
