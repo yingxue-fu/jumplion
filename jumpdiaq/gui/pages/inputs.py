@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 # external
 import dash
-from dash import html, dcc, ctx, Input, Output, State
+from dash import html, dcc, ctx, Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 # local
 from jumpdiaq.gui.app import app, page_sidebar_style, logger
@@ -24,16 +24,39 @@ sidebar = html.Div(
                 dbc.Input(id='msfile-path', type='text', 
                           placeholder='Path of MS files (.raw, .mzML, .d)', 
                           style={'width': '100%'}, persistence=True),  
-                dcc.Dropdown(id='msfile-selector', 
-                             placeholder='Select files (.raw, .mzML, .d)', 
-                             multi=True, style={'width': '100%'}, 
-                             className="p-0 mt-1"),  
-                dbc.Col(dbc.Button("Select all", id="select-all-msfiles",
-                                   color="secondary", outline=True, n_clicks=0, 
-                                   className="p-0 mt-1",
-                                   style={"width": "80px", "height": "25px", 
-                                          "textTransform": "none"}),
-                        style={"text-align": "right"}),  
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div(id='msfile-selector', style={
+                            'maxHeight': '200px',
+                            'height': '100%',
+                            'width': '100%',
+                            'overflowY': 'auto',
+                            'backgroundColor': '#f8f9fa',
+                            'border': '1px solid #ccc',
+                            'borderRadius': '5px',
+                            'padding': '10px',
+                            'flex': '1',
+                            'display': 'flex',
+                            'flexDirection': 'column',
+                            'fontSize': '14px'
+                        })
+                    ], style={'height': '100%', 'display': 'flex', 
+                              'flexDirection': 'column', 'padding': 0})
+                ], className="p-0 mt-1", style={'height': '100%', 'width': '100%'}),
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Button("Select All", id="select-all-msfiles", 
+                                       color="secondary", outline=True,
+                                       className="p-0 mt-1",
+                                       style={"width": "80px", "height": "25px", 
+                                              "textTransform": "none"}),
+                        dbc.Button("Clear All", id="clear-all-msfiles", 
+                                       color="secondary", outline=True,
+                                       className="p-0 mt-1 ms-1",
+                                       style={"width": "80px", "height": "25px", 
+                                              "textTransform": "none"})
+                        ], width=12, className="d-flex justify-content-end"),
+                ]),
                 html.Label("Identification report", style={"font-weight": "bold"}),
                 dbc.Input(id='idreport-path', type='text', 
                           placeholder='Precursor-level identification report', 
@@ -67,7 +90,15 @@ sidebar = html.Div(
                             dbc.Spinner(color="primary", size="sm", type="grow", id="run-spinner"),
                             id="spinner-container",
                             style={"display": "none", "marginLeft": "10px"}
-                        )
+                        ),
+                        dbc.Modal(
+                            [
+                                dbc.ModalHeader(dbc.ModalTitle("Note"), close_button=True),
+                                dbc.ModalBody("No MS files selected, quantification results will be read directly from the provided output directory."),
+                            ],
+                            id="no-msfile",
+                            is_open=False,
+                        ),
                     ], width=7),
                     dbc.Col(
                         dbc.Button("Stop", id="stop-button", 
@@ -245,7 +276,7 @@ sidebar = html.Div(
 
 # Enhanced layout with smart scrolling
 layout = html.Div(children=[
-    # Store to track process and scroll state
+    dcc.Store(id="selected-msfiles"),
     dcc.Store(id="process-state", data={"running": False, "start_time": None}),
     dcc.Store(id="scroll-state", data={"auto_scroll": True, "user_scrolled": False}),
                     
@@ -302,7 +333,7 @@ layout = html.Div(children=[
                                 "width": "100%", 
                                 "height": "500px",
                                 "fontFamily": "'Consolas', 'Courier New', 'Fira Mono', monospace",
-                                "fontSize": "13px"
+                                "fontSize": "14px"
                                 }, 
                             readOnly=True)
                     ])
@@ -321,6 +352,86 @@ layout = html.Div(children=[
     ])
 ])
 
+
+# Callback: Update the msfile options when the directory path changes
+def list_ms_files(msfile_path):
+    if not msfile_path or not os.path.isdir(msfile_path):
+        return []
+    
+    # Find .raw/.mzML files
+    msfile_exts = ('.raw', '.mzML')
+    ms_files = sorted([f for f in os.listdir(msfile_path) if f.endswith(msfile_exts)])
+
+    # Find .d directories
+    d_directories = [d for d in os.listdir(msfile_path)
+                     if os.path.isdir(os.path.join(msfile_path, d)) and d.endswith('.d')]
+    ms_files.extend(sorted(d_directories))
+    
+    return ms_files
+
+@app.callback(
+    Output('msfile-selector', 'children'),
+    Input('msfile-path', 'value'),
+    Input('select-all-msfiles', 'n_clicks'),
+    Input('clear-all-msfiles', 'n_clicks'),
+)
+def msfile_checkboxes(path, select_clicks, clear_clicks):
+    if path:
+        files = list_ms_files(path)
+        if not files:
+            return html.Div("No valid MS files found in the path.")
+
+    triggered = ctx.triggered_id
+    checked = triggered == 'select-all-msfiles'
+
+    return [
+        dbc.Checkbox(
+            label=f,
+            value=checked,
+            id={'type': 'msfile-check', 'filename': f},
+            className="mt-1 mb-2",
+            style={'display': 'block', 'whiteSpace': 'normal', 'wordBreak': 'break-all'}
+        ) for f in files
+    ]
+
+@app.callback(
+    Output('selected-msfiles', 'data'),
+    Input({'type': 'msfile-check', 'filename': ALL}, 'value'),
+    State({'type': 'msfile-check', 'filename': ALL}, 'id'),
+)
+def select_msfiles(msfile_checked, msfile_options):
+    msfiles = [option['filename'] for option, checked in zip(msfile_options, msfile_checked) if checked]
+    return msfiles
+
+# Callback: Update the msfile options when the directory path changes
+@app.callback(
+    Output('fasta-selector', 'options'),
+    Input('fasta-path', 'value')  # Trigger when path changes
+)
+def list_fasta_files(fasta_path):
+    if not fasta_path or not os.path.isdir(fasta_path):
+        return []
+    
+    # Find .fasta/.fas files
+    fasta_exts = ('.fasta', '.fas')
+    fasta_files = sorted([f for f in os.listdir(fasta_path) if f.endswith(fasta_exts)])
+    
+    return [{'label': f, 'value': f} for f in fasta_files]
+
+@app.callback(
+    Output('fasta-selector', 'value'),
+    Input('select-all-fasta', 'n_clicks'),
+    State('fasta-selector', 'options'),
+    State('fasta-selector', 'value')  # <- Add this back
+)
+def select_all_fastas(n_clicks, options, current_value):
+    if n_clicks == 0:
+        return current_value
+
+    if current_value and len(current_value) == len(options):
+        return []
+
+    return [option['value'] for option in options]
 
 @app.callback(
     Output("param-collapse", "is_open"),
@@ -612,13 +723,18 @@ def update_process_state(log_value, n_intervals, process_state):
         return dash.no_update, dash.no_update
 
 
+
+
+
 # Callback to load available CSV files from the directory
 @app.callback(
+    Output('no-msfile', 'is_open'),
     Output('stored-outdir', 'data'),
     Output("scroll-state", "data", allow_duplicate=True),
     Input('run-button', 'n_clicks'),
+    State('no-msfile', 'is_open'),
     State('msfile-path', 'value'), 
-    State('msfile-selector', 'value'),
+    State('selected-msfiles', 'data'),
     State('idreport-path', 'value'),
     State('speclib-path', 'value'),
     State('fasta-path', 'value'), 
@@ -643,9 +759,10 @@ def update_process_state(log_value, n_intervals, process_state):
     prevent_initial_call=True
 )
 def run_jumpdiaq(
-        n_clicks, 
+        n_clicks_run,
+        no_msfile_open,
         msfile_path,
-        msfiles,
+        selected_msfiles,  
         idreport,
         speclib,
         fasta_path,
@@ -668,20 +785,21 @@ def run_jumpdiaq(
         norm_method,
         trim_percentage
         ):
-    if n_clicks == 0 or not outdir:
-        return None, dash.no_update
-    
-    if not msfiles and outdir and os.path.isdir(outdir):
+    if n_clicks_run == 0 or not outdir:
+        return no_msfile_open, None, dash.no_update
+
+    #msfiles = [option['filename'] for option, checked in zip(msfile_options, msfile_checked) if checked]
+    if not selected_msfiles and outdir and os.path.isdir(outdir):
         logger.info(f"Quantification results will be read directly from {outdir}")
-        return outdir, dash.no_update
+        return not no_msfile_open, outdir, dash.no_update
     
     # Generate cmd
     cmd_args = []
     
     # Add MS files
-    if msfiles and msfile_path:
+    if selected_msfiles and msfile_path:
         cmd_args.append("--input-runs")
-        for msfile in msfiles:
+        for msfile in selected_msfiles:
             full_path = os.path.join(msfile_path, msfile)
             cmd_args.append(full_path)
     
@@ -775,19 +893,19 @@ def run_jumpdiaq(
     #
     run_jumpdiaq_process(config_path)
     
-    return outdir, {"auto_scroll": True, "user_scrolled": False}
+    return no_msfile_open, outdir, {"auto_scroll": True, "user_scrolled": False}
 
 
 @app.callback(
     Output("spinner-container", "style"),
     Input("run-button", "n_clicks"),
     Input("stop-button", "n_clicks"),
-    State('msfile-selector', 'value'),
+    State("selected-msfiles", "data"),
     State("process-state", "data"),
     prevent_initial_call=True
 )
-def running_indicator(run_clicks, stop_clicks, ms_files, process_state):
-    if ctx.triggered_id == "run-button" and ms_files:
+def running_indicator(run_clicks, stop_clicks, selected_msfiles, process_state):
+    if ctx.triggered_id == "run-button" and selected_msfiles:
         return {"display": "inline-block", "marginLeft": "10px"}
     elif ctx.triggered_id == "stop-button" or process_state.get("running", False):
         return {"display": "none"}
@@ -830,76 +948,3 @@ def stop_process(n_clicks):
             return f"Failed to stop: {str(e)}"
     
     return "No process running"
-
-# Callback: Update the msfile options when the directory path changes
-@app.callback(
-    Output('msfile-selector', 'options'),
-    Input('msfile-path', 'value'),  # Trigger when path changes
-)
-def list_ms_files(dir_path):
-    if not dir_path or not os.path.isdir(dir_path):
-        return []
-
-    ms_files = []
-    
-    # Find .raw files
-    raw_files = [f for f in os.listdir(dir_path) if f.endswith('.raw')]
-    ms_files.extend(raw_files)
-    
-    # Find .mzML files
-    mzml_files = [f for f in os.listdir(dir_path) if f.endswith('.mzML')]
-    ms_files.extend(mzml_files)
-
-    # Find .d directories
-    d_directories = [d for d in os.listdir(dir_path)
-                     if os.path.isdir(os.path.join(dir_path, d)) and d.endswith('.d')]
-    ms_files.extend(d_directories)
-    
-    ms_files.sort()
-    return [{'label': f, 'value': f} for f in ms_files]
-
-# Callback: Update the msfile options when the directory path changes
-@app.callback(
-    Output('fasta-selector', 'options'),
-    Input('fasta-path', 'value')  # Trigger when path changes
-)
-def list_fasta_files(dir_path):
-    if not dir_path or not os.path.isdir(dir_path):
-        return []
-
-    # Find .fasta/.fas files
-    fasta_files = [f for f in os.listdir(dir_path) if f.endswith('.fasta')]
-    fas_files = [f for f in os.listdir(dir_path) if f.endswith('.fas')]
-    fasta_files.extend(fas_files)
-
-    return [{'label': f, 'value': f} for f in fasta_files]
-
-@app.callback(
-    Output('msfile-selector', 'value'),
-    Input('select-all-msfiles', 'n_clicks'),
-    State('msfile-selector', 'options'),
-    State('msfile-selector', 'value')  # <- Add this back
-)
-def select_all_msfiles(n_clicks, options, current_value):
-    if n_clicks == 0:
-        return current_value
-
-    if current_value and len(current_value) == len(options):
-        return []
-
-    return [option['value'] for option in options]
-
-@app.callback(
-    Output('fasta-selector', 'value'),
-    Input('select-all-fasta', 'n_clicks'),
-    State('fasta-selector', 'options'),
-    State('fasta-selector', 'value')  # <- Add this back
-)
-def select_all_fastas(n_clicks, options, current_value):
-    if n_clicks == 0:
-        return current_value
-
-    if current_value and len(current_value) == len(options):
-        return []
-
-    return [option['value'] for option in options]

@@ -51,7 +51,7 @@ sidebar = html.Div(
 
 # Main Layout with All Pages Preloaded but Hidden
 app.layout = html.Div([
-    dcc.Store(id='stored-msfiles', storage_type='session'),
+    #dcc.Store(id='stored-msfiles', storage_type='session'),
     dcc.Store(id='stored-outdir', storage_type='session'),
     dcc.Store(id='stored-meta-path', storage_type='session'),
     dcc.Store(id='stored-meta', storage_type='session'),
