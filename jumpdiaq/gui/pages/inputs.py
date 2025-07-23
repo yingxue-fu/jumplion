@@ -854,8 +854,8 @@ def list_ms_files(dir_path):
     d_directories = [d for d in os.listdir(dir_path)
                      if os.path.isdir(os.path.join(dir_path, d)) and d.endswith('.d')]
     ms_files.extend(d_directories)
-
-    return [{'label': f, 'value': f} for f in ms_files]
+    
+    return [{'label': f, 'value': f} for f in ms_files.sort()]
 
 # Callback: Update the msfile options when the directory path changes
 @app.callback(
