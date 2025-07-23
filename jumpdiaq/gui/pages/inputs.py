@@ -113,7 +113,7 @@ sidebar = html.Div(
                             dbc.Col(html.Label("use_saved_rts"), width=8),  
                             dbc.Col(dbc.Checklist(id="use-saved-rts",
                                                   options=[{"label": "Enabled", "value": "yes"}],
-                                                  value=["no"],
+                                                  value=[],
                                                   inline=True), 
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
@@ -121,7 +121,7 @@ sidebar = html.Div(
                             dbc.Col(html.Label("use_saved_xic"), width=8),  
                             dbc.Col(dbc.Checklist(id="use-saved-xic",
                                                   options=[{"label": "Enabled", "value": "yes"}],
-                                                  value=["no"],
+                                                  value=[],
                                                   inline=True), 
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
@@ -129,7 +129,7 @@ sidebar = html.Div(
                             dbc.Col(html.Label("use_xic_report"), width=8),  
                             dbc.Col(dbc.Checklist(id="use-xic-report",
                                                   options=[{"label": "Enabled", "value": "yes"}],
-                                                  value=["no"],
+                                                  value=[],
                                                   inline=True), 
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
@@ -171,7 +171,7 @@ sidebar = html.Div(
                             dbc.Col(html.Label("fix_mass_acc"), width=8),  
                             dbc.Col(dbc.Checklist(id="fix-mass-acc",
                                                   options=[{"label": "Enabled", "value": "yes"}],
-                                                  value=["no"],
+                                                  value=[],
                                                   inline=True), 
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
@@ -714,17 +714,17 @@ def run_jumpdiaq(
     cmd_args.append(str(log_level))
     
     # 
-    if use_saved_rts == 'yes':
+    if 'yes' in use_saved_rts:
         cmd_args.append("--use-saved-rts")
         cmd_args.append("1")
         
     # 
-    if use_saved_xic == 'yes':
+    if 'yes' in use_saved_xic:
         cmd_args.append("--use-saved-xic")
         cmd_args.append("1")
             
     # 
-    if use_xic_report == 'yes':
+    if 'yes' in use_xic_report:
         cmd_args.append("--use-xic-report")
         cmd_args.append("1")
     
@@ -735,11 +735,11 @@ def run_jumpdiaq(
     cmd_args.append("--min-runs-cal")
     cmd_args.append(str(min_runs_cal))
     
-    if mass_calibration == 'no':
+    if 'yes' not in mass_calibration:
         cmd_args.append("--mass-calibration")
         cmd_args.append("0")
         
-    if fix_mass_acc == 'yes':
+    if 'yes' in fix_mass_acc:
         cmd_args.append("--fix-mass-acc")
         cmd_args.append("1")
         cmd_args.append("--mass-acc-ms2")
@@ -751,7 +751,7 @@ def run_jumpdiaq(
     cmd_args.append(str(optimal_xic_source))
     
     # Add interference removal option
-    if int_removal == 'no':
+    if 'yes' not in int_removal:
         cmd_args.append("--int-removal") 
         cmd_args.append("0")
     
