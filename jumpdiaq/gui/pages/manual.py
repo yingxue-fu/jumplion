@@ -9,7 +9,7 @@ from jumpdiaq.gui.app import page_sidebar_style
 
 
 # Load markdown content
-markdown_path = pathlib.Path(__file__).parent.parent / "README.md"
+markdown_path = pathlib.Path(__file__).parent.parent / "assets" / "README.md"
 with open(markdown_path, 'r', encoding='utf-8') as f:
     markdown_text = f.read()
 
