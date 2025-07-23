@@ -110,8 +110,24 @@ sidebar = html.Div(
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
+                            dbc.Col(html.Label("use_saved_rts"), width=8),  
+                            dbc.Col(dbc.Checklist(id="use-saved-rts",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["no"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
                             dbc.Col(html.Label("use_saved_xic"), width=8),  
                             dbc.Col(dbc.Checklist(id="use-saved-xic",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["no"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("use_xic_report"), width=8),  
+                            dbc.Col(dbc.Checklist(id="use-xic-report",
                                                   options=[{"label": "Enabled", "value": "yes"}],
                                                   value=["no"],
                                                   inline=True), 
@@ -609,7 +625,9 @@ def update_process_state(log_value, n_intervals, process_state):
     State('fasta-selector', 'value'),
     State('outdir-path', 'value'),
     State('log-level', 'value'),
+    State('use-saved-rts', 'value'),
     State('use-saved-xic', 'value'),
+    State('use-xic-report', 'value'),
     State('min-runs-quant', 'value'),
     State('min-runs-model', 'value'),
     State('min-runs-cal', 'value'),
@@ -634,7 +652,9 @@ def run_jumpdiaq(
         fastas,
         outdir,
         log_level,
+        use_saved_rts,
         use_saved_xic,
+        use_xic_report,
         min_runs_quant,
         min_runs_model,
         min_runs_cal,
@@ -694,8 +714,18 @@ def run_jumpdiaq(
     cmd_args.append(str(log_level))
     
     # 
-    if use_saved_xic == 'Yes':
+    if use_saved_rts == 'yes':
+        cmd_args.append("--use-saved-rts")
+        cmd_args.append("1")
+        
+    # 
+    if use_saved_xic == 'yes':
         cmd_args.append("--use-saved-xic")
+        cmd_args.append("1")
+            
+    # 
+    if use_xic_report == 'yes':
+        cmd_args.append("--use-xic-report")
         cmd_args.append("1")
     
     cmd_args.append("--min-runs-quant")
@@ -705,11 +735,11 @@ def run_jumpdiaq(
     cmd_args.append("--min-runs-cal")
     cmd_args.append(str(min_runs_cal))
     
-    if mass_calibration == 'No':
+    if mass_calibration == 'no':
         cmd_args.append("--mass-calibration")
         cmd_args.append("0")
         
-    if fix_mass_acc == 'Yes':
+    if fix_mass_acc == 'yes':
         cmd_args.append("--fix-mass-acc")
         cmd_args.append("1")
         cmd_args.append("--mass-acc-ms2")
@@ -721,7 +751,7 @@ def run_jumpdiaq(
     cmd_args.append(str(optimal_xic_source))
     
     # Add interference removal option
-    if int_removal == 'No':
+    if int_removal == 'no':
         cmd_args.append("--int-removal") 
         cmd_args.append("0")
     
