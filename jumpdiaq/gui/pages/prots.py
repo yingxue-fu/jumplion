@@ -111,6 +111,14 @@ tab_label_style = {
     "textAlign": "center"
 }
 
+active_tab_label_style = {
+    "textTransform": "none",
+    "textAlign": "center", 
+    "backgroundColor": "#007bff",  # Active background color
+    "color": "white",  # Active text color
+    "borderColor": "#007bff"
+}
+
 tab_bar_style = {
     "flexWrap": "nowrap",  # Prevent line wrapping
 }
@@ -180,8 +188,7 @@ layout = html.Div(children=[
                                     dbc.Tab(label="Protein Coverage Information", 
                                             tab_id="tab-4", label_style=tab_label_style),
                                     dbc.Tab(label="Quantification Benchmark Plot", 
-                                            tab_id="tab-5", label_style=tab_label_style,
-                                            className="custom-tab"),
+                                            tab_id="tab-5", label_style=tab_label_style),
                                 ],
                                 style=tab_bar_style
                             ),
@@ -707,6 +714,18 @@ def update_summ_plot(selected_prot,
         prec_quality_df = pd.DataFrame(prec_quality_data)
         
         # Plot each tract as a connected scatter plot
+        unique_precursors = pd.concat([
+            prec_quant_df["Precursor.Id_MS_type"], 
+            prec_quality_df["Precursor.Id_MS_type"]
+        ]).unique()
+        num_traces = len(unique_precursors)
+        if num_traces <= len(px.colors.qualitative.Plotly):
+            sampled_colors = px.colors.qualitative.Plotly[:num_traces]
+        else:
+            default_colorscale = [[i/(len(px.colors.qualitative.Plotly)-1), color] 
+                                 for i, color in enumerate(px.colors.qualitative.Plotly)]
+            sampled_colors = px.colors.sample_colorscale(default_colorscale, num_traces)
+        trace_colors = dict(zip(unique_precursors, sampled_colors))
         for tract_id, group in prec_quant_df.groupby("Precursor.Id_MS_type"):
             if sub_row_means:
                 quant_fig.add_trace(go.Scatter(
@@ -714,9 +733,10 @@ def update_summ_plot(selected_prot,
                     y=group["Y"]-np.nanmean(group["Y"].to_numpy()), 
                     mode="lines+markers",
                     name="Precursors" if show_summ_value else tract_id,
-                    line=dict(color='gray' if show_summ_value else None),
-                    marker=dict(color='gray' if show_summ_value else None),
-                    showlegend=not show_summ_value
+                    line=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
+                    marker=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
+                    showlegend=not show_summ_value,
+                    opacity=0.7
                 ))
             else:
                 quant_fig.add_trace(go.Scatter(
@@ -724,8 +744,8 @@ def update_summ_plot(selected_prot,
                     y=group["Y"], 
                     mode="lines+markers",
                     name="Precursors" if show_summ_value else tract_id,
-                    line=dict(color='gray' if show_summ_value else None),
-                    marker=dict(color='gray' if show_summ_value else None),
+                    line=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
+                    marker=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
                     showlegend=not show_summ_value
                 ))
         
@@ -735,9 +755,9 @@ def update_summ_plot(selected_prot,
                 y=group["Y"], 
                 mode="lines+markers",
                 name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='gray' if show_summ_value else None),
-                marker=dict(color='gray' if show_summ_value else None),
-                showlegend=not show_summ_value
+                line=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
+                marker=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
+                showlegend=not show_summ_value,
             ))
         
         if show_summ_value:
@@ -798,9 +818,13 @@ def update_summ_plot(selected_prot,
                 itemclick="toggleothers",
                 itemdoubleclick="toggle",
                 orientation="v",
-                traceorder="normal"
+                traceorder="normal", 
             ),
         )
+        
+        # 
+        quant_fig.update_traces(hoverinfo='name')
+        quality_fig.update_traces(hoverinfo='name')
         
         return quant_fig, quality_fig
     except Exception as e:

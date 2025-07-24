@@ -10,7 +10,6 @@ import plotly.graph_objects as go
 
 def get_local_ip():
     try:
-        # Connect to an external address (Google DNS) without sending data
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
             return s.getsockname()[0]

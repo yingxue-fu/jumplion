@@ -110,6 +110,5 @@ def switch_tabs(n1, n2, n3, n4, n5, read_click, start_click, start_click_manual,
 
 def main():
     local_ip = get_local_ip()
-    print(f"Copy and paste this address to your browser: http://{local_ip}:8050")
-    app.run(host="0.0.0.0", port=8050, debug=True)
+    app.run(host=local_ip, port=8050, debug=True)
     

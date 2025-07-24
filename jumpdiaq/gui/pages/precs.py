@@ -5,11 +5,11 @@ from typing import List, Dict, Any, Tuple, Optional
 # external
 import numpy as np
 import pandas as pd
-from dash import dcc, html, Input, Output, State, dash_table, callback_context
-import dash_bootstrap_components as dbc
-from dash_bootstrap_templates import load_figure_template
 import plotly.graph_objs as go
 import plotly.express as px
+import dash_bootstrap_components as dbc
+from dash import dcc, html, Input, Output, State, dash_table, callback_context
+from dash_bootstrap_templates import load_figure_template
 # local
 from jumpdiaq.gui.app import app, page_sidebar_style, logger
 from jumpdiaq.gui.utils import extract_unique_parts
@@ -28,7 +28,7 @@ sidebar = html.Div(
                 dbc.Select(id='precursor-dropdown', placeholder="Select a Precursor"),
                 html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
                 html.Br(),
-                html.Label("For cross runs", style={"font-weight": "bold"}),
+                html.Label("For cross-run", style={"font-weight": "bold"}),
                 dbc.Switch(label='Show summarization value', id='show-prec-summ', 
                            value=False, className="d-inline-block", 
                            style={'marginTop': '5px'}),
@@ -57,6 +57,7 @@ tabs_styles = {
 }
 
 tab_label_style = {
+    'fontSize': '14px',
     "textTransform": "none",  # Prevent all caps
     "textAlign": "center"
 }
@@ -73,27 +74,27 @@ layout = html.Div(children=[
         dbc.Col(sidebar, width=4),
         dbc.Col([
             dbc.Tabs([
-                dbc.Tab(label='Cross runs', children=[
+                dbc.Tab(label='Cross-run', children=[
+                        dbc.Row([
+                            dbc.Col(html.Div(id='show-precid-c', style={'fontSize': '20px'}), width=11)
+                        ], style={'margin-top': '20px'}),
                         html.Div([   
                             dcc.Graph(id="prec-quant-plot"),
                             dcc.Graph(id="prec-quality-plot"),
-                            ], className="p-4")
+                            ], className="p-2")
                 ], label_style=tab_label_style),
                 dbc.Tab(label='Individual run', children=[
                     dbc.Row([
-                        dbc.Col(html.Div(id='text-output', style={'fontSize': '18px'}), width=11)
+                        dbc.Col(html.Div(id='show-precid-i', style={'fontSize': '20px'}), width=11)
                     ], style={'margin-top': '20px'}),
                     dbc.Row([
-                        dbc.Col(html.Div(id='show-prec-run', style={'color': 'green'}), width=11)
-                    ], style={'margin-top': '20px'}),
-                    dbc.Row([
-                        dbc.Col(dcc.Graph(id='xic-plot-ms1'), width=7),
+                        dbc.Col(dcc.Graph(id='xic-plot-ms1'), width=8),
                         dbc.Col(dcc.Graph(id='xic-plot-ms1-c'), width=4)
-                    ], style={'margin-top': '5px'}),
+                    ], style={'margin-top': '5px', 'margin-right': '10px'}),
                     dbc.Row([
-                        dbc.Col(dcc.Graph(id='xic-plot-ms2'), width=7),
+                        dbc.Col(dcc.Graph(id='xic-plot-ms2'), width=8),
                         dbc.Col(dcc.Graph(id='xic-plot-ms2-c'), width=4)
-                    ], style={'margin-top': '5px'}),
+                    ], style={'margin-top': '5px', 'margin-right': '10px'}),
                     dbc.Row([
                         dbc.Col(dash_table.DataTable(
                             id='xic-info-table',
@@ -110,7 +111,7 @@ layout = html.Div(children=[
                             style_header={'fontWeight': 'bold'},
                             page_size=10,
                         ), width=11, className="mx-auto"),
-                    ], style={'margin-top': '15px'}),
+                    ], style={'margin-top': '15px', 'margin-bottom': '20px'}),
                     ], label_style=tab_label_style)
                 ], style=tabs_styles),
         ], width=8)
@@ -187,13 +188,14 @@ def load_options(stored_options):
 
 # Callback to read HDF file based on selected row
 @app.callback(
-    Output('show-ms-level', 'children'), 
-    Output('stored-precquant', 'data'),
-    Output('stored-precquality', 'data'),
-    Output('stored-precMS1quant', 'data'),
-    Output('stored-precMS1quality', 'data'),
-    Output('stored-precMS2quant', 'data'),
-    Output('stored-precMS2quality', 'data'),
+    [Output('show-precid-c', 'children'),
+     Output('show-ms-level', 'children'), 
+     Output('stored-precquant', 'data'),
+     Output('stored-precquality', 'data'),
+     Output('stored-precMS1quant', 'data'),
+     Output('stored-precMS1quality', 'data'),
+     Output('stored-precMS2quant', 'data'),
+     Output('stored-precMS2quality', 'data')],
     Input('precursor-dropdown', 'value'),
     State('stored-outdir', 'data'),
     #prevent_initial_call=True
@@ -201,7 +203,7 @@ def load_options(stored_options):
 def read_precs_data(selected_precursor_ms, outdir_path):
     
     if not selected_precursor_ms or outdir_path is None:
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None
     # outdir_path = r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\test_20250523"
     # df = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\test_20250514\Protein.Group_Quan_maxLFQ.csv"))
     # meta = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\sample_meta.csv"))
@@ -217,6 +219,7 @@ def read_precs_data(selected_precursor_ms, outdir_path):
     
     selected_precursor = selected_precursor_ms.split("_")[0]
     ms_level = selected_precursor_ms.split("_")[1]
+    title = html.Div([f"     {selected_precursor}"])
     ms_level_info = f"{ms_level}-level quantification of this precursor is used when summarizing to protein."
     try:
         prec_quant_df = pd.read_parquet(prec_quant_file, filters=[('Precursor.Id', '==', selected_precursor)])
@@ -234,7 +237,7 @@ def read_precs_data(selected_precursor_ms, outdir_path):
         ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', selected_precursor)])
         ms2_quality_df['samples'] = extract_unique_parts(ms2_quality_df['samples'].values.tolist())
         
-        return (ms_level_info,
+        return (title, ms_level_info,
                 prec_quant_df.to_dict("records"), 
                 prec_quality_df.to_dict("records"), 
                 ms1_quant_df.to_dict("records"), 
@@ -244,7 +247,7 @@ def read_precs_data(selected_precursor_ms, outdir_path):
                 )
     except Exception as e:
         logger.error(f"Error loading parquet file: {str(e)}")
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None
 
 
 # Callback to generate figure from selected row
@@ -401,7 +404,7 @@ def update_summ_plot(show_summ_value,
         
         # Layout settings
         quant_fig.update_layout(
-            #title=pg_name,
+            title="Quantity",
             xaxis_title="Runs",
             yaxis_title="log2(intensity)",
             template="vizro",
@@ -419,7 +422,7 @@ def update_summ_plot(show_summ_value,
         )
         
         quality_fig.update_layout(
-            #title=pg_name,
+            title="Quality",
             xaxis_title="Runs",
             yaxis_title="Quality",
             template="vizro",
@@ -483,8 +486,7 @@ def update_run_options(selected_precursor: str, file_path: str) -> tuple:
         return [], None#, [], []
 
 @app.callback(
-    [Output('text-output', 'children'), 
-     Output('show-prec-run', 'children'), 
+    [Output('show-precid-i', 'children'), 
      Output('xic-plot-ms1', 'figure'),
      Output('xic-plot-ms1-c', 'figure'),
      Output('xic-plot-ms2', 'figure'),
@@ -502,7 +504,8 @@ def update_XIC_plots_table(selected_run: str,
                             stored_data: List[Dict[str, Any]], 
                             file_path: str) -> tuple:
     if selected_run is None or selected_precursor is None or not stored_data:
-        return '', '', go.Figure(), go.Figure(), go.Figure(), go.Figure(), []
+        return ('Select a run to check precursor XICs', go.Figure(), 
+                go.Figure(), go.Figure(), go.Figure(), [])
 
     try:
         report_df = pd.DataFrame(stored_data)
@@ -529,193 +532,10 @@ def update_XIC_plots_table(selected_run: str,
             raise ValueError("No XIC data found for selected precursor")
     
         # Extract relevant data
-        title = html.Div([f"     {selected_precursor}"])
-        
-        prec_run_info = f"     {selected_run}"
+        title = f"     {selected_precursor} in run {selected_run}"
         
         # Define template based on switch state
         template = "vizro" #if switch_on else "vizro_dark"
-        
-        #print('ms1 plots')
-        optimal_xic_type = report_data['Optimal.XIC.Type'].iloc[0]
-        optimal_xic = report_data['Optimal.XIC'].iloc[0]
-        
-        xic_mask = xic_data['row_type'] == 'xic_row'
-        mz_mask = xic_data['row_type'] == 'mz_row'
-        score_mask = xic_data['row_type'] == 'score_row'
-        
-        ms1_traces = []
-        ms1_rt = xic_data.loc[xic_mask, 'ms1_rt'].values
-        ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns
-        pr_mzs = xic_data.loc[mz_mask, ms1_intensity_cols].values[0]
-        for i, pr in enumerate(ms1_intensity_cols):
-            ms1_intensity = xic_data.loc[xic_mask, pr].values
-            ms1_traces.append(go.Scatter(
-                x=ms1_rt,
-                y=ms1_intensity,
-                mode='lines+markers',
-                name=f"m/z {np.round(pr_mzs[i], 4)}",
-                marker=dict(size=6),
-                #legendgroup="ms1"
-            ))
-        
-        ms2_traces = []
-        ms2_rt = xic_data.loc[xic_mask, 'ms2_rt'].values
-        ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns
-        for fr in ms2_intensity_cols:
-            fr_mz = xic_data.loc[mz_mask, fr].values[0]
-            ms2_intensity = xic_data.loc[xic_mask, fr].values
-            ms2_traces.append(go.Scatter(
-                x=ms2_rt,
-                y=ms2_intensity,
-                mode='lines+markers',
-                name=f"m/z {np.round(fr_mz, 4)}",
-                #opacity=0.5,
-                marker=dict(size=6),
-                #legendgroup="ms2"
-            ))
-        
-        ms1_i_traces = []
-        ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns
-        for i, pr in enumerate(ms1_interpol_cols):
-            ms1_i_intensity = xic_data.loc[xic_mask, pr].values
-            ms1_i_traces.append(go.Scatter(
-                x=ms2_rt,
-                y=ms1_i_intensity,
-                mode='lines+markers',
-                name=f"m/z {np.round(pr_mzs[i], 4)}",
-                marker=dict(size=6),
-                #legendgroup="ms1"
-            ))
-            
-        xic_c_path = (data_path / "xic_files" / "xics.corrected.parquet").resolve()
-        xic_data_c = pd.read_parquet(xic_c_path, 
-                                     filters=[('Run', '==', selected_run),
-                                              ('Precursor.Id', '==', selected_precursor)])
-        ms1_traces_c = []
-        ms1_rt_c = xic_data_c.loc[:, 'ms2_rt'].values
-        for pr in ms1_intensity_cols:
-            ms1_intensity = xic_data_c.loc[:, pr].values
-            ms1_traces_c.append(go.Scatter(
-                x=ms1_rt_c,
-                y=ms1_intensity,
-                mode='lines+markers',
-                marker=dict(size=6),
-                #legendgroup="ms1"
-            ))  
-        
-        ms2_traces_c = []
-        ms2_rt_c = xic_data_c.loc[:, 'ms2_rt'].values
-        for fr in ms2_intensity_cols:
-            fr_mz = xic_data_c.loc[0, fr]
-            ms2_intensity = xic_data_c.loc[:, fr].values
-            ms2_traces_c.append(go.Scatter(
-                x=ms2_rt_c,
-                y=ms2_intensity,
-                mode='lines+markers',
-                marker=dict(size=6),
-                #legendgroup="ms2"
-            )) 
-        
-        if optimal_xic_type == 'ms2':
-            ms2_traces_c.append(go.Scatter(
-                x=ms2_rt_c,
-                y=xic_data_c.loc[:, 'elution'].values,
-                mode='lines+markers',
-                #name=f"Fr {np.round(fr_mz, 4)}",
-                marker=dict(size=6),
-                line=dict(dash='dash'),  # Use 'dash', 'dot', 'dashdot', etc.
-                #legendgroup="ms2"
-            ))
-        elif optimal_xic_type == 'ms1':
-            ms1_traces_c.append(go.Scatter(
-                x=ms1_rt_c,
-                y=xic_data_c.loc[:, 'elution'].values,
-                mode='lines+markers',
-                #name=f"Fr {np.round(fr_mz, 4)}",
-                marker=dict(size=6),
-                line=dict(dash='dash'),  # Use 'dash', 'dot', 'dashdot', etc.
-                #legendgroup="ms1"
-            ))
-        
-        if not show_interpolated_ms1:
-            fig_ms1 = go.Figure(data=ms1_traces)
-            num_colors = len(ms1_traces)
-        else:
-            fig_ms1 = go.Figure(data=ms1_i_traces)
-            num_colors = len(ms1_i_traces)
-        
-        ms1_colors = px.colors.sample_colorscale(px.colors.sequential.Jet, [i / (num_colors - 1) for i in range(num_colors)])
-        fig_ms1.update_layout(
-            xaxis_title="Retention Time",
-            yaxis_title="Intensity",
-            legend_title="MS1 XICs",
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="left",
-                x=0,
-                itemclick="toggleothers",
-                itemdoubleclick=False
-            ),
-            xaxis_range=[min(ms1_rt[0], ms2_rt[0]), max(ms1_rt[-1], ms2_rt[-1])],
-            yaxis=dict(tickformat=".1e"),
-            colorway=ms1_colors,
-            template=template
-        )
-    
-        fig_ms2 = go.Figure(data=ms2_traces)
-        num_colors = len(ms2_traces)
-        ms2_colors = px.colors.sample_colorscale(px.colors.sequential.Rainbow, [i / (num_colors - 1) for i in range(num_colors)])
-        fig_ms2.update_layout(
-            xaxis_title="Retention Time",
-            yaxis_title="Intensity",
-            legend_title="MS2 XICs",
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="left",
-                x=0,
-                itemclick="toggleothers",
-                itemdoubleclick=False
-            ),
-            xaxis_range=[min(ms1_rt[0], ms2_rt[0]), max(ms1_rt[-1], ms2_rt[-1])],
-            yaxis=dict(tickformat=".1e"),
-            colorway=ms2_colors,
-            template=template
-        )
-        
-        fig_ms1_c = go.Figure(data=ms1_traces_c)
-        fig_ms1_c.update_layout(
-            xaxis_title="Retention Time",
-            yaxis_title="Intensity",
-            showlegend=False,
-            xaxis_range=[min(ms1_rt_c[0], ms2_rt_c[0]), max(ms1_rt_c[-1], ms2_rt_c[-1])],
-            yaxis=dict(tickformat=".1e"),
-            colorway=ms1_colors,
-            template=template
-        )
-    
-        fig_ms2_c = go.Figure(data=ms2_traces_c)
-        fig_ms2_c.update_layout(
-            xaxis_title="Retention Time",
-            yaxis_title="Intensity",
-            showlegend=False,
-            xaxis_range=[min(ms1_rt_c[0], ms2_rt_c[0]), max(ms1_rt_c[-1], ms2_rt_c[-1])],
-            yaxis=dict(tickformat=".1e"),
-            colorway=ms2_colors,
-            template=template
-        )
-        
-        #print('add RT boundries')    
-        # Add vertical lines to MS2 plot
-        rt_marks = ['Apex', 'Left', 'Right']
-        rt_boundaries = ms2_rt_c[[len(ms1_rt_c)//2, 0, -1]]
-        for i, rt in enumerate(rt_boundaries):
-            fig_ms1.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
-            fig_ms2.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
         
         # Precursor info table
         prec_info = report_data[['MS1.XIC.Mzs', 
@@ -750,7 +570,9 @@ def update_XIC_plots_table(selected_run: str,
             "XIC Quant (Raw)": string2float(frag_info['MS2.XIC.Quant.Raw'].split(';'), 2),
             "XIC Quant (Adj)": string2float(frag_info['MS2.XIC.Quant.Adjusted'].split(';'), 2)
         })
-        
+
+        optimal_xic_type = report_data['Optimal.XIC.Type'].iloc[0]
+        optimal_xic = report_data['Optimal.XIC'].iloc[0]
         # annotate best ion
         if optimal_xic_type == 'ms2':
             best_frag = frag_info_df.loc[optimal_xic, 'XIC Name']
@@ -758,6 +580,186 @@ def update_XIC_plots_table(selected_run: str,
         elif optimal_xic_type == 'ms1':
             best_prec = prec_info_df.loc[optimal_xic, 'XIC Name']
             prec_info_df.loc[optimal_xic, 'XIC Name'] = best_prec + " (optimal)"
+        
+        xic_mask = xic_data['row_type'] == 'xic_row'
+        #mz_mask = xic_data['row_type'] == 'mz_row'
+        score_mask = xic_data['row_type'] == 'score_row'
+        
+        ms1_traces = []
+        ms1_rt = xic_data.loc[xic_mask, 'ms1_rt'].values
+        ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns
+        ms1_names = ['M+0', 'M+1', 'M+2']
+        for i, pr in enumerate(ms1_intensity_cols):
+            ms1_intensity = xic_data.loc[xic_mask, pr].values
+            ms1_traces.append(go.Scatter(
+                x=ms1_rt,
+                y=ms1_intensity,
+                mode='lines+markers',
+                name=ms1_names[i],
+                marker=dict(size=6),
+            ))
+        
+        ms2_traces = []
+        ms2_rt = xic_data.loc[xic_mask, 'ms2_rt'].values
+        ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns
+        for i, fr in enumerate(ms2_intensity_cols):
+            ms2_intensity = xic_data.loc[xic_mask, fr].values
+            ms2_traces.append(go.Scatter(
+                x=ms2_rt,
+                y=ms2_intensity,
+                mode='lines+markers',
+                name=frag_ions[i],
+                marker=dict(size=6),
+            ))
+        
+        ms1_i_traces = []
+        ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns
+        for i, pr in enumerate(ms1_interpol_cols):
+            ms1_i_intensity = xic_data.loc[xic_mask, pr].values
+            ms1_i_traces.append(go.Scatter(
+                x=ms2_rt,
+                y=ms1_i_intensity,
+                mode='lines+markers',
+                name=ms1_names[i],
+                marker=dict(size=6),
+            ))
+            
+        xic_c_path = (data_path / "xic_files" / "xics.corrected.parquet").resolve()
+        xic_data_c = pd.read_parquet(xic_c_path, 
+                                     filters=[('Run', '==', selected_run),
+                                              ('Precursor.Id', '==', selected_precursor)])
+        ms1_traces_c = []
+        ms1_rt_c = xic_data_c.loc[:, 'ms2_rt'].values
+        for pr in ms1_intensity_cols:
+            ms1_intensity = xic_data_c.loc[:, pr].values
+            ms1_traces_c.append(go.Scatter(
+                x=ms1_rt_c,
+                y=ms1_intensity,
+                mode='lines+markers',
+                marker=dict(size=6),
+            ))  
+        
+        ms2_traces_c = []
+        ms2_rt_c = xic_data_c.loc[:, 'ms2_rt'].values
+        for fr in ms2_intensity_cols:
+            ms2_intensity = xic_data_c.loc[:, fr].values
+            ms2_traces_c.append(go.Scatter(
+                x=ms2_rt_c,
+                y=ms2_intensity,
+                mode='lines+markers',
+                marker=dict(size=6),
+            )) 
+        
+        if optimal_xic_type == 'ms2':
+            ms2_traces_c.append(go.Scatter(
+                x=ms2_rt_c,
+                y=xic_data_c.loc[:, 'elution'].values,
+                mode='lines+markers',
+                marker=dict(size=6),
+                line=dict(dash='dash'),  # Use 'dash', 'dot', 'dashdot', etc.
+            ))
+        elif optimal_xic_type == 'ms1':
+            ms1_traces_c.append(go.Scatter(
+                x=ms1_rt_c,
+                y=xic_data_c.loc[:, 'elution'].values,
+                mode='lines+markers',
+                marker=dict(size=6),
+                line=dict(dash='dash'),  # Use 'dash', 'dot', 'dashdot', etc.
+            ))
+        
+        if not show_interpolated_ms1:
+            fig_ms1 = go.Figure(data=ms1_traces)
+            num_colors = len(ms1_traces)
+        else:
+            fig_ms1 = go.Figure(data=ms1_i_traces)
+            num_colors = len(ms1_i_traces)
+        
+        ms1_colors = px.colors.sample_colorscale("Jet", [i / (num_colors - 1) for i in range(num_colors)])
+        fig_ms1.update_layout(
+            title="MS1-level XICs (Raw)",
+            xaxis_title="Retention Time",
+            yaxis_title="Intensity",
+            legend_title="",
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=0.98,
+                xanchor="left",
+                x=0.02,
+                itemclick="toggleothers",
+                itemdoubleclick=False,
+                bgcolor='rgba(255,255,255,0.5)',
+                bordercolor='rgba(0,0,0,0.2)',
+                borderwidth=1,
+            ),
+            xaxis_range=[min(ms1_rt[0], ms2_rt[0]), max(ms1_rt[-1], ms2_rt[-1])],
+            yaxis=dict(tickformat=".1e"),
+            colorway=ms1_colors,
+            template=template,
+            margin=dict(l=0, r=0, t=70, b=70) 
+        )
+    
+        fig_ms2 = go.Figure(data=ms2_traces)
+        num_colors = len(ms2_traces)
+        ms2_colors = px.colors.sample_colorscale("Rainbow", num_colors)
+        fig_ms2.update_layout(
+            title="MS2-level XICs (Raw)",
+            xaxis_title="Retention Time",
+            yaxis_title="Intensity",
+            legend_title="",
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=0.98,
+                xanchor="left",
+                x=0.02,
+                itemclick="toggleothers",
+                itemdoubleclick=False,
+                bgcolor='rgba(255,255,255,0.5)',
+                bordercolor='rgba(0,0,0,0.2)',
+                borderwidth=1,
+            ),
+            xaxis_range=[min(ms1_rt[0], ms2_rt[0]), max(ms1_rt[-1], ms2_rt[-1])],
+            yaxis=dict(tickformat=".1e"),
+            colorway=ms2_colors,
+            template=template,
+            margin=dict(l=0, r=0, t=70, b=70) 
+        )
+        
+        fig_ms1_c = go.Figure(data=ms1_traces_c)
+        fig_ms1_c.update_layout(
+            title="MS1-level XICs (Adj)",
+            xaxis_title="Retention Time",
+            yaxis_title=None,
+            showlegend=False,
+            xaxis_range=[min(ms1_rt_c[0], ms2_rt_c[0]), max(ms1_rt_c[-1], ms2_rt_c[-1])],
+            yaxis=dict(tickformat=".1e"),
+            colorway=ms1_colors,
+            template=template,
+            margin=dict(l=0, r=0, t=70, b=70) 
+        )
+    
+        fig_ms2_c = go.Figure(data=ms2_traces_c)
+        fig_ms2_c.update_layout(
+            title="MS2-level XICs (Adj)",
+            xaxis_title="Retention Time",
+            yaxis_title=None,
+            showlegend=False,
+            xaxis_range=[min(ms1_rt_c[0], ms2_rt_c[0]), max(ms1_rt_c[-1], ms2_rt_c[-1])],
+            yaxis=dict(tickformat=".1e"),
+            colorway=ms2_colors,
+            template=template,
+            margin=dict(l=0, r=0, t=70, b=70) 
+        )
+   
+        # Add vertical lines to MS2 plot
+        rt_marks = ['Apex', 'Left', 'Right']
+        rt_boundaries = ms2_rt_c[[len(ms1_rt_c)//2, 0, -1]]
+        for i, rt in enumerate(rt_boundaries):
+            fig_ms1.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
+            fig_ms2.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
+        
+
 
         xic_info_df = pd.concat([prec_info_df, frag_info_df], axis=0)
         xic_score = xic_data.loc[score_mask, ms1_intensity_cols.union(ms2_intensity_cols)].values
@@ -766,7 +768,7 @@ def update_XIC_plots_table(selected_run: str,
                                              
     except Exception as e:
         logger.error(f"Error updating plot: {e}")
-        return '', '', go.Figure(), go.Figure(), go.Figure(), go.Figure(), []
+        return '', go.Figure(), go.Figure(), go.Figure(), go.Figure(), []
     
-    return title, prec_run_info, fig_ms1, fig_ms1_c, fig_ms2, fig_ms2_c, xic_info_df.to_dict('records')
+    return title, fig_ms1, fig_ms1_c, fig_ms2, fig_ms2_c, xic_info_df.to_dict('records')
 
