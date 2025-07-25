@@ -111,14 +111,6 @@ tab_label_style = {
     "textAlign": "center"
 }
 
-active_tab_label_style = {
-    "textTransform": "none",
-    "textAlign": "center", 
-    "backgroundColor": "#007bff",  # Active background color
-    "color": "white",  # Active text color
-    "borderColor": "#007bff"
-}
-
 tab_bar_style = {
     "flexWrap": "nowrap",  # Prevent line wrapping
 }
@@ -207,8 +199,7 @@ layout = html.Div(children=[
                                             dcc.Graph(id="prot-prec-quant-plot"),
                                             dbc.Button("Check Precursors", id="check-prec-quantity", 
                                                        color="info",  
-                                                       style={"font-weight": "bold", 
-                                                              #"width": "120px", 
+                                                       style={"font-weight": "bold",  
                                                               "marginTop": "5px",
                                                               "textTransform": "none"}),
                                         ],    
@@ -221,7 +212,6 @@ layout = html.Div(children=[
                                             dbc.Button("Check Precursors", id="check-prec-quality", 
                                                        color="info",  
                                                        style={"font-weight": "bold", 
-                                                              #"width": "120px", 
                                                               "marginTop": "5px",
                                                               "textTransform": "none"}),
                                         ],    
@@ -301,16 +291,22 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
     try:
         quant_df = pd.read_csv(quant_csv_path)
         meta = pd.read_csv(meta_path)
-        quant_df = quant_df.loc[:, quant_df.columns[0:12].values.tolist() + meta['Sample'].values.tolist() + [quant_df.columns[-1]]]
+        # Make the samples the same order as in the meta file
+        sample_names = meta['Sample'].values.tolist()
+        quant_df = quant_df.loc[:, quant_df.columns[0:12].values.tolist() + sample_names + [quant_df.columns[-1]]]
+        # Simplify the sample name
+        simple_sample_names = extract_unique_parts(sample_names)
         quant_df.columns = (
             quant_df.columns[0:12].values.tolist() + 
-            extract_unique_parts(quant_df.columns[12:-1].values.tolist()) + 
+            simple_sample_names + 
             [quant_df.columns[-1]]
         )
         # Convert the string to an actual list of tuples
         quant_df['Peptide.Positions'] = quant_df['Peptide.Positions'].apply(ast.literal_eval)
         
         quant_df_to_show = quant_df.drop(columns=['Protein.Group', 'Protein.Description', 'Protein.Names', 'Sequence', 'Precursors', 'Peptides', 'Peptide.Positions'])
+        value_cols = simple_sample_names + ['Average']
+        quant_df_to_show[value_cols] = quant_df_to_show[value_cols].round(2)
         cutoff = selected_table.split("QT")[1].split(".csv")[0]
         
         quality_df = pd.read_csv(quality_csv_path)
@@ -758,6 +754,7 @@ def update_summ_plot(selected_prot,
                 line=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
                 marker=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
                 showlegend=not show_summ_value,
+                opacity=0.7
             ))
         
         if show_summ_value:

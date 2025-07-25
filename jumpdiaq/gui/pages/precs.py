@@ -29,9 +29,8 @@ sidebar = html.Div(
                 html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
                 html.Br(),
                 html.Label("For cross-run", style={"font-weight": "bold"}),
-                dbc.Switch(label='Show summarization value', id='show-prec-summ', 
-                           value=False, className="d-inline-block", 
-                           style={'marginTop': '5px'}),
+                dbc.Switch(label='Substract row means', id='sub-row-means-xic', value=False),
+                dbc.Switch(label='Show summarization value', id='show-prec-summ', value=False),
                 html.Br(),
                 html.Label("For individual run", style={"font-weight": "bold"}),
                 dbc.Select(id='run-dropdown', placeholder="Select a Run"),
@@ -254,6 +253,7 @@ def read_precs_data(selected_precursor_ms, outdir_path):
 @app.callback(
     Output('prec-quant-plot', 'figure'),
     Output('prec-quality-plot', 'figure'),
+    Input('sub-row-means-xic', 'value'),
     Input('show-prec-summ', 'value'),
     Input('stored-precquant', 'data'),
     Input('stored-precquality', 'data'),
@@ -264,7 +264,8 @@ def read_precs_data(selected_precursor_ms, outdir_path):
     State('stored-meta', 'data'),
     prevent_initial_call=True  # Add this to prevent initial callback
 )
-def update_summ_plot(show_summ_value, 
+def update_summ_plot(sub_row_means_xic,
+                     show_summ_value, 
                      prec_quant_data, 
                      prec_quality_data,
                      ms1_quant_data, 
@@ -336,25 +337,44 @@ def update_summ_plot(show_summ_value,
         
         ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quant', meta_samples, True)
         for tract_id, group in ms1_quant_df.groupby("source_id"):
+            x=group["X"]
+            if sub_row_means_xic:
+                y=group["Y"]-np.nanmean(group["Y"].to_numpy())
+                opacity=0.7
+            else:
+                y=group["Y"]
+                opacity=1.0
+                
             quant_fig.add_trace(go.Scatter(
-                x=group["X"], 
-                y=group["Y"], 
+                x=x, 
+                y=y, 
                 mode="lines+markers",
                 name="Precursors" if show_summ_value else tract_id,
                 line=dict(color='gray' if show_summ_value else None),
                 marker=dict(color='gray' if show_summ_value else None),
-                showlegend=not show_summ_value
+                showlegend=not show_summ_value,
+                opacity=opacity
             ))
+
         ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quant', meta_samples, False)
         for tract_id, group in ms2_quant_df.groupby("source_id"):
+            x=group["X"]
+            if sub_row_means_xic:
+                y=group["Y"]-np.nanmean(group["Y"].to_numpy())
+                opacity=0.7
+            else:
+                y=group["Y"]
+                opacity=1.0
+                
             quant_fig.add_trace(go.Scatter(
-                x=group["X"], 
-                y=group["Y"], 
+                x=x, 
+                y=y, 
                 mode="lines+markers",
                 name="Precursors" if show_summ_value else tract_id,
                 line=dict(color='gray' if show_summ_value else None),
                 marker=dict(color='gray' if show_summ_value else None),
-                showlegend=not show_summ_value
+                showlegend=not show_summ_value,
+                opacity=opacity
             ))
         
         ms1_quality_df = pivot_order_melt(ms1_quality_df, 'quality', meta_samples, True)
@@ -366,7 +386,8 @@ def update_summ_plot(show_summ_value,
                 name="Precursors" if show_summ_value else tract_id,
                 line=dict(color='gray' if show_summ_value else None),
                 marker=dict(color='gray' if show_summ_value else None),
-                showlegend=not show_summ_value
+                showlegend=not show_summ_value,
+                opacity=0.7 if show_summ_value else 1.0
             ))
         ms2_quality_df = pivot_order_melt(ms2_quality_df, 'quality', meta_samples, False)
         for tract_id, group in ms2_quality_df.groupby("source_id"):
@@ -377,15 +398,24 @@ def update_summ_plot(show_summ_value,
                 name="Precursors" if show_summ_value else tract_id,
                 line=dict(color='gray' if show_summ_value else None),
                 marker=dict(color='gray' if show_summ_value else None),
-                showlegend=not show_summ_value
+                showlegend=not show_summ_value,
+                opacity=0.7 if show_summ_value else 1.0
             ))
         
         color_map = {"MS1": "purple", "MS2": "blue"}
         if show_summ_value:
             for tract_id, group in prec_quant_values.groupby("MS_type"):
+                x=group["X"]
+                if sub_row_means_xic:
+                    y=group["Y"]-np.nanmean(group["Y"].to_numpy())
+                    opacity=0.7
+                else:
+                    y=group["Y"]
+                    opacity=1.0
+                    
                 quant_fig.add_trace(go.Scatter(
-                    x=group["X"], 
-                    y=group["Y"], 
+                    x=x, 
+                    y=y, 
                     mode="lines+markers",
                     name=tract_id,
                     line=dict(color=color_map.get(tract_id, "gray"), width=2),
@@ -450,8 +480,6 @@ def update_summ_plot(show_summ_value,
 @app.callback(
     [Output('run-dropdown', 'options'),
      Output('data-store', 'data')],     
-     #Output('corr-table', 'data'),
-     #Output('quan-table', 'data')],
     Input('precursor-dropdown', 'value'),
     State('stored-outdir', 'data')
 )
