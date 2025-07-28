@@ -3,8 +3,9 @@ import logging
 from typing import Tuple
 # external
 import numpy as np
+import numba as nb
 from numba.typed import List
-from numba import types
+from numba import njit, types
 from numba.experimental import jitclass
 import pyteomics.mzml
 import timsrust_pyo3
@@ -16,6 +17,12 @@ from jumpdiaq.ext.alpharaw_thermo import RawFileReader
 from jumpdiaq.ext.alphatims_bruker import get_meta_bruker, get_mobility_mz
 
 args = Arguments()
+ShowProgress = args.show_progress
+InterProgress = args.inter_progress
+TimsCentroid = args.tims_centroid
+WeightedCentroid = args.weighted_centroid
+MassAccCentroid = args.mass_acc_centroid * 1e-6
+IMWindowCentroid = args.im_window_centroid
 PEAK_MZ_DTYPE = np.float32
 PEAK_IM_DTYPE = np.float32
 PEAK_INTENSITY_DTYPE = np.float32
@@ -264,8 +271,8 @@ def load_thermo_raw(raw_file_path: str, centroided: bool = True):
     ms1_spectra = List()
     ms2_spectra = List()
     for i in progress_bar(range(first_spectrum_number, last_spectrum_number + 1), 
-                          args.show_progress, 
-                          args.inter_progress):
+                          ShowProgress, 
+                          InterProgress):
         ms_order = rawfile.GetMSOrderForScanNum(i)
         rt = rawfile.RTFromScanNum(i)
         if not centroided:
@@ -356,22 +363,30 @@ def load_timsTOF_d(bruker_d_folder_name):
     
     ms1_idx = 0
     ms2_idx = 0
-    for i, frame in enumerate(progress_bar(frames, args.show_progress, args.inter_progress)):
+    rt_conversion = 1.0 / 60.0
+    for i, frame in enumerate(progress_bar(frames, ShowProgress, InterProgress)):
         mzs = mz_values[frame.tof_indices].astype(PEAK_MZ_DTYPE)
         ims = np.repeat(mobility_values, np.diff(frame.scan_offsets)).astype(PEAK_IM_DTYPE)
         intensities = np.array(frame.intensities, dtype=PEAK_INTENSITY_DTYPE)
-        rt = frame.rt * (1.0 / 60)
+        rt = np.float32(frame.rt * rt_conversion)
         
         if frame.ms_level == MSLevel.MS1:  # MS1 spectra
             spec = timsSpectrum()
             spec.type = np.int8(1)
-            spec.RT = np.float32(rt)
-            spec.n = len(mzs)
+            spec.RT = rt
             
-            sort_idx = np.argsort(mzs)
-            spec.peaks_mz = mzs[sort_idx]
-            spec.peaks_im = ims[sort_idx]
-            spec.peaks_intensity = intensities[sort_idx]
+            mzs_cen, ims_cen, intensities_cen = centroid_and_sort(
+                mzs, ims, intensities, 
+                centroid=TimsCentroid,
+                weighted_mean=WeightedCentroid,
+                mz_rel_threshold=MassAccCentroid, 
+                im_abs_threshold=IMWindowCentroid)
+            
+            spec.n = len(mzs_cen)
+            spec.peaks_mz = mzs_cen
+            spec.peaks_im = ims_cen
+            spec.peaks_intensity = intensities_cen
+            
             ms1_spectra[ms1_idx] = spec
             ms1_idx += 1
         elif frame.ms_level == MSLevel.MS2:  # MS2 spectra
@@ -380,23 +395,38 @@ def load_timsTOF_d(bruker_d_folder_name):
             starts = scan_offsets[quad_settings.scan_starts]
             ends = scan_offsets[quad_settings.scan_ends]
             #
-            isolation_width_half = np.array(quad_settings.isolation_width) / 2
+            isolation_width_half = np.array(quad_settings.isolation_width) * 0.5
             mz_window_low = quad_settings.isolation_mz - isolation_width_half
             mz_window_high = quad_settings.isolation_mz + isolation_width_half
 
             for j in range(len(starts)):
                 spec = timsSpectrum()
                 spec.type = np.int8(2)
-                spec.RT = np.float32(rt)
-                mzs_sub = mzs[starts[j] : ends[j]]
-                ims_sub = ims[starts[j] : ends[j]]
-                intensities_sub = intensities[starts[j] : ends[j]]
+                spec.RT = rt
                 
-                spec.n = len(mzs_sub)
-                sort_idx = np.argsort(mzs_sub)
-                spec.peaks_mz = mzs_sub[sort_idx]
-                spec.peaks_im = ims_sub[sort_idx]
-                spec.peaks_intensity = intensities_sub[sort_idx]
+                start_idx, end_idx = starts[j], ends[j]
+                mzs_sub = mzs[start_idx:end_idx]
+                ims_sub = ims[start_idx:end_idx]
+                intensities_sub = intensities[start_idx:end_idx]
+                
+                # Skip empty spectra
+                if len(mzs_sub) == 0:
+                    continue
+                
+                mzs_cen, ims_cen, intensities_cen = centroid_and_sort(
+                    mzs_sub, 
+                    ims_sub, 
+                    intensities_sub, 
+                    centroid=TimsCentroid,
+                    weighted_mean=WeightedCentroid,
+                    mz_rel_threshold=MassAccCentroid, 
+                    im_abs_threshold=IMWindowCentroid)
+                
+                spec.n = len(mzs_cen)
+                spec.peaks_mz = mzs_cen
+                spec.peaks_im = ims_cen
+                spec.peaks_intensity = intensities_cen
+                
                 spec.window_low = float(mz_window_low[j])
                 spec.window_high = float(mz_window_high[j])
                 ms2_spectra[ms2_idx] = spec
@@ -406,3 +436,103 @@ def load_timsTOF_d(bruker_d_folder_name):
     frames.clear()
     del frames
     return ms1_spectra[:ms1_idx], ms2_spectra[:ms2_idx]
+
+@njit
+def centroid_and_sort(mzs, ims, intensities, 
+                      centroid=0, 
+                      use_weighted_mean=0,
+                      mz_rel_threshold=5e-6, 
+                      im_abs_threshold=0.005):
+    """
+    Pre-sort by mz for spatial locality + early termination
+    """    
+    # Sort by mz first for spatial locality
+    mz_indices = np.argsort(mzs)
+    n = len(mzs)
+    
+    if not centroid or n==0:
+        return mzs[mz_indices], ims[mz_indices], intensities[mz_indices]
+
+    # Get intensity order within mz-sorted data
+    sorted_intensities = intensities[mz_indices]
+    intensity_order = np.argsort(-sorted_intensities)
+    
+    used = np.zeros(n, dtype=nb.boolean)
+    
+    # Pre-allocate result arrays
+    mzs_result = np.empty(n, dtype=np.float32)
+    ims_result = np.empty(n, dtype=np.float32)
+    intensities_result = np.empty(n, dtype=np.float32)
+    result_count = 0
+    
+    # Process in intensity order within mz-sorted data
+    for idx in range(n):
+        i_sorted = intensity_order[idx]
+        i = mz_indices[i_sorted]
+        
+        if used[i_sorted]:
+            continue
+        
+        # Cache frequently used values
+        current_mz = mzs[i]
+        current_im = ims[i]
+        current_intensity = intensities[i]
+        
+        # Initialize accumulators
+        mz_weighted_sum = current_mz * current_intensity
+        im_weighted_sum = current_im * current_intensity
+        intensity_sum = current_intensity
+        used[i_sorted] = True
+        
+        mz_threshold_abs = current_mz * mz_rel_threshold
+        
+        # Search nearby points in mz-sorted order (both directions)
+        # Search left (lower mz)
+        for k in range(i_sorted - 1, -1, -1):
+            if used[k]:
+                continue
+            j = mz_indices[k]
+            if current_mz - mzs[j] > mz_threshold_abs:
+                break  # Early termination
+                
+            if abs(ims[j] - current_im) < im_abs_threshold:
+                intensity_j = intensities[j]
+                mz_weighted_sum += mzs[j] * intensity_j
+                im_weighted_sum += ims[j] * intensity_j
+                intensity_sum += intensity_j
+                used[k] = True
+        
+        # Search right (higher mz)
+        for k in range(i_sorted + 1, n):
+            if used[k]:
+                continue
+            j = mz_indices[k]
+            if mzs[j] - current_mz > mz_threshold_abs:
+                break  # Early termination
+                
+            if abs(ims[j] - current_im) < im_abs_threshold:
+                intensity_j = intensities[j]
+                mz_weighted_sum += mzs[j] * intensity_j
+                im_weighted_sum += ims[j] * intensity_j
+                intensity_sum += intensity_j
+                used[k] = True
+        
+        # Store results
+        if use_weighted_mean:
+            mzs_result[result_count] = mz_weighted_sum / intensity_sum
+            ims_result[result_count] = im_weighted_sum / intensity_sum
+        else:
+            mzs_result[result_count] = current_mz
+            ims_result[result_count] = current_im
+        intensities_result[result_count] = intensity_sum
+        result_count += 1
+    
+    # Sort results by mz coordinate before returning
+    if result_count > 1:
+        sort_indices = np.argsort(mzs_result[:result_count])
+        return (mzs_result[:result_count][sort_indices], 
+                ims_result[:result_count][sort_indices], 
+                intensities_result[:result_count][sort_indices])
+    else:
+        return mzs_result[:result_count], ims_result[:result_count], intensities_result[:result_count]
+        

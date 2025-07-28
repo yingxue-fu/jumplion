@@ -79,6 +79,12 @@ class Arguments:
     norm_method: int = 0
     trim_percentage: int = 5
     
+    # timsTOF data preprocessing
+    tims_centroid: int = 1
+    weighted_centroid: int = 1
+    mass_acc_centroid: int = 5
+    im_window_centroid: float = 0.005
+    
     # Internal use
     show_progress: int = 1
     inter_progress: int = 0    
@@ -177,10 +183,18 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--norm-method", type=int, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
-    # 
-    parser.add_argument("--config-file", type=str, help="Path to a configuration file")
+    # timsTOF data preprocessing
+    parser.add_argument("--tims-centroid", type=int, help="")
+    parser.add_argument("--weighted-centroid", type=int, help="")
+    parser.add_argument("--mass-acc-centroid", type=int, help="")
+    parser.add_argument("--im-window-centroid", type=float, help="")
+    
+    #
     parser.add_argument("--show-progress", type=int, help="")
     parser.add_argument("--inter-progress", type=int, help="")
+    
+    #
+    parser.add_argument("--config-file", type=str, help="Path to a configuration file")
     
     return parser
 
