@@ -378,7 +378,7 @@ def load_timsTOF_d(bruker_d_folder_name):
             mzs_cen, ims_cen, intensities_cen = centroid_and_sort(
                 mzs, ims, intensities, 
                 centroid=TimsCentroid,
-                weighted_mean=WeightedCentroid,
+                use_weighted_mean=WeightedCentroid,
                 mz_rel_threshold=MassAccCentroid, 
                 im_abs_threshold=IMWindowCentroid)
             
@@ -418,7 +418,7 @@ def load_timsTOF_d(bruker_d_folder_name):
                     ims_sub, 
                     intensities_sub, 
                     centroid=TimsCentroid,
-                    weighted_mean=WeightedCentroid,
+                    use_weighted_mean=WeightedCentroid,
                     mz_rel_threshold=MassAccCentroid, 
                     im_abs_threshold=IMWindowCentroid)
                 
