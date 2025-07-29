@@ -905,7 +905,7 @@ def update_sequence_viewer(selected_prot, data):
     sequence_viewer = dash_bio.SequenceViewer(
         sequence=sequence,
         title=f"{row['Genes']}",
-        sequenceMaxHeight='500px',
+        sequenceMaxHeight='300px',
         showLineNumbers=True,
         charsPerLine=100,
         toolbar=True,

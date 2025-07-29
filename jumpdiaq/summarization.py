@@ -131,11 +131,11 @@ def precursor_summarize(quant_df: pl.DataFrame,
         quality_summed[i, :] = topN(quality_mat)
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
-    quant_table = quant_table.with_columns(pl.Series(name="Average", values=np.nanmean(quant_summed, axis=1)))
+    quant_table = quant_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
     quant_table = quant_table.with_columns(pl.Series(name="Precursor.Id", values=prec_ids))
     
     quality_table = pl.DataFrame(quality_summed, schema=sample_cols)
-    quality_table = quality_table.with_columns(pl.Series(name="Average", values=np.nanmean(quality_summed, axis=1)))
+    quality_table = quality_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
     quality_table = quality_table.with_columns(pl.Series(name="Precursor.Id", values=prec_ids))
 
     return quant_table, quality_table

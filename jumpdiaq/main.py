@@ -15,11 +15,6 @@ matplotlib.use('Agg') # This line must come before importing pyplot
 import jumpdiaq
 from jumpdiaq.arguments import parse_arguments, setup_logger, close_logger
 from jumpdiaq.utils import remove_extension, get_file_name
-from jumpdiaq.summarization import (quantify_precursors, 
-                                    quantify_proteins, 
-                                    quality_hist_plot, 
-                                    norm_dataframe, 
-                                    filter_based_on_quality)
 
 
 def main():
@@ -39,6 +34,11 @@ def main():
                                                 get_precursor_locations, 
                                                 get_protein_info, 
                                                 calculate_protein_coverage)
+    from jumpdiaq.summarization import (quantify_precursors, 
+                                        quantify_proteins, 
+                                        quality_hist_plot, 
+                                        norm_dataframe, 
+                                        filter_based_on_quality)
 
     #
     MSFiles = args.ms_files
