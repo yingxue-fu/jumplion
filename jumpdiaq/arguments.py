@@ -80,7 +80,7 @@ class Arguments:
     trim_percentage: int = 5
     
     # timsTOF data preprocessing
-    tims_centroid: int = 1
+    tims_centroid: int = 0
     weighted_centroid: int = 1
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
