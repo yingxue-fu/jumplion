@@ -13,6 +13,8 @@ from jumpdiaq.arguments import Arguments
 from jumpdiaq.utils import progress_bar
 
 args = Arguments()
+ShowProgress = args.show_progress
+InterProgress = args.inter_progress
 
 def get_quant_quality_dfs(report_df, 
                           id_col,
@@ -102,7 +104,7 @@ def precursor_summarize(quant_df: pl.DataFrame,
     quant_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
     quality_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
 
-    for i, prec_id in enumerate(progress_bar(prec_ids, args.show_progress, args.inter_progress)):
+    for i, prec_id in enumerate(progress_bar(prec_ids, ShowProgress, InterProgress)):
         quant_df_sub = quant_groups.get((prec_id,))
         if quant_df_sub is None:
             continue
@@ -226,7 +228,7 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
                                              report_file, 
                                              id_col,
                                              sample_col="Run",
-                                             quant_id_col="MS1.XIC.Mzs",
+                                             quant_id_col="MS1.XIC.Info",
                                              quality_col="MS1.XIC.Corr.Raw",
                                              quant_col="MS1.XIC.Quant.Adjusted",
                                              annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
@@ -277,11 +279,29 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
     elif quant_source == 'ms2':
         return ms2_quant_table, ms2_quality_table
     elif quant_source == 'ms1_ms2':
-        # Keep only the row with the highest Average per Precursor.Id
+        # Keep only the row with the highest Average per Precursor.Id, but prioritize MS2 when both > 0.8
         ms1_ms2_quality_table = (
             ms1_ms2_quality_table
-            .filter(pl.col("Average") == pl.col("Average").max().over("Precursor.Id"))
+            .with_columns([
+                # Get MS1 and MS2 averages for each Precursor.Id (null if not exists)
+                pl.col("Average").filter(pl.col("MS_type") == "MS1").first().over("Precursor.Id").alias("ms1_avg"),
+                pl.col("Average").filter(pl.col("MS_type") == "MS2").first().over("Precursor.Id").alias("ms2_avg")
+            ])
+            .with_columns([
+                # Check if both MS1 and MS2 exist and have Average > 0.8
+                ((pl.col("ms1_avg").is_not_null()) & (pl.col("ms1_avg") > 0.8)).alias("ms1_good"),
+                ((pl.col("ms2_avg").is_not_null()) & (pl.col("ms2_avg") > 0.8)).alias("ms2_good")
+            ])
+            .filter(
+                # If both MS1 and MS2 have Average > 0.8, choose MS2
+                pl.when(pl.col("ms1_good") & pl.col("ms2_good"))
+                .then(pl.col("MS_type") == "MS2")
+                # Otherwise, choose the one with max average
+                .otherwise(pl.col("Average") == pl.col("Average").max().over("Precursor.Id"))
+            )
+            .drop(["ms1_avg", "ms2_avg", "ms1_good", "ms2_good"])
         )
+        
         # Filter quant table to keep only rows matching filtered quality table
         ms1_ms2_quant_table = ms1_ms2_quant_table.filter(
             pl.col("Precursor.Id_MS_type").is_in(
@@ -303,7 +323,7 @@ def protein_summarize(prec_quant_table,
     quant_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
     quality_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
 
-    for i, prot_id in enumerate(progress_bar(prot_ids, args.show_progress, args.inter_progress)):
+    for i, prot_id in enumerate(progress_bar(prot_ids, ShowProgress, InterProgress)):
         # prot_id = prot_ids[0]
         quant_df_sub = quant_groups.get((prot_id,))
         if quant_df_sub is None:

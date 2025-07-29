@@ -35,6 +35,8 @@ MinApexEvidence = args.min_apex_evidence
 IntRemoval = args.int_removal
 IntRemovalCorr = args.int_removal_corr
 IntFilterFactor = args.int_filter_factor
+ShowProgress = args.show_progress
+InterProgress = args.inter_progress
 
 # Mapping of column indices 
 libPr = 0
@@ -329,17 +331,18 @@ class Library:
                         "MS2.XIC.Corr.Raw": ";".join([str(fr.corr[0]) for fr in jt[1].ms2_quant]),
                         "MS2.XIC.Corr.Adjusted": ";".join([str(fr.corr[1]) for fr in jt[1].ms2_quant])
                     })
-
+                    
+                    ms1_xic_names = ['M+0', 'M+1', 'M+2']
                     row_data.update({
-                        "MS1.XIC.Mzs": ";".join([str(pr.mz) for pr in jt[1].ms1_quant]),
-                        "MS2.XIC.Mzs": ";".join([str(fr.mz) for fr in jt[1].ms2_quant]),
                         "Optimal.XIC": jt[1].optimal_xic,
                         "Optimal.XIC.Type": f"ms{jt[1].optimal_xic_type}",
+                        "MS1.XIC.Info": ";".join([f"{ms1_xic_names[i]}/{np.round(pr.mz, 4)}" 
+                                                  for i, pr in enumerate(jt[1].ms1_quant)]),
                         "MS2.XIC.Info": ";".join([
                                              f"{char_of_fType[(cfr.ion_type & (fTypeB | fTypeY)) >> 0]}"  # Ion type (B or Y)
                                              f"{cfr.index if cfr.ion_type & fTypeB else len(get_aas(entry.name)) - cfr.index}"  # Index
                                              f"{'-' + name_of_loss[cfr.loss] if cfr.loss != loss_none else ''}"  # Loss info (if any)
-                                             f"^{cfr.charge}"#/{cfr.mz}"  # Charge and m/z
+                                             f"^{cfr.charge}/{np.round(cfr.mz, 4)}"  # Charge and m/z
                                              for fr in jt[1].ms2_quant 
                                              for cfr in [entry.prec.products[fr.index]]
                                              ])
@@ -447,13 +450,7 @@ class Info:
     
             precursor_groups = df.partition_by("Precursor.Id", as_dict=True)
     
-            for precursor_id, subdf in progress_bar(precursor_groups.items(), 
-                                                    args.show_progress, 
-                                                    args.inter_progress):
-                # precursor_id = precursor_ids[3706]
-                # subdf = precursor_groups[(precursor_id,)]
-                # tempdf = subdf.to_pandas()
-                # print(precursor_id)
+            for precursor_id, subdf in progress_bar(precursor_groups.items(), ShowProgress, InterProgress):
                 row_type_map = subdf.partition_by("row_type", as_dict=True)
                 xic_rows = row_type_map.get(("xic_row",), pl.DataFrame())
                 mz_row = row_type_map.get(("mz_row",), pl.DataFrame())
@@ -510,7 +507,7 @@ class Info:
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
         
         data_rows = []
-        for pr_index, v in progress_bar(self.map.items(), args.show_progress, args.inter_progress):
+        for pr_index, v in progress_bar(self.map.items(), ShowProgress, InterProgress):
             # pr_index = 1
             # v = self.map[pr_index]
             # for each precursor, check overall optimal xic type

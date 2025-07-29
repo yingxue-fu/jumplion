@@ -141,6 +141,8 @@ layout = html.Div(children=[
                                 'height': '400px', 
                                 'overflowY': 'auto'},
                             style_cell={
+                                'fontFamily': 'Arial, sans-serif',
+                                'fontSize': '14px',
                                 'textAlign': 'center', 
                                 'padding': '5px',
                                 'whiteSpace': 'normal',
@@ -150,14 +152,13 @@ layout = html.Div(children=[
                                 'backgroundColor': 'white'
                             },
                             style_header={
-                                'backgroundColor': 'lightgray', 
+                                'backgroundColor': 'white', #'lightgray',
                                 'fontWeight': 'bold'},
                             filter_action="native",
                             sort_action="native",
                             sort_mode="multi",
                             page_size=10,
                             page_action="native",
-                            
                         ),
                     ])
                 ], style={"width": "97%"})
@@ -667,7 +668,7 @@ def read_precs_data(selected_prot, outdir_path, meta):
      Input('show-summ', 'value'),
      Input('stored-prot-prec-quant', 'data'),
      Input('stored-prot-prec-quant-norm', 'data'),
-     Input('stored-prot-prec-quality', 'data'),],  
+     Input('stored-prot-prec-quality', 'data')],  
     [State('stored-prot-quant', 'data'),
      State('stored-prot-quality', 'data')],
     prevent_initial_call=True  # Add this to prevent initial callback
@@ -719,7 +720,7 @@ def update_summ_plot(selected_prot,
             sampled_colors = px.colors.qualitative.Plotly[:num_traces]
         else:
             default_colorscale = [[i/(len(px.colors.qualitative.Plotly)-1), color] 
-                                 for i, color in enumerate(px.colors.qualitative.Plotly)]
+                                  for i, color in enumerate(px.colors.qualitative.Plotly)]
             sampled_colors = px.colors.sample_colorscale(default_colorscale, num_traces)
         trace_colors = dict(zip(unique_precursors, sampled_colors))
         for tract_id, group in prec_quant_df.groupby("Precursor.Id_MS_type"):
@@ -754,7 +755,7 @@ def update_summ_plot(selected_prot,
                 line=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
                 marker=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
                 showlegend=not show_summ_value,
-                opacity=0.7
+                opacity=0.7 if show_summ_value else 1.0
             ))
         
         if show_summ_value:
@@ -883,9 +884,9 @@ def update_sequence_viewer(selected_prot, data):
     # Step 3: Assign color based on coverage
     def get_color(coverage_count):
         if coverage_count == 1:
-            return '#C50063'  # Original color
+            return '#B6E880'  # Original color
         else:
-            return '#FFA500'  # Overlapping region color (adjust as needed)
+            return '#FECB52'  # Overlapping region color (adjust as needed)
     
     # Step 4: Generate coverage_data without overlaps
     coverage_data = []
@@ -895,8 +896,8 @@ def update_sequence_viewer(selected_prot, data):
             'end': end,
             'tooltip': f"Coverage: {count} peptide(s)",
             'bgcolor': get_color(count),
-            'color': 'white',
-            'underscore': True
+            'color': 'black',
+            'underscore': False
         })
 
     

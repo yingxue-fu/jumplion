@@ -23,9 +23,9 @@ TimsCentroid = args.tims_centroid
 WeightedCentroid = args.weighted_centroid
 MassAccCentroid = args.mass_acc_centroid * 1e-6
 IMWindowCentroid = args.im_window_centroid
-PEAK_MZ_DTYPE = np.float32
-PEAK_IM_DTYPE = np.float32
-PEAK_INTENSITY_DTYPE = np.float32
+PeakMzDtype = np.float32
+PeakIMDtype = np.float32
+PeakIntensityDtype = np.float32
 
 @jitclass([
     ("RT", types.float32), 
@@ -284,8 +284,8 @@ def load_thermo_raw(raw_file_path: str, centroided: bool = True):
         spec.type = np.int8(ms_order)
         spec.RT = np.float32(rt)
         spec.n = len(masses)
-        spec.peaks_mz = masses.astype(PEAK_MZ_DTYPE)
-        spec.peaks_intensity = intensities.astype(PEAK_INTENSITY_DTYPE)
+        spec.peaks_mz = masses.astype(PeakMzDtype)
+        spec.peaks_intensity = intensities.astype(PeakIntensityDtype)
 
         if spec.type == 1:
             ms1_spectra.append(spec)
@@ -365,9 +365,9 @@ def load_timsTOF_d(bruker_d_folder_name):
     ms2_idx = 0
     rt_conversion = 1.0 / 60.0
     for i, frame in enumerate(progress_bar(frames, ShowProgress, InterProgress)):
-        mzs = mz_values[frame.tof_indices].astype(PEAK_MZ_DTYPE)
-        ims = np.repeat(mobility_values, np.diff(frame.scan_offsets)).astype(PEAK_IM_DTYPE)
-        intensities = np.array(frame.intensities, dtype=PEAK_INTENSITY_DTYPE)
+        mzs = mz_values[frame.tof_indices].astype(PeakMzDtype)
+        ims = np.repeat(mobility_values, np.diff(frame.scan_offsets)).astype(PeakIMDtype)
+        intensities = np.array(frame.intensities, dtype=PeakIntensityDtype)
         rt = np.float32(frame.rt * rt_conversion)
         
         if frame.ms_level == MSLevel.MS1:  # MS1 spectra

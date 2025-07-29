@@ -53,10 +53,6 @@
   white-space: nowrap;
 }
 
-@font-face {
-  font-family: "garamond";
-  }
-
 .nav-link.active{
   color: #40484E !important;
 }

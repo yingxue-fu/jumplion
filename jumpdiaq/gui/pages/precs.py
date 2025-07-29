@@ -1,7 +1,7 @@
 # builtin
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any#, Tuple, Optional
 # external
 import numpy as np
 import pandas as pd
@@ -16,7 +16,8 @@ from jumpdiaq.gui.utils import extract_unique_parts
 
 
 load_figure_template(["vizro", "vizro_dark"])
-
+ms1_colors = dict(zip(["M+0", "M+1", "M+2"], px.colors.qualitative.T10[0:3]))
+ms2_colors = px.colors.qualitative.T10[3:]
 
 sidebar = html.Div(
     [
@@ -25,7 +26,7 @@ sidebar = html.Div(
         dbc.Nav(
             [   
                 html.Label(id='protein-label', style={"font-weight": "bold"}),
-                dbc.Select(id='precursor-dropdown', placeholder="Select a Precursor"),
+                dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor"),
                 html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
                 html.Br(),
                 html.Label("For cross-run", style={"font-weight": "bold"}),
@@ -33,7 +34,7 @@ sidebar = html.Div(
                 dbc.Switch(label='Show summarization value', id='show-prec-summ', value=False),
                 html.Br(),
                 html.Label("For individual run", style={"font-weight": "bold"}),
-                dbc.Select(id='run-dropdown', placeholder="Select a Run"),
+                dcc.Dropdown(id='run-dropdown', placeholder="Select a Run"),
                 dbc.Switch(label='Show Interpolated MS1 XICs', id='show-ms1-inter', value=False, 
                            className="d-inline-block", style={'marginTop': '5px'}),
                 html.Hr(),
@@ -87,6 +88,9 @@ layout = html.Div(children=[
                         dbc.Col(html.Div(id='show-precid-i', style={'fontSize': '20px'}), width=11)
                     ], style={'margin-top': '20px'}),
                     dbc.Row([
+                        dbc.Col(html.Div(id='show-run-info', style={'fontSize': '16px', 'color': 'green'}), width=11)
+                    ], style={'margin-top': '5px'}),
+                    dbc.Row([
                         dbc.Col(dcc.Graph(id='xic-plot-ms1'), width=8),
                         dbc.Col(dcc.Graph(id='xic-plot-ms1-c'), width=4)
                     ], style={'margin-top': '5px', 'margin-right': '10px'}),
@@ -106,7 +110,10 @@ layout = html.Div(children=[
                                                                           "XIC Quant (Adj)"]],
                             data=[],
                             style_table={'overflowX': 'auto'},
-                            style_cell={'textAlign': 'left', 'padding': '5px'},
+                            style_cell={'fontFamily': 'Arial, sans-serif',
+                                        'fontSize': '14px',
+                                        'textAlign': 'left', 
+                                        'padding': '5px'},
                             style_header={'fontWeight': 'bold'},
                             page_size=10,
                         ), width=11, className="mx-auto"),
@@ -117,28 +124,6 @@ layout = html.Div(children=[
     ])
 ], className="dbc dbc-row-selectable")
 
-
-def validate_parquet_file(filepath: Path, required_cols: List[str]) -> Tuple[bool, Optional[str]]:
-    """Validate parquet file and required columns"""
-    try:
-        if not filepath.is_file():
-            return False, f"File not found: {filepath}"
-            
-        if filepath.suffix.lower() != '.parquet':
-            return False, f"Invalid file type. Expected .parquet file, got: {filepath.suffix}"
-            
-        if not os.access(filepath, os.R_OK):
-            return False, f"File is not readable: {filepath}"
-            
-        df = pd.read_parquet(filepath, columns=required_cols)
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {', '.join(missing_cols)}"
-            
-        return True, None
-        
-    except Exception as e:
-        return False, str(e)
 
 def get_xic_path(data_path: Path, run_name: str) -> Path:
     """
@@ -167,9 +152,8 @@ def string2float(float_strings: List[str], decimal: int) -> List[str]:
     Output('protein-label', 'children'),
     Input('selected-prot', 'data'),
 )
-def update_label(protein_name):
+def update_protein_label(protein_name):
     return f"For protein: {protein_name}"
-
 
 @app.callback(
     Output('precursor-dropdown', 'options'),
@@ -178,14 +162,11 @@ def update_label(protein_name):
 def load_options(stored_options):
     if stored_options is None:
         return []
-    
+    # Note: label and value are different
     precursor_options = [{'label': precursor.split("_")[0], 'value': precursor} 
                          for precursor in stored_options]
-    
     return precursor_options
 
-
-# Callback to read HDF file based on selected row
 @app.callback(
     [Output('show-precid-c', 'children'),
      Output('show-ms-level', 'children'), 
@@ -197,43 +178,37 @@ def load_options(stored_options):
      Output('stored-precMS2quality', 'data')],
     Input('precursor-dropdown', 'value'),
     State('stored-outdir', 'data'),
-    #prevent_initial_call=True
+    prevent_initial_call=True
 )
-def read_precs_data(selected_precursor_ms, outdir_path):
-    
-    if not selected_precursor_ms or outdir_path is None:
+def read_precs_data(selected_precursor, outdir_path):
+    if not selected_precursor or outdir_path is None:
         return None, None, None, None, None, None, None, None
-    # outdir_path = r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\test_20250523"
-    # df = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\test_20250514\Protein.Group_Quan_maxLFQ.csv"))
-    # meta = pd.read_csv(Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\sample_meta.csv"))
 
-    # Assuming "file_name" column contains the name of the corresponding HDF file
     prec_quant_file = os.path.join(outdir_path, "Precursor.Id_quant_ms1_ms2_summ_table.parquet")
     prec_quality_file = os.path.join(outdir_path, "Precursor.Id_quality_ms1_ms2_summ_table.parquet")
-    
     ms1_quant_file = os.path.join(outdir_path, "Precursor.Id_MS1.XIC.Quant.Adjusted_mapping.parquet")
     ms1_quality_file = os.path.join(outdir_path, "Precursor.Id_MS1.XIC.Corr.Raw_mapping.parquet")
     ms2_quant_file = os.path.join(outdir_path, "Precursor.Id_MS2.XIC.Quant.Adjusted_mapping.parquet")
     ms2_quality_file = os.path.join(outdir_path, "Precursor.Id_MS2.XIC.Corr.Raw_mapping.parquet")
     
-    selected_precursor = selected_precursor_ms.split("_")[0]
-    ms_level = selected_precursor_ms.split("_")[1]
-    title = html.Div([f"     {selected_precursor}"])
+    precursor_id = selected_precursor.split("_")[0]
+    ms_level = selected_precursor.split("_")[1]
+    title = html.Div([f"     {precursor_id}"])
     ms_level_info = f"{ms_level}-level quantification of this precursor is used when summarizing to protein."
     try:
-        prec_quant_df = pd.read_parquet(prec_quant_file, filters=[('Precursor.Id', '==', selected_precursor)])
-        prec_quality_df = pd.read_parquet(prec_quality_file, filters=[('Precursor.Id', '==', selected_precursor)])
+        prec_quant_df = pd.read_parquet(prec_quant_file, filters=[('Precursor.Id', '==', precursor_id)])
+        prec_quality_df = pd.read_parquet(prec_quality_file, filters=[('Precursor.Id', '==', precursor_id)])
         
-        ms1_quant_df = pd.read_parquet(ms1_quant_file, filters=[('target_id', '==', selected_precursor)])
+        ms1_quant_df = pd.read_parquet(ms1_quant_file, filters=[('target_id', '==', precursor_id)])
         ms1_quant_df['samples'] = extract_unique_parts(ms1_quant_df['samples'].values.tolist())
         
-        ms1_quality_df = pd.read_parquet(ms1_quality_file, filters=[('target_id', '==', selected_precursor)])
+        ms1_quality_df = pd.read_parquet(ms1_quality_file, filters=[('target_id', '==', precursor_id)])
         ms1_quality_df['samples'] = extract_unique_parts(ms1_quality_df['samples'].values.tolist())
         
-        ms2_quant_df = pd.read_parquet(ms2_quant_file, filters=[('target_id', '==', selected_precursor)])
+        ms2_quant_df = pd.read_parquet(ms2_quant_file, filters=[('target_id', '==', precursor_id)])
         ms2_quant_df['samples'] = extract_unique_parts(ms2_quant_df['samples'].values.tolist())
         
-        ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', selected_precursor)])
+        ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', precursor_id)])
         ms2_quality_df['samples'] = extract_unique_parts(ms2_quality_df['samples'].values.tolist())
         
         return (title, ms_level_info,
@@ -248,8 +223,6 @@ def read_precs_data(selected_precursor_ms, outdir_path):
         logger.error(f"Error loading parquet file: {str(e)}")
         return None, None, None, None, None, None, None, None
 
-
-# Callback to generate figure from selected row
 @app.callback(
     Output('prec-quant-plot', 'figure'),
     Output('prec-quality-plot', 'figure'),
@@ -262,7 +235,7 @@ def read_precs_data(selected_precursor_ms, outdir_path):
     Input('stored-precMS2quant', 'data'),
     Input('stored-precMS2quality', 'data'), 
     State('stored-meta', 'data'),
-    prevent_initial_call=True  # Add this to prevent initial callback
+    prevent_initial_call=True  
 )
 def update_summ_plot(sub_row_means_xic,
                      show_summ_value, 
@@ -279,7 +252,6 @@ def update_summ_plot(sub_row_means_xic,
                 go.Figure(layout=dict(title="Select a precursor to visualize its quality data")))
     
     try:
-        # AVAVDLGNR2, Q8TCS8
         meta = pd.DataFrame(meta)
         meta_samples = meta['Sample'].values.tolist()
         prec_quant_df = pd.DataFrame(prec_quant_data)
@@ -299,33 +271,21 @@ def update_summ_plot(sub_row_means_xic,
         ms2_quant_df = pd.DataFrame(ms2_quant_data)
         ms2_quality_df = pd.DataFrame(ms2_quality_data)
         
-        ms1_xic_names = ['M+0', 'M+1', 'M+2']
-        def pivot_order_melt(df, value_type, samples, is_ms1):
+        def pivot_order_melt(df, value_type, samples):
             # Pivot to wide format
-            df_pivot = df.pivot(index='source_id', columns='samples', values=f'source_{value_type}')
-        
+            df_pivot = df.pivot(index='source_id', 
+                                columns='samples', 
+                                values=f'source_{value_type}')
             # Add missing samples as NaN
             for sample in samples:
                 if sample not in df_pivot.columns:
                     df_pivot[sample] = np.nan
-        
             # Reorder columns
             df_pivot = df_pivot[samples]
-        
-            if is_ms1:
-                # Get min mz for each source_id
-                ms1_mzs = df['source_id'].unique()
-                ms1_mzs = np.sort(ms1_mzs)
-        
-                # Assign labels based on mz rank
-                label_map = dict(zip(ms1_mzs, ms1_xic_names[:len(ms1_mzs)]))
-        
-                # Rename index
-                df_pivot = df_pivot.rename(index=label_map)
-                df_pivot.index.name = 'source_id'
-        
             # Convert to long format
-            df_long = df_pivot.reset_index().melt(id_vars='source_id', var_name='X', value_name='Y')
+            df_long = df_pivot.reset_index().melt(id_vars='source_id', 
+                                                  var_name='X', 
+                                                  value_name='Y')
             return df_long
         
         # Create figure
@@ -335,7 +295,7 @@ def update_summ_plot(sub_row_means_xic,
         # Plot each tract as a connected scatter plot
         meta_samples = extract_unique_parts(meta_samples)
         
-        ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quant', meta_samples, True)
+        ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quant', meta_samples)
         for tract_id, group in ms1_quant_df.groupby("source_id"):
             x=group["X"]
             if sub_row_means_xic:
@@ -349,15 +309,15 @@ def update_summ_plot(sub_row_means_xic,
                 x=x, 
                 y=y, 
                 mode="lines+markers",
-                name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='gray' if show_summ_value else None),
-                marker=dict(color='gray' if show_summ_value else None),
+                name="MS1 XICs" if show_summ_value else tract_id,
+                line=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
+                marker=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
                 showlegend=not show_summ_value,
                 opacity=opacity
             ))
 
-        ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quant', meta_samples, False)
-        for tract_id, group in ms2_quant_df.groupby("source_id"):
+        ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quant', meta_samples)
+        for i, (tract_id, group) in enumerate(ms2_quant_df.groupby("source_id")):
             x=group["X"]
             if sub_row_means_xic:
                 y=group["Y"]-np.nanmean(group["Y"].to_numpy())
@@ -370,34 +330,34 @@ def update_summ_plot(sub_row_means_xic,
                 x=x, 
                 y=y, 
                 mode="lines+markers",
-                name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='gray' if show_summ_value else None),
-                marker=dict(color='gray' if show_summ_value else None),
+                name="MS2 XICs" if show_summ_value else tract_id,
+                line=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
+                marker=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
                 showlegend=not show_summ_value,
                 opacity=opacity
             ))
         
-        ms1_quality_df = pivot_order_melt(ms1_quality_df, 'quality', meta_samples, True)
+        ms1_quality_df = pivot_order_melt(ms1_quality_df, 'quality', meta_samples)
         for tract_id, group in ms1_quality_df.groupby("source_id"):
             quality_fig.add_trace(go.Scatter(
                 x=group["X"], 
                 y=group["Y"], 
                 mode="lines+markers",
                 name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='gray' if show_summ_value else None),
-                marker=dict(color='gray' if show_summ_value else None),
+                line=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
+                marker=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
                 showlegend=not show_summ_value,
                 opacity=0.7 if show_summ_value else 1.0
             ))
-        ms2_quality_df = pivot_order_melt(ms2_quality_df, 'quality', meta_samples, False)
-        for tract_id, group in ms2_quality_df.groupby("source_id"):
+        ms2_quality_df = pivot_order_melt(ms2_quality_df, 'quality', meta_samples)
+        for i, (tract_id, group) in enumerate(ms2_quality_df.groupby("source_id")):
             quality_fig.add_trace(go.Scatter(
                 x=group["X"], 
                 y=group["Y"], 
                 mode="lines+markers",
                 name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='gray' if show_summ_value else None),
-                marker=dict(color='gray' if show_summ_value else None),
+                line=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
+                marker=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
                 showlegend=not show_summ_value,
                 opacity=0.7 if show_summ_value else 1.0
             ))
@@ -488,20 +448,21 @@ def update_run_options(selected_precursor: str, file_path: str) -> tuple:
         return [], None#, [], []
 
     try:
-        # file_path = r'C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\test_20250513'
         data_path = Path(file_path) / 'xic_quan_report.parquet'
-        required_cols = ['File.Name', 'Run', 'Precursor.Id', 'Precursor.Mz', 'MS1.XIC.Mzs', 
-                            'RT.Apex', 'RT.Left', 'RT.Right', 'MS2.XIC.Info', 'MS2.XIC.Mzs', 
-                            'Optimal.XIC', 'Optimal.XIC.Type',
-                            'MS2.XIC.Corr.Raw', 'MS2.XIC.Quant.Raw', 'MS2.XIC.Quant.Adjusted',
-                            'MS1.XIC.Corr.Raw', 'MS1.XIC.Quant.Raw', 'MS1.XIC.Quant.Adjusted']
+        required_cols = ['File.Name', 'Run', 
+                         'Precursor.Id', 'Precursor.Mz', 
+                         'RT.Apex', 'RT.Left', 'RT.Right', 
+                         'Optimal.XIC', 'Optimal.XIC.Type', 
+                         'MS1.XIC.Info', 'MS2.XIC.Info', 
+                         'MS2.XIC.Corr.Raw', 'MS2.XIC.Quant.Raw', 'MS2.XIC.Quant.Adjusted',
+                         'MS1.XIC.Corr.Raw', 'MS1.XIC.Quant.Raw', 'MS1.XIC.Quant.Adjusted']
         selected_precursor = selected_precursor.split("_")[0]
         df = pd.read_parquet(data_path, 
                            columns=required_cols,
                            filters=[('Precursor.Id', '==', selected_precursor)])
         
         if df.empty:
-            return [], None#, [], []
+            return [], None
         
         # Store the absolute path
         df['file_path'] = str(data_path)
@@ -511,10 +472,11 @@ def update_run_options(selected_precursor: str, file_path: str) -> tuple:
         
     except Exception as e:
         logger.error(f"Error updating run options: {e}")
-        return [], None#, [], []
+        return [], None
 
 @app.callback(
     [Output('show-precid-i', 'children'), 
+     Output('show-run-info', 'children'), 
      Output('xic-plot-ms1', 'figure'),
      Output('xic-plot-ms1-c', 'figure'),
      Output('xic-plot-ms2', 'figure'),
@@ -532,7 +494,7 @@ def update_XIC_plots_table(selected_run: str,
                             stored_data: List[Dict[str, Any]], 
                             file_path: str) -> tuple:
     if selected_run is None or selected_precursor is None or not stored_data:
-        return ('Select a run to check precursor XICs', go.Figure(), 
+        return ('Select a run to check precursor XICs', '', go.Figure(), 
                 go.Figure(), go.Figure(), go.Figure(), [])
 
     try:
@@ -560,22 +522,29 @@ def update_XIC_plots_table(selected_run: str,
             raise ValueError("No XIC data found for selected precursor")
     
         # Extract relevant data
-        title = f"     {selected_precursor} in run {selected_run}"
+        prec_title = f"     {selected_precursor}"
+        run_title = f"     Run: {selected_run}"
         
         # Define template based on switch state
         template = "vizro" #if switch_on else "vizro_dark"
         
         # Precursor info table
-        prec_info = report_data[['MS1.XIC.Mzs', 
+        prec_info = report_data[['MS1.XIC.Info', 
                                  'MS1.XIC.Corr.Raw', 
                                  'MS1.XIC.Quant.Raw', 
                                  'MS1.XIC.Quant.Adjusted']].iloc[0]
-        prec_mz = prec_info['MS1.XIC.Mzs'].split(';')
+        ms1_xics = prec_info['MS1.XIC.Info'].split(';')
+        ms1_xic_names = []
+        ms1_xic_mzs = []
+        for ms1_xic in ms1_xics:
+            parts = ms1_xic.split('/')
+            ms1_xic_names.append(parts[0])
+            ms1_xic_mzs.append(parts[1])
 
         prec_info_df = pd.DataFrame({
-            "XIC Type": ["MS1"] * len(prec_mz),
-            "XIC Name": ['M+0', 'M+1', 'M+2'],
-            "XIC m/z": string2float(prec_mz, 4),
+            "XIC Type": ["MS1"] * len(ms1_xics),
+            "XIC Name": ms1_xic_names,
+            "XIC m/z": ms1_xic_mzs,
             "XIC Corr": string2float(prec_info['MS1.XIC.Corr.Raw'].split(';'), 2),
             "XIC Quant (Raw)": string2float(prec_info['MS1.XIC.Quant.Raw'].split(';'), 2),
             "XIC Quant (Adj)": string2float(prec_info['MS1.XIC.Quant.Adjusted'].split(';'), 2)
@@ -583,17 +552,21 @@ def update_XIC_plots_table(selected_run: str,
 
         # Fragment info table
         frag_info = report_data[['MS2.XIC.Info', 
-                                 'MS2.XIC.Mzs',
                                  'MS2.XIC.Corr.Raw', 
                                  'MS2.XIC.Quant.Raw', 
                                  'MS2.XIC.Quant.Adjusted']].iloc[0]
-        frag_ions = frag_info['MS2.XIC.Info'].split(';')
-        frag_mzs = frag_info['MS2.XIC.Mzs'].split(';')
+        ms2_xics = frag_info['MS2.XIC.Info'].split(';')
+        ms2_xic_names = []
+        ms2_xic_mzs = []
+        for ms2_xic in ms2_xics:
+            parts = ms2_xic.split('/')
+            ms2_xic_names.append(parts[0])
+            ms2_xic_mzs.append(parts[1])
         
         frag_info_df = pd.DataFrame({
-            "XIC Type": ["MS2"] * len(frag_ions),
-            "XIC Name": frag_ions,
-            "XIC m/z": string2float(frag_mzs, 4),
+            "XIC Type": ["MS2"] * len(ms2_xics),
+            "XIC Name": ms2_xic_names,
+            "XIC m/z": ms2_xic_mzs,
             "XIC Corr": string2float(frag_info['MS2.XIC.Corr.Raw'].split(';'), 2),
             "XIC Quant (Raw)": string2float(frag_info['MS2.XIC.Quant.Raw'].split(';'), 2),
             "XIC Quant (Adj)": string2float(frag_info['MS2.XIC.Quant.Adjusted'].split(';'), 2)
@@ -616,28 +589,31 @@ def update_XIC_plots_table(selected_run: str,
         ms1_traces = []
         ms1_rt = xic_data.loc[xic_mask, 'ms1_rt'].values
         ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns
-        ms1_names = ['M+0', 'M+1', 'M+2']
+        #pr_mzs = xic_data.loc[mz_mask, ms1_intensity_cols].values[0]
         for i, pr in enumerate(ms1_intensity_cols):
             ms1_intensity = xic_data.loc[xic_mask, pr].values
             ms1_traces.append(go.Scatter(
                 x=ms1_rt,
                 y=ms1_intensity,
                 mode='lines+markers',
-                name=ms1_names[i],
-                marker=dict(size=6),
+                name=ms1_xics[i], #+ f": {np.round(pr_mzs[i], 4)}",
+                line=dict(color=ms1_colors[ms1_xics[i].split("/")[0]]),
+                marker=dict(color=ms1_colors[ms1_xics[i].split("/")[0]])
             ))
         
         ms2_traces = []
         ms2_rt = xic_data.loc[xic_mask, 'ms2_rt'].values
         ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns
+        #fr_mzs = xic_data.loc[mz_mask, ms2_intensity_cols].values[0]
         for i, fr in enumerate(ms2_intensity_cols):
             ms2_intensity = xic_data.loc[xic_mask, fr].values
             ms2_traces.append(go.Scatter(
                 x=ms2_rt,
                 y=ms2_intensity,
                 mode='lines+markers',
-                name=frag_ions[i],
-                marker=dict(size=6),
+                name=ms2_xics[i], #+ f": {np.round(fr_mzs[i], 4)}",
+                line=dict(color=ms2_colors[i]),
+                marker=dict(color=ms2_colors[i])
             ))
         
         ms1_i_traces = []
@@ -648,8 +624,9 @@ def update_XIC_plots_table(selected_run: str,
                 x=ms2_rt,
                 y=ms1_i_intensity,
                 mode='lines+markers',
-                name=ms1_names[i],
-                marker=dict(size=6),
+                name=ms1_xics[i],
+                line=dict(color=ms1_colors[ms1_xics[i].split("/")[0]]),
+                marker=dict(color=ms1_colors[ms1_xics[i].split("/")[0]])
             ))
             
         xic_c_path = (data_path / "xic_files" / "xics.corrected.parquet").resolve()
@@ -658,24 +635,28 @@ def update_XIC_plots_table(selected_run: str,
                                               ('Precursor.Id', '==', selected_precursor)])
         ms1_traces_c = []
         ms1_rt_c = xic_data_c.loc[:, 'ms2_rt'].values
-        for pr in ms1_intensity_cols:
+        for i, pr in enumerate(ms1_intensity_cols):
             ms1_intensity = xic_data_c.loc[:, pr].values
             ms1_traces_c.append(go.Scatter(
                 x=ms1_rt_c,
                 y=ms1_intensity,
                 mode='lines+markers',
-                marker=dict(size=6),
+                name=ms1_xics[i],
+                line=dict(color=ms1_colors[ms1_xics[i].split("/")[0]]),
+                marker=dict(color=ms1_colors[ms1_xics[i].split("/")[0]])
             ))  
         
         ms2_traces_c = []
         ms2_rt_c = xic_data_c.loc[:, 'ms2_rt'].values
-        for fr in ms2_intensity_cols:
+        for i, fr in enumerate(ms2_intensity_cols):
             ms2_intensity = xic_data_c.loc[:, fr].values
             ms2_traces_c.append(go.Scatter(
                 x=ms2_rt_c,
                 y=ms2_intensity,
                 mode='lines+markers',
-                marker=dict(size=6),
+                name=ms2_xics[i],
+                line=dict(color=ms2_colors[i]),
+                marker=dict(color=ms2_colors[i])
             )) 
         
         if optimal_xic_type == 'ms2':
@@ -683,26 +664,28 @@ def update_XIC_plots_table(selected_run: str,
                 x=ms2_rt_c,
                 y=xic_data_c.loc[:, 'elution'].values,
                 mode='lines+markers',
-                marker=dict(size=6),
-                line=dict(dash='dash'),  # Use 'dash', 'dot', 'dashdot', etc.
+                name='optimal',
+                marker=dict(size=6, color='red'),
+                line=dict(dash='dash', color='red'),  # Use 'dash', 'dot', 'dashdot', etc.
             ))
         elif optimal_xic_type == 'ms1':
             ms1_traces_c.append(go.Scatter(
                 x=ms1_rt_c,
                 y=xic_data_c.loc[:, 'elution'].values,
                 mode='lines+markers',
-                marker=dict(size=6),
-                line=dict(dash='dash'),  # Use 'dash', 'dot', 'dashdot', etc.
+                name='optimal',
+                marker=dict(size=6, color='red'),
+                line=dict(dash='dash', color='red'),  # Use 'dash', 'dot', 'dashdot', etc.
             ))
         
         if not show_interpolated_ms1:
             fig_ms1 = go.Figure(data=ms1_traces)
-            num_colors = len(ms1_traces)
+            #num_colors = len(ms1_traces)
         else:
             fig_ms1 = go.Figure(data=ms1_i_traces)
-            num_colors = len(ms1_i_traces)
+            #num_colors = len(ms1_i_traces)
         
-        ms1_colors = px.colors.sample_colorscale("Jet", [i / (num_colors - 1) for i in range(num_colors)])
+        #ms1_colors = px.colors.sample_colorscale("Jet", [i / (num_colors - 1) for i in range(num_colors)])
         fig_ms1.update_layout(
             title="MS1-level XICs (Raw)",
             xaxis_title="Retention Time",
@@ -722,14 +705,14 @@ def update_XIC_plots_table(selected_run: str,
             ),
             xaxis_range=[min(ms1_rt[0], ms2_rt[0]), max(ms1_rt[-1], ms2_rt[-1])],
             yaxis=dict(tickformat=".1e"),
-            colorway=ms1_colors,
+            #colorway=ms1_colors,
             template=template,
             margin=dict(l=0, r=0, t=70, b=70) 
         )
     
         fig_ms2 = go.Figure(data=ms2_traces)
-        num_colors = len(ms2_traces)
-        ms2_colors = px.colors.sample_colorscale("Rainbow", num_colors)
+        #num_colors = len(ms2_traces)
+        #ms2_colors = px.colors.sample_colorscale("Rainbow", num_colors)
         fig_ms2.update_layout(
             title="MS2-level XICs (Raw)",
             xaxis_title="Retention Time",
@@ -749,7 +732,7 @@ def update_XIC_plots_table(selected_run: str,
             ),
             xaxis_range=[min(ms1_rt[0], ms2_rt[0]), max(ms1_rt[-1], ms2_rt[-1])],
             yaxis=dict(tickformat=".1e"),
-            colorway=ms2_colors,
+            #colorway=ms2_colors,
             template=template,
             margin=dict(l=0, r=0, t=70, b=70) 
         )
@@ -762,7 +745,7 @@ def update_XIC_plots_table(selected_run: str,
             showlegend=False,
             xaxis_range=[min(ms1_rt_c[0], ms2_rt_c[0]), max(ms1_rt_c[-1], ms2_rt_c[-1])],
             yaxis=dict(tickformat=".1e"),
-            colorway=ms1_colors,
+            #colorway=ms1_colors,
             template=template,
             margin=dict(l=0, r=0, t=70, b=70) 
         )
@@ -775,7 +758,7 @@ def update_XIC_plots_table(selected_run: str,
             showlegend=False,
             xaxis_range=[min(ms1_rt_c[0], ms2_rt_c[0]), max(ms1_rt_c[-1], ms2_rt_c[-1])],
             yaxis=dict(tickformat=".1e"),
-            colorway=ms2_colors,
+            #colorway=ms2_colors,
             template=template,
             margin=dict(l=0, r=0, t=70, b=70) 
         )
@@ -786,17 +769,13 @@ def update_XIC_plots_table(selected_run: str,
         for i, rt in enumerate(rt_boundaries):
             fig_ms1.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
             fig_ms2.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
-        
-
 
         xic_info_df = pd.concat([prec_info_df, frag_info_df], axis=0)
         xic_score = xic_data.loc[score_mask, ms1_intensity_cols.union(ms2_intensity_cols)].values
-        xic_info_df.insert(3, 'XIC Rank Score', np.round(xic_score[0], 2))
-
-                                             
+        xic_info_df.insert(3, 'XIC Rank Score', np.round(xic_score[0], 2))          
     except Exception as e:
         logger.error(f"Error updating plot: {e}")
-        return '', go.Figure(), go.Figure(), go.Figure(), go.Figure(), []
+        return '', '', go.Figure(), go.Figure(), go.Figure(), go.Figure(), []
     
-    return title, fig_ms1, fig_ms1_c, fig_ms2, fig_ms2_c, xic_info_df.to_dict('records')
+    return prec_title, run_title, fig_ms1, fig_ms1_c, fig_ms2, fig_ms2_c, xic_info_df.to_dict('records')
 
