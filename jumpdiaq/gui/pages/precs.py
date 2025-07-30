@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.express as px
 import dash_bootstrap_components as dbc
-from dash import dcc, html, Input, Output, State, dash_table, callback_context
+from dash import dcc, html, Input, Output, State, dash_table#, callback_context
 from dash_bootstrap_templates import load_figure_template
 # local
 from jumpdiaq.gui.app import app, page_sidebar_style, logger
@@ -246,8 +246,8 @@ def update_summ_plot(sub_row_means_xic,
                      ms2_quant_data, 
                      ms2_quality_data,
                      meta):
-    ctx = callback_context
-    if not ctx.triggered or not prec_quant_data or not ms1_quant_data:
+    #ctx = callback_context
+    if not prec_quant_data or not ms1_quant_data: # not ctx.triggered or
         return (go.Figure(layout=dict(title="Select a precursor to visualize its quantification data")),
                 go.Figure(layout=dict(title="Select a precursor to visualize its quality data")))
     

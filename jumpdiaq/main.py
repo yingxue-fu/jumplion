@@ -72,13 +72,13 @@ def main():
     SaveMemory = True if mem_available < 64 else False
     
     logger = setup_logger(LogLevel, False, OutDir)
-    logger.info("===============================================")
+    logger.info("====================================================")
     logger.info(f" JUMPdiaq (v{jumpdiaq.__version__}) ")
     logger.info(" ")
     logger.info(f" System: {system} {release}, {architecture} ")
     logger.info(f" CPU: {cores} Cores, {threads} Threads ")
     logger.info(f" Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total) ")
-    logger.info("===============================================\n")
+    logger.info("====================================================\n")
     
     logger.info(f"Command: {cmd}\n")
     if os.path.isfile(sys.argv[1]):

@@ -1,7 +1,10 @@
+# builtin
+import logging
 # external
 from dash import dcc, html, Input, Output, callback_context
 import dash_bootstrap_components as dbc
 # local
+import jumpdiaq
 from jumpdiaq.gui.app import app
 from jumpdiaq.gui.pages import home, inputs, prots, precs, manual
 from jumpdiaq.gui.utils import get_local_ip
@@ -109,6 +112,7 @@ def switch_tabs(n1, n2, n3, n4, n5, read_click, start_click, start_click_manual,
 
 
 def main():
+    logging.info(f"JUMPdiaq-GUI (v{jumpdiaq.__version__})")
     local_ip = get_local_ip()
     app.run(host=local_ip, port=8050, debug=True)
     
