@@ -258,6 +258,23 @@ sidebar = html.Div(
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
+                        html.P('Protein summarization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("max_n_precs"), width=8),  
+                            dbc.Col(dbc.Input(id="max-n-precs", 
+                                              type="number", 
+                                              value='100', 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("prot_quality_cutoffs"), width=8),  
+                            dbc.Col(dbc.Input(id="prot-quality-cutoffs", 
+                                              type="number", 
+                                              value=10, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
                     ])
                 ], className="mt-1"),
                 id="param-collapse",
@@ -764,6 +781,8 @@ def update_process_state(log_value, n_intervals, process_state):
     State('norm-species', 'value'),
     State('norm-method', 'value'),
     State('trim-percentage', 'value'),
+    State('max-n-precs', 'value'),
+    State('prot-quality-cutoffs', 'value'),
     prevent_initial_call=True
 )
 def run_jumpdiaq(
@@ -791,7 +810,9 @@ def run_jumpdiaq(
         int_removal,
         norm_species,
         norm_method,
-        trim_percentage
+        trim_percentage,
+        max_n_precs,
+        prot_quality_cutoffs
         ):
     if n_clicks_run == 0 or not outdir:
         return no_msfile_open, None, dash.no_update
@@ -887,6 +908,11 @@ def run_jumpdiaq(
     cmd_args.append(str(norm_method))
     cmd_args.append("--trim-percentage") 
     cmd_args.append(str(trim_percentage))
+    
+    cmd_args.append("--max-n-precs")
+    cmd_args.append(str(max_n_precs))
+    cmd_args.append("--prot-quality-cutoffs") 
+    cmd_args.append(str(prot_quality_cutoffs))
     
     #
     cmd_args.append("--show-progress")
