@@ -8,6 +8,7 @@ import gc
 from pathlib import Path
 import logging
 # external
+import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg') # This line must come before importing pyplot
@@ -56,6 +57,9 @@ def main():
     NormSpecies = args.norm_species
     NormMethod = "median" if args.norm_method == 0 else "mean"
     TrimPercentage = args.trim_percentage
+    #
+    ProtQualityCutoffs = args.prot_quality_cutoffs
+    MaxNPrecs = args.max_n_precs
     
     # System information
     system = platform.system()
@@ -137,7 +141,6 @@ def main():
         lib.info.quantify(MSFiles, OutDir)
         lib.report(report_file, MSFiles, prec_prot_info)
     
-    # OutDir = r"C:\Users\yfu\Downloads\miss_dia_test_data\chengrp_test\chengrp_20250701"
     # Precursor quantification
     prec_quant_table, prec_quality_table = quantify_precursors(
                                                 report_file, 
@@ -165,13 +168,20 @@ def main():
     prot_quant_table, prot_quality_table = quantify_proteins(
                                                     prec_quant_table_norm, 
                                                     prec_quality_table, 
-                                                    max_n_precs=15)
+                                                    max_n_precs=MaxNPrecs)
                            
     # filter based on quality
-    quality_hist_plot(prot_quality_table.to_pandas(), 
-                      prot_quality_table.columns[3:-1], 
-                      Path(OutDir))
-    QualityCutoffs = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    value_columns = prot_quality_table.columns[3:-1]
+    if ProtQualityCutoffs < 1:
+        quantiles = np.array(np.nan)
+        QualityCutoffs = [ProtQualityCutoffs]
+    else:
+        quantiles = np.round(np.arange(0.0, 1.0, 1 / ProtQualityCutoffs)[1:], 2)
+        QualityCutoffs = np.nanquantile(prot_quality_table.select(value_columns).to_numpy().flatten(), quantiles)
+        QualityCutoffs = np.round(QualityCutoffs, 2)
+        
+    quality_hist_plot(prot_quality_table.to_pandas(), value_columns, 
+                      QualityCutoffs, Path(OutDir))
     prot_quant_table_filtered = filter_based_on_quality(prot_quant_table.to_pandas(), 
                                                         prot_quality_table.to_pandas(),
                                                         tag_column='Protein.Group',
@@ -186,10 +196,10 @@ def main():
     prot_quant_table = prot_prec_pep_info.merge(prot_quant_table.to_pandas(), how='right')
     prot_quant_table.to_csv(Path(OutDir) / "Protein.Group_Quan_QT0.0.csv", index=False)
     
-    for i, cutoff in enumerate(QualityCutoffs):
+    for i, (qt, cutoff) in enumerate(zip(quantiles, QualityCutoffs)):
         prot_quant_table_f = prot_quant_table_filtered[i]
         prot_quant_table_f = prot_prec_pep_info.merge(prot_quant_table_f, how='right')
-        prot_quant_table_f.to_csv(Path(OutDir) / f"Protein.Group_Quan_QT{cutoff}.csv", index=False)
+        prot_quant_table_f.to_csv(Path(OutDir) / f"Protein.Group_Quan_QT{qt}_quality{cutoff}.csv", index=False)
         
     prot_quality_table = prot_prec_pep_info.merge(prot_quality_table.to_pandas(), how='right')
     prot_quality_table.to_csv(Path(OutDir) / "Protein.Group_Quan_Quality.csv", index=False)

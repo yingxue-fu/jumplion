@@ -79,6 +79,10 @@ class Arguments:
     norm_method: int = 0
     trim_percentage: int = 5
     
+    # Protein summarization
+    max_n_precs: int = 100
+    prot_quality_cutoffs: float = 0.8
+    
     # timsTOF data preprocessing
     tims_centroid: int = 0
     weighted_centroid: int = 1
@@ -182,6 +186,10 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--norm-species", type=str, help="")
     optional_group.add_argument("--norm-method", type=int, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
+    
+    # Protein summarization
+    optional_group.add_argument("--max-n-precs", type=int, help="")
+    optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")
     
     # timsTOF data preprocessing
     parser.add_argument("--tims-centroid", type=int, help="")

@@ -308,7 +308,8 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
         quant_df_to_show = quant_df.drop(columns=['Protein.Group', 'Protein.Description', 'Protein.Names', 'Sequence', 'Precursors', 'Peptides', 'Peptide.Positions'])
         value_cols = simple_sample_names + ['Average']
         quant_df_to_show[value_cols] = quant_df_to_show[value_cols].round(2)
-        cutoff = selected_table.split("QT")[1].split(".csv")[0]
+        extracted_cutoffs = selected_table.split("QT")[1].split(".csv")[0].split("_quality")
+        quality_tier, quality_cutoff = tuple(extracted_cutoffs)
         
         quality_df = pd.read_csv(quality_csv_path)
         quality_df = quality_df.drop(columns=['Accession.Number', 'Protein.Description', 'Sequence', 'Precursors', 'n.Precursors', 'Peptides', 'n.Peptides', 'Peptide.Positions', 'Coverage.Percentage', 'Protein.Names', 'Genes', 'Average'])
@@ -318,7 +319,7 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
                 [{'name': col, 'id': col} for col in quant_df_to_show.columns], 
                 quant_df.to_dict('records'), 
                 quality_df.to_dict('records'),
-                f"Using quality cutoff: {cutoff}",
+                f"Using quality cutoff: {quality_cutoff}",
                 meta.to_dict('records'))
 
     except Exception as e:

@@ -1,7 +1,8 @@
 # builtin
-from pathlib import Path
+import textwrap
 import logging
 import warnings
+from pathlib import Path
 # external
 import numpy as np
 from numba import njit
@@ -314,7 +315,7 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
 def protein_summarize(prec_quant_table, 
                       prec_quality_table, 
                       sample_cols, 
-                      max_n_precs=30):
+                      max_n_precs):
     # Group by protein group for fast lookup
     quant_groups = prec_quant_table.partition_by("Protein.Group", as_dict=True)
     quality_groups = prec_quality_table.partition_by("Protein.Group", as_dict=True)
@@ -324,7 +325,6 @@ def protein_summarize(prec_quant_table,
     quality_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
 
     for i, prot_id in enumerate(progress_bar(prot_ids, ShowProgress, InterProgress)):
-        # prot_id = prot_ids[0]
         quant_df_sub = quant_groups.get((prot_id,))
         if quant_df_sub is None:
             continue
@@ -346,9 +346,9 @@ def protein_summarize(prec_quant_table,
         quant_mat = quant_df_sub.select(sample_cols).to_numpy()
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
-        # Summarization (both peptide and protein)
-        # Limit the number of PSMs when there are TOO many PSMs(?)
-        # Choose top-n PSMs according to the PSM-wise total intensity
+        # Summarization
+        # Limit the number of PSMs when there are too many precursors
+        # Choose top-n precursors according to the PSM-wise total intensity
         if quant_mat.shape[0] > max_n_precs:
             row_means = np.nanmean(quant_mat, axis=1)
             sorted_indices = np.argsort(-row_means)
@@ -374,7 +374,7 @@ def quantify_proteins(prec_quant_table,
                       prec_quality_table, 
                       max_n_precs
                       ):
-    
+    logging.info("Quantifying proteins")
     other_cols = {'Precursor.Id',
                   'Protein.Group',
                   'Protein.Names',
@@ -385,7 +385,10 @@ def quantify_proteins(prec_quant_table,
                   'Precursor.Id_MS_type'}
     # Extract unique sample column names (excluding primary_id and id)
     sample_cols = [col for col in prec_quant_table.columns if col not in other_cols]
-    prot_quant_table, prot_quality_table = protein_summarize(prec_quant_table, prec_quality_table, sample_cols)
+    prot_quant_table, prot_quality_table = protein_summarize(prec_quant_table, 
+                                                             prec_quality_table, 
+                                                             sample_cols,
+                                                             max_n_precs)
     extra_names = extract_annotation(prot_quant_table['Protein.Group'].to_list(), 
                                      prec_quant_table, 
                                      id_col='Protein.Group',
@@ -396,7 +399,7 @@ def quantify_proteins(prec_quant_table,
     return prot_quant_table, prot_quality_table
     
 
-def quality_hist_plot(quality_table, value_columns, out_dir):
+def quality_hist_plot(quality_table, value_columns, quality_cutoffs, out_dir):
     # Calculate appropriate figure size based on number of columns
     num_cols = quality_table.loc[:, value_columns].shape[1]
     nrows=int(np.ceil(num_cols/4))
@@ -420,7 +423,14 @@ def quality_hist_plot(quality_table, value_columns, out_dir):
     for i, (col_name, col_data) in enumerate(quality_table.iloc[:, 3:].items()):
         if i < len(axes):
             col_data.hist(ax=axes[i], bins=20, color='gray', grid=False)
-            axes[i].set_title(col_name)
+            # Add vertical dashed lines for quality cutoffs
+            for cutoff_value in quality_cutoffs:
+                axes[i].axvline(x=cutoff_value, color='red', linestyle='--', 
+                                linewidth=1, alpha=0.8)
+            
+            # Wrap long titles
+            wrapped_title = '\n'.join(textwrap.wrap(col_name, width=20))
+            axes[i].set_title(wrapped_title, fontsize=10)
     
     # Hide any unused subplots
     for j in range(num_cols, len(axes)):
