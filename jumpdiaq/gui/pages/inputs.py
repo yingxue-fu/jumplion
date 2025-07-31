@@ -226,8 +226,8 @@ sidebar = html.Div(
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("int_removal"), width=8),  
-                            dbc.Col(dbc.Checklist(id="int-removal",
+                            dbc.Col(html.Label("intf_removal"), width=8),  
+                            dbc.Col(dbc.Checklist(id="intf-removal",
                                                   options=[{"label": "Enabled", "value": "yes"}],
                                                   value=["yes"],
                                                   inline=True), 
@@ -259,6 +259,14 @@ sidebar = html.Div(
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         html.P('Protein summarization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("ms2_priority_quality"), width=8),  
+                            dbc.Col(dbc.Input(id="ms2-priority-quality", 
+                                              type="number", 
+                                              value='0.75', 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
                         dbc.Row([
                             dbc.Col(html.Label("max_n_precs"), width=8),  
                             dbc.Col(dbc.Input(id="max-n-precs", 
@@ -777,10 +785,11 @@ def update_process_state(log_value, n_intervals, process_state):
     State('mass-acc-ms2', 'value'),
     State('mass-acc-ms1', 'value'),
     State('optimal-xic-source', 'value'),
-    State('int-removal', 'value'),
+    State('intf-removal', 'value'),
     State('norm-species', 'value'),
     State('norm-method', 'value'),
     State('trim-percentage', 'value'),
+    State('ms2-priority-quality', 'value'),
     State('max-n-precs', 'value'),
     State('prot-quality-cutoffs', 'value'),
     prevent_initial_call=True
@@ -807,10 +816,11 @@ def run_jumpdiaq(
         mass_acc_ms2,
         mass_acc_ms1,
         optimal_xic_source,
-        int_removal,
+        intf_removal,
         norm_species,
         norm_method,
         trim_percentage,
+        ms2_priority_quality,
         max_n_precs,
         prot_quality_cutoffs
         ):
@@ -898,8 +908,8 @@ def run_jumpdiaq(
     cmd_args.append(str(optimal_xic_source))
     
     # Add interference removal option
-    if 'yes' not in int_removal:
-        cmd_args.append("--int-removal") 
+    if 'yes' not in intf_removal:
+        cmd_args.append("--intf-removal") 
         cmd_args.append("0")
     
     cmd_args.append("--norm-species")
@@ -909,6 +919,8 @@ def run_jumpdiaq(
     cmd_args.append("--trim-percentage") 
     cmd_args.append(str(trim_percentage))
     
+    cmd_args.append("--ms2-priority-quality")
+    cmd_args.append(str(ms2_priority_quality))
     cmd_args.append("--max-n-precs")
     cmd_args.append(str(max_n_precs))
     cmd_args.append("--prot-quality-cutoffs") 

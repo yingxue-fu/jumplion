@@ -32,9 +32,9 @@ MinShapeScore = args.min_shape_score
 MinXicIntensity = args.min_xic_intensity
 MinApexIntensity = args.min_apex_intensity
 MinApexEvidence = args.min_apex_evidence
-IntRemoval = args.int_removal
-IntRemovalCorr = args.int_removal_corr
-IntFilterFactor = args.int_filter_factor
+IntfRemoval = args.intf_removal
+IntfRemovalCorr = args.intf_removal_corr
+IntfFilterFactor = args.intf_filter_factor
 ShowProgress = args.show_progress
 InterProgress = args.inter_progress
 
@@ -580,9 +580,9 @@ class Info:
                                                       optimal_xic, 
                                                       optimal_xic_type, 
                                                        corr_method=CorrMethod, 
-                                                       int_removal=IntRemoval, 
-                                                       int_removal_corr=IntRemovalCorr, 
-                                                       filter_factor=IntFilterFactor)
+                                                       intf_removal=IntfRemoval, 
+                                                       intf_removal_corr=IntfRemovalCorr, 
+                                                       filter_factor=IntfFilterFactor)
                 
                 n_ms1 = len(jt[1].ms1_quant)
                 for prec in range(n_ms1):

@@ -55,7 +55,7 @@ def ratio_violin_plot(ratios, labels, colors, ylim=None, text_cex=1):
 
     fig.update_layout(
         font=dict(size=14 * text_cex),
-        xaxis_title='',
+        xaxis_title='Species',
         yaxis_title=None,  # Explicitly remove the y-axis title
         margin=dict(l=10),  # Reduce left margin (l = left)
         showlegend=False,
@@ -73,16 +73,45 @@ def ratio_violin_plot(ratios, labels, colors, ylim=None, text_cex=1):
     if ylim is not None:
         fig.update_yaxes(range=ylim)
         
-    # Add count annotations above each violin
-    group_counts = df['Label'].value_counts()
-    for label, count in group_counts.items():
+    # Calculate statistics for each group
+    group_stats = df.groupby('Label')['Value'].agg(['count', 'median', 'mean', 'std'])
+    
+    # Add annotations for each violin
+    for label in group_stats.index:
+        count = group_stats.loc[label, 'count']
+        median = group_stats.loc[label, 'median']
+        mean = group_stats.loc[label, 'mean']
+        std = group_stats.loc[label, 'std']
+        
+        # Position for count annotation (below violin)
+        y_count = df['Value'].min() * 0.95 if ylim is None else ylim[0] * 0.95
+        
+        # Position for statistics annotation (above violin)
+        y_stats = df['Value'].max() * 0.85 if ylim is None else ylim[1] * 0.85
+        
+        # Add count annotation
         fig.add_annotation(
             x=label,
-            y=df['Value'].min() * 0.95 if ylim is None else ylim[0] * 0.95,
+            y=y_count,
             text=f"n={count}",
             showarrow=False,
             font=dict(size=12 * text_cex),
-            xanchor='center'
+            xanchor='center',
+            bgcolor="rgba(255,255,255,0.5)",
+        )
+        
+        # Add statistics annotation
+        stats_text = f"Median: {median:.2f}<br>Mean: {mean:.2f}<br>SD: {std:.2f}"
+        fig.add_annotation(
+            x=label,
+            y=y_stats,
+            text=stats_text,
+            showarrow=False,
+            font=dict(size=10 * text_cex),
+            xanchor='center',
+            bgcolor="rgba(255,255,255,0.5)",
+            bordercolor="gray",
+            borderwidth=0.2
         )
 
     return fig

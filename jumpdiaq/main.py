@@ -58,6 +58,7 @@ def main():
     NormMethod = "median" if args.norm_method == 0 else "mean"
     TrimPercentage = args.trim_percentage
     #
+    Ms2PriorityQuality = args.ms2_priority_quality
     ProtQualityCutoffs = args.prot_quality_cutoffs
     MaxNPrecs = args.max_n_precs
     
@@ -147,6 +148,7 @@ def main():
                                                 xic_quality_cutoff=0.0, 
                                                 xic_quant_cutoff=0.0, 
                                                 quant_source='ms1_ms2',
+                                                ms2_priority_quality=Ms2PriorityQuality,
                                                 out_dir=OutDir)
     prec_quant_table.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table.parquet")
     prec_quality_table.write_parquet(Path(OutDir) / "Precursor.Id_quality_summ_table.parquet")

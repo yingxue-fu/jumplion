@@ -70,9 +70,9 @@ class Arguments:
     optimal_xic_source: int = 0
     
     # Interference removal
-    int_removal: int = 1
-    int_removal_corr: float = 0.0
-    int_filter_factor: float = 1.5
+    intf_removal: int = 1
+    intf_removal_corr: float = 0.0
+    intf_filter_factor: float = 1.5
     
     # Normalization
     norm_species: str = "HUMAN"
@@ -80,6 +80,7 @@ class Arguments:
     trim_percentage: int = 5
     
     # Protein summarization
+    ms2_priority_quality: float = 0.75
     max_n_precs: int = 100
     prot_quality_cutoffs: float = 0.8
     
@@ -178,9 +179,9 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--optimal-xic-source", type=int, help="")
     
     # Interference removal 
-    optional_group.add_argument("--int-removal", type=int, help="")
-    optional_group.add_argument("--int-removal-corr", type=float, help="")
-    optional_group.add_argument("--int-filter-factor", type=float, help="")
+    optional_group.add_argument("--intf-removal", type=int, help="")
+    optional_group.add_argument("--intf-removal-corr", type=float, help="")
+    optional_group.add_argument("--intf-filter-factor", type=float, help="")
     
     # Normalization
     optional_group.add_argument("--norm-species", type=str, help="")
@@ -188,6 +189,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
     # Protein summarization
+    optional_group.add_argument("--ms2-priority-quality", type=float, help="")
     optional_group.add_argument("--max-n-precs", type=int, help="")
     optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")
     

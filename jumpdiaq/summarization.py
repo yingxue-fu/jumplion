@@ -220,7 +220,7 @@ def quantify_from_xic_report(
     return final_quant_table, final_quality_table
     
 
-def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.0, quant_source='ms1_ms2', out_dir=""):
+def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.0, quant_source='ms1_ms2', ms2_priority_quality=0.8, out_dir=""):
     # report_file = Path(OutDir) / 'xic_quan_report.parquet'
     id_col="Precursor.Id"
     
@@ -289,12 +289,12 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
                 pl.col("Average").filter(pl.col("MS_type") == "MS2").first().over("Precursor.Id").alias("ms2_avg")
             ])
             .with_columns([
-                # Check if both MS1 and MS2 exist and have Average > 0.8
-                ((pl.col("ms1_avg").is_not_null()) & (pl.col("ms1_avg") > 0.8)).alias("ms1_good"),
-                ((pl.col("ms2_avg").is_not_null()) & (pl.col("ms2_avg") > 0.8)).alias("ms2_good")
+                # Check if both MS1 and MS2 exist and have Average > ms2_priority_quality
+                ((pl.col("ms1_avg").is_not_null()) & (pl.col("ms1_avg") > ms2_priority_quality)).alias("ms1_good"),
+                ((pl.col("ms2_avg").is_not_null()) & (pl.col("ms2_avg") > ms2_priority_quality)).alias("ms2_good")
             ])
             .filter(
-                # If both MS1 and MS2 have Average > 0.8, choose MS2
+                # If both MS1 and MS2 have Average > ms2_priority_quality, choose MS2
                 pl.when(pl.col("ms1_good") & pl.col("ms2_good"))
                 .then(pl.col("MS_type") == "MS2")
                 # Otherwise, choose the one with max average

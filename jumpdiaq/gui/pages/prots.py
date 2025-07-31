@@ -48,19 +48,12 @@ sidebar = html.Div(
                     placeholder="Select a species"
                 ),
                 html.Br(),
-                html.Label("Protein Quantity Summarization", style={"font-weight": "bold", 'marginBottom': '5px'}),
-                dbc.Switch(label='Show raw precursor intensity', id='show-raw', value=False),
-                dbc.Switch(label='Substract row means', id='sub-row-means', value=False),
-                dbc.Switch(label='Show Summarization Value', id='show-summ', value=False),
+                html.Label("Protein Summarization", style={"font-weight": "bold", 'marginBottom': '5px'}),
+                dbc.Switch(label='Show raw precursor quantity', id='show-raw', value=False),
+                dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means', value=False),
+                dbc.Switch(label='Show summarized quantity/quality', id='show-summ', value=False),
                 html.Br(),
                 html.Label("Quantification Benchmark Plot", style={"font-weight": "bold"}),
-                html.Label("Select species"),
-                dcc.Dropdown(
-                    id='species-input-bench',
-                    options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'SCHPO', 'MOUSE', 'YEAST', 'ECOLI']],
-                    multi=True,
-                    placeholder="Select one or more species"
-                ),
                 html.Label("Select groups for comparison", style={'marginTop': '5px'}),
                 dbc.Select(id='group-A', placeholder="Group A"),
                 dbc.Select(id='group-B', placeholder="Group B", style={'marginTop': '5px'}),
@@ -70,6 +63,13 @@ sidebar = html.Div(
                     dbc.Col(dbc.Input(id="ratio-2", type="number", value=2.0), width=4),
                     dbc.Col(dbc.Input(id="ratio-3", type="number", value=0.25), width=4),
                 ]),
+                html.Label("Select species"),
+                dcc.Dropdown(
+                    id='species-input-bench',
+                    options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'SCHPO', 'MOUSE', 'YEAST', 'ECOLI']],
+                    multi=True,
+                    placeholder="Select one or more species"
+                ),
                 html.Label("Point Size:", style={'marginTop': '5px'}),
                 dcc.Slider(
                     id='point-size',
@@ -400,7 +400,7 @@ def update_violin_plot(data, species_input):
     fig.update_layout(
         title='', 
         xaxis_title="Runs",
-        yaxis_title="log2(intensity)",
+        yaxis_title="Log2(Intensity)",
         violingap=0,
         template="vizro",
         height=700,
@@ -788,7 +788,7 @@ def update_summ_plot(selected_prot,
         quant_fig.update_layout(
             title=selected_prot,
             xaxis_title="Runs",
-            yaxis_title="log2(intensity)",
+            yaxis_title="Log2(Ratio)" if sub_row_means else "Log2(Intensity)",
             template="vizro",
             height=700,
             legend=dict(
