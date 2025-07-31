@@ -187,7 +187,7 @@ def quantify_from_xic_report(
     # report_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250617\xic_quan_report.parquet"
     columns = [sample_col, id_col, quant_id_col, quality_col, quant_col] + annotation_cols
     report_df = pl.read_parquet(Path(report_file), columns=columns)
-    logging.info(f"Performing quantification for {id_col} based on {quant_col} values.")
+    logging.info(f"ID column: {id_col}, Quantity column: {quant_col}")
     
     # 1. extract quant and quality
     quant_df, quality_df = get_quant_quality_dfs(
@@ -225,6 +225,7 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
     id_col="Precursor.Id"
     
     # MS1-level quantification
+    logging.info("Quantifying precursors at MS1-level")
     ms1_quant_table, ms1_quality_table = quantify_from_xic_report(
                                              report_file, 
                                              id_col,
@@ -246,6 +247,7 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
     ])
 
     # MS2-level quantification
+    logging.info("Quantifying precursors at MS2-level")
     ms2_quant_table, ms2_quality_table = quantify_from_xic_report(
                                              report_file, 
                                              id_col,
