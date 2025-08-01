@@ -11,8 +11,8 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html, Input, Output, State, dash_table#, callback_context
 from dash_bootstrap_templates import load_figure_template
 # local
+from jumpdiaq.utils import extract_unique_parts
 from jumpdiaq.gui.app import app, page_sidebar_style, logger
-from jumpdiaq.gui.utils import extract_unique_parts
 
 
 load_figure_template(["vizro", "vizro_dark"])
@@ -107,7 +107,7 @@ layout = html.Div(children=[
                                                                           "XIC Rank Score",
                                                                           "XIC Corr", 
                                                                           "XIC Quant (Raw)", 
-                                                                          "XIC Quant (Adj)"]],
+                                                                          "XIC Quant (Adjusted)"]],
                             data=[],
                             style_table={'overflowX': 'auto'},
                             style_cell={'fontFamily': 'Arial, sans-serif',
@@ -547,7 +547,7 @@ def update_XIC_plots_table(selected_run: str,
             "XIC m/z": ms1_xic_mzs,
             "XIC Corr": string2float(prec_info['MS1.XIC.Corr.Raw'].split(';'), 2),
             "XIC Quant (Raw)": string2float(prec_info['MS1.XIC.Quant.Raw'].split(';'), 2),
-            "XIC Quant (Adj)": string2float(prec_info['MS1.XIC.Quant.Adjusted'].split(';'), 2)
+            "XIC Quant (Adjusted)": string2float(prec_info['MS1.XIC.Quant.Adjusted'].split(';'), 2)
         })
 
         # Fragment info table
@@ -569,7 +569,7 @@ def update_XIC_plots_table(selected_run: str,
             "XIC m/z": ms2_xic_mzs,
             "XIC Corr": string2float(frag_info['MS2.XIC.Corr.Raw'].split(';'), 2),
             "XIC Quant (Raw)": string2float(frag_info['MS2.XIC.Quant.Raw'].split(';'), 2),
-            "XIC Quant (Adj)": string2float(frag_info['MS2.XIC.Quant.Adjusted'].split(';'), 2)
+            "XIC Quant (Adjusted)": string2float(frag_info['MS2.XIC.Quant.Adjusted'].split(';'), 2)
         })
 
         optimal_xic_type = report_data['Optimal.XIC.Type'].iloc[0]
@@ -739,7 +739,7 @@ def update_XIC_plots_table(selected_run: str,
         
         fig_ms1_c = go.Figure(data=ms1_traces_c)
         fig_ms1_c.update_layout(
-            title="MS1-level XICs (Adj)",
+            title="MS1-level XICs (Adjusted)",
             xaxis_title="Retention Time",
             yaxis_title=None,
             showlegend=False,
@@ -752,7 +752,7 @@ def update_XIC_plots_table(selected_run: str,
     
         fig_ms2_c = go.Figure(data=ms2_traces_c)
         fig_ms2_c.update_layout(
-            title="MS2-level XICs (Adj)",
+            title="MS2-level XICs (Adjusted)",
             xaxis_title="Retention Time",
             yaxis_title=None,
             showlegend=False,

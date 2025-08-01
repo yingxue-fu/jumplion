@@ -121,7 +121,7 @@ class Library:
             logging.error("ERROR: Spectral library format not supported.")
                 
         self.elution_group_index()  
-        logging.info(f"Spectral library loaded: {len(self.entries)} precursors in {len(self.co_elution_index)} elution groups.\n")
+        logging.info(f"Spectral library loaded: {len(self.entries)} precursors in {len(self.co_elution_index)} elution groups\n")
         
         return True
         
@@ -359,7 +359,7 @@ class Library:
     
             # Save the DataFrame to a Parquet file
             report_df.write_parquet(file_name)
-            logging.info(f"XIC quantification report saved to {file_name}")
+            logging.info(f"XIC quantification report saved to {file_name}\n")
     
         except IOError as e:
             logging.error(f"ERROR: cannot write to {file_name}. Check if the destination folder is write-protected or the file is in use: {e}")
@@ -604,4 +604,4 @@ class Info:
         df = pl.DataFrame(data_rows, schema=column_names, orient="row")
         out_xic = Path(out_dir) / "xic_files" / "xics.corrected.parquet"
         df.write_parquet(out_xic)
-        logging.info(f"Corrected XIC data saved to {out_xic}\n")
+        logging.info(f"Corrected XIC data saved to {out_xic}")

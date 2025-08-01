@@ -370,8 +370,8 @@ def identify_optimal_xic(ms1, ms2,
 def calculate_quantity(ms1, ms2, 
                        start, stop, apex, 
                        optimal_xic, optimal_xic_type, 
-                       corr_method=0, int_removal=True, 
-                       int_removal_corr=0.5, filter_factor=1.5):
+                       corr_method=0, intf_removal=True, 
+                       intf_removal_corr=0.5, filter_factor=1.5):
     
     ms1_ms2 = np.concatenate((ms1, ms2), axis=1)
     len_ = stop - start + 1
@@ -408,8 +408,8 @@ def calculate_quantity(ms1, ms2,
             if ion == optimal_xic:
                 continue
             
-            if quant_corr[ion, 0] > int_removal_corr:
-                if int_removal:
+            if quant_corr[ion, 0] > intf_removal_corr:
+                if intf_removal:
                     w = max(E, np.sum(elution[apex - 1:apex + 2] ** 2))
                     scaled = np.sum(ms1_ms2[apex - 1:apex + 2, :] * elution[apex - 1:apex + 2, None] ** 2, axis=0) / w
                     if scaled[optimal_xic]:

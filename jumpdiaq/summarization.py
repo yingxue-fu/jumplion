@@ -11,7 +11,7 @@ import polars as pl
 import matplotlib.pyplot as plt
 # local
 from jumpdiaq.arguments import Arguments
-from jumpdiaq.utils import progress_bar
+from jumpdiaq.utils import progress_bar, extract_unique_parts
 
 args = Arguments()
 ShowProgress = args.show_progress
@@ -278,10 +278,13 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
     ms1_ms2_quality_table.write_parquet(Path(out_dir) / f"{id_col}_quality_ms1_ms2_summ_table.parquet")
     
     if quant_source == 'ms1':
+        logging.info("Using only MS1-level precursor quantity for further analysis")
         return ms1_quant_table, ms1_quality_table
     elif quant_source == 'ms2':
+        logging.info("Using only MS2-level precursor quantity for further analysis")
         return ms2_quant_table, ms2_quality_table
     elif quant_source == 'ms1_ms2':
+        logging.info("Dynamically select MS1- or MS2-level quantity for each precursor based on quality scores")
         # Keep only the row with the highest Average per Precursor.Id, but prioritize MS2 when both > 0.8
         ms1_ms2_quality_table = (
             ms1_ms2_quality_table
@@ -561,6 +564,7 @@ def topN(mat, N=3):
 
 #####
 def norm_dataframe(df, data_type, tag_column, value_columns, norm_species, norm_method='median', trim_percentage=5):
+    logging.info(f"Performing {data_type}-level normalization")
     if norm_species == 'ALL':
         sub_df = df.clone()
     else:
@@ -568,22 +572,31 @@ def norm_dataframe(df, data_type, tag_column, value_columns, norm_species, norm_
             pl.col(tag_column).str.contains(norm_species).alias("match")
         )["match"]
         if species_tags.sum() == 0:
-            print('No matching species found in your input. Using all proteins')
+            logging.warning('WARNING: No matching species found in your input. Using all proteins')
             sub_df = df.clone()
         else:
+            
             sub_df = df.filter(species_tags)
-
+    
     mat = sub_df.select(value_columns)
-    print("\nMedian log2(Intensity) before normalization: ")
-    print(mat.median().to_pandas().T)
-
-    loadBias = get_loading_bias(mat, data_type, trim_percentage, trim_percentage)
-    print("\nLoading bias before normalization:")
-    print(loadBias)
-
+    loadBias = get_loading_bias(mat, value_columns, data_type, trim_percentage, trim_percentage)
     mat_norm, normFactors = normalization(mat, trim_percentage, trim_percentage, norm_method)
-    print("\nMedian log2(Intensity) after normalization: ")
-    print(mat_norm.median().to_pandas().T)
+    
+    #
+    logging.info("Loading bias before normalization:\n%s", 
+                 loadBias.to_string(index=False))
+    medians_df = mat.median().to_pandas().T.reset_index(drop=False)
+    medians_df.columns = ['Samples', 'Medians']
+    normFactors_df = pd.DataFrame(list(normFactors.items()), columns=['Samples', 'NormFactors'])
+    medians_df = medians_df.merge(normFactors_df)
+    medians_df['Samples'] = extract_unique_parts(medians_df['Samples'].to_list())
+    logging.info("Median log2(Intensity) before normalization:\n%s", 
+                 medians_df.to_string(index=False))
+    medians_norm_df = mat_norm.median().to_pandas().T.reset_index(drop=False)
+    medians_norm_df.columns = ['Samples', 'Medians']
+    medians_norm_df['Samples'] = extract_unique_parts(medians_norm_df['Samples'].to_list())
+    logging.info("Median log2(Intensity) after normalization:\n%s", 
+                 medians_norm_df.to_string(index=False))
 
     df_norm = df.clone()
     for col in value_columns:
@@ -621,7 +634,7 @@ def trim_matrix(mat, trim_pct_upper, trim_pct_lower):
     return pl.DataFrame(centered_np[valid_idx], schema=mat.columns)
 
 
-def get_loading_bias(mat, data_type, trim_pct_upper, trim_pct_lower):
+def get_loading_bias(mat, sample_names, data_type, trim_pct_upper, trim_pct_lower):
     mat_f = trim_matrix(mat, trim_pct_upper, trim_pct_lower)
     n = mat_f.height
     sm = 2 ** mat_f.mean().to_numpy()[0]
@@ -632,10 +645,11 @@ def get_loading_bias(mat, data_type, trim_pct_upper, trim_pct_lower):
     sem = sd / np.sqrt(n)
 
     loadBias = pd.DataFrame({
+        "Samples": extract_unique_parts(sample_names),
         "Mean[%]": avg,
         "SD[%]": sd,
         "SEM[%]": sem,
-        f"# {data_type}": [n] * len(avg)
+        f"# {data_type}s": [n] * len(avg)
     })
     return loadBias
 

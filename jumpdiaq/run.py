@@ -44,12 +44,7 @@ MinShapeScore = args.min_shape_score
 MinXicIntensity = args.min_xic_intensity
 MinApexIntensity = args.min_apex_intensity
 MinApexEvidence = args.min_apex_evidence
-if args.optimal_xic_source == 0: 
-    OptimalXicSource = 'ms1_ms2' 
-elif args.optimal_xic_source == 1: 
-    OptimalXicSource = 'ms1'
-elif args.optimal_xic_source == 2: 
-    OptimalXicSource = 'ms2'
+OptimalXicSource = args.optimal_xic_source
 
 MinBinPoints = 500
 MassCalXicCorr = 0.8
@@ -635,8 +630,6 @@ class Run:
     
     
     def do_mass_calibration(self, save_cal_info=True):
-    #def collect_mass_calibration_data(self):
-        #logging.debug("Extracting peaks for building mass calibration model")
         for entry in self.entries:   
             if entry.mass_cal == 1:
                 entry.get_optimal_xic(stage=0, n_xic_points=MinXICPoints)

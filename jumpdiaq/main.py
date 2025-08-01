@@ -24,15 +24,18 @@ def main():
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     
     if len(sys.argv) < 2:
-        print("\nUsage: jumpdiaq params.file\n")
+        print("Use jumpdiaq -h to show the help message")
         sys.exit(1)
     
     # read arguments
-    args, cmd = parse_arguments(sys.argv[1:])  
+    args, cmd = parse_arguments(sys.argv[1:])
+    if args.gen_params:
+        args.generate_file(args.gen_params)
+        sys.exit(1)
+        
     from jumpdiaq.library import Library
     from jumpdiaq.run import Run
     from jumpdiaq.id_results_processing import (process_id_results, 
-                                                get_precursor_locations, 
                                                 get_protein_info, 
                                                 calculate_protein_coverage)
     from jumpdiaq.summarization import (quantify_precursors, 
@@ -46,19 +49,20 @@ def main():
     IdFile = args.id_report
     LibFile = args.spec_lib
     FastaFiles = args.fastas
-    # 
     OutDir = args.out_dir
-    LogLevel = args.log_level
+    if not LibFile:
+        logging.warning("WARNING: no spectral library provided: nothing to do\n")
     # 
-    UseSavedRTs = args.use_saved_rts
+    SkipPreprocess = args.skip_preprocess
     UseSavedXIC = args.use_saved_xic
     UseXICReport = args.use_xic_report
     #
     NormSpecies = args.norm_species
-    NormMethod = "median" if args.norm_method == 0 else "mean"
+    NormMethod = args.norm_method
     TrimPercentage = args.trim_percentage
     #
-    Ms2PriorityQuality = args.ms2_priority_quality
+    PrecQuantLevel = args.prec_quant_level
+    MS2PriorityQuality = args.ms2_priority_quality
     ProtQualityCutoffs = args.prot_quality_cutoffs
     MaxNPrecs = args.max_n_precs
     
@@ -72,7 +76,7 @@ def main():
     mem_available = mem_info.available / (1024 ** 3)
     SaveMemory = True if mem_available < 64 else False
     
-    logger = setup_logger(LogLevel, False, OutDir)
+    logger = setup_logger(False, OutDir)
     logger.info("====================================================")
     logger.info(f" JUMPdiaq (v{jumpdiaq.__version__}) ")
     logger.info(" ")
@@ -91,31 +95,22 @@ def main():
         logging.info(f"Using existing XIC quantification report: {report_file}") 
     else:
         logging.info(f"{len(MSFiles)} runs will be analyzed")
-        (is_tims, id_df, 
-         rt_mat, im_mat, 
-         lib_df_uniq_prec, 
-         cycle_time) = process_id_results(IdFile, LibFile, MSFiles, OutDir)
+        if SkipPreprocess:
+            prec_locations_file = Path(OutDir) / "precursor_locations.csv"
+            logging.info(f"Preprocess skipped. Using existing precursor RTs (and IMs): {prec_locations_file}\n") 
+            prec_locations = pd.read_csv(prec_locations_file)
+            prec_locations.set_index('Precursor.Id', inplace=True)
+        else:
+            prec_locations = process_id_results(IdFile, LibFile, MSFiles, OutDir)
         
+        # load library
         lib = Library()
         if not lib.load(Path(OutDir) / 'splib_quan.parquet'):
             raise Exception("Cannot load spectral library")
         lib.initialize()
         
-        if not UseSavedRTs:
-            logging.info("Predicting precursor RTs (and IMs)") 
-            prec_locations = get_precursor_locations(is_tims, id_df,
-                                                     rt_mat, im_mat,
-                                                     lib_df_uniq_prec,
-                                                     cycle_time, OutDir)
-        else:
-            prec_locations_file = Path(OutDir) / "precursor_locations.csv"
-            logging.info(f"Using existing precursor RTs (and IMs): {prec_locations_file}\n") 
-            prec_locations = pd.read_csv(prec_locations_file)
-            prec_locations.set_index('Precursor.Id', inplace=True)
-            
+        # Analyze each run
         for i, file in enumerate(MSFiles):
-            # i = 0
-            # file = MSFiles[i]
             logging.info(f"Analyzing run {i+1} of {len(MSFiles)}")
             if UseSavedXIC:
                 run_name = remove_extension(get_file_name(file))
@@ -135,9 +130,9 @@ def main():
             del run
             if SaveMemory:
                 gc.collect()
-                
-        # 
-        prec_prot_info = get_protein_info(IdFile, OutDir)
+
+        # Assambling xic data and genereate xic quant report
+        prec_prot_info = get_protein_info(LibFile, OutDir)
         lib.info.load(lib, MSFiles, OutDir)
         lib.info.quantify(MSFiles, OutDir)
         lib.report(report_file, MSFiles, prec_prot_info)
@@ -147,8 +142,8 @@ def main():
                                                 report_file, 
                                                 xic_quality_cutoff=0.0, 
                                                 xic_quant_cutoff=0.0, 
-                                                quant_source='ms1_ms2',
-                                                ms2_priority_quality=Ms2PriorityQuality,
+                                                quant_source=PrecQuantLevel,
+                                                ms2_priority_quality=MS2PriorityQuality,
                                                 out_dir=OutDir)
     prec_quant_table.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table.parquet")
     prec_quality_table.write_parquet(Path(OutDir) / "Precursor.Id_quality_summ_table.parquet")
@@ -159,7 +154,7 @@ def main():
     # TrimPercentage=5
     prec_quant_table_norm, norm_factors = norm_dataframe(
                                                   prec_quant_table, 
-                                                  data_type='Precursors',
+                                                  data_type='precursor',
                                                   tag_column='Protein.Names', 
                                                   value_columns=prec_quant_table.columns[4:-3], 
                                                   norm_species=NormSpecies, 

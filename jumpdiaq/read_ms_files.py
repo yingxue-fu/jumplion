@@ -23,6 +23,7 @@ TimsCentroid = args.tims_centroid
 WeightedCentroid = args.weighted_centroid
 MassAccCentroid = args.mass_acc_centroid * 1e-6
 IMWindowCentroid = args.im_window_centroid
+
 PeakMzDtype = np.float32
 PeakIMDtype = np.float32
 PeakIntensityDtype = np.float32

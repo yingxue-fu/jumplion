@@ -13,8 +13,9 @@ import dash_bio
 import plotly.graph_objects as go
 import plotly.express as px
 # local
+from jumpdiaq.utils import extract_unique_parts
 from jumpdiaq.gui.app import app, page_sidebar_style, logger
-from jumpdiaq.gui.utils import extract_unique_parts, get_valid_ratios, lfqbench_plot
+from jumpdiaq.gui.utils import get_valid_ratios, lfqbench_plot
 
 load_figure_template(["vizro", "vizro_dark"])
 colors = {'ALL': '#1F77B4',

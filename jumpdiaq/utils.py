@@ -1,5 +1,6 @@
 # builtin
 import os
+import re
 # external
 from tqdm import tqdm
 import numpy as np
@@ -84,3 +85,20 @@ def get_format(value):
         return 'f'
     else:
         raise TypeError(f"Unsupported type: {type(value)}")
+        
+def extract_unique_parts(strings):
+    if not strings:
+        return strings
+    # Step 1: Split each string by '_' and '-'
+    split_strings = [re.split(r'[-_]', s) for s in strings]
+    # Step 2: Transpose the list to identify common elements **at the same position**
+    transposed = list(zip(*split_strings))
+    # Step 3: Identify indices where all elements are identical
+    common_indices = {i for i, values in enumerate(transposed) if len(set(values)) == 1}
+    # Step 4: Remove elements at common indices
+    unique_parts = [
+        [value for i, value in enumerate(parts) if i not in common_indices]
+        for parts in split_strings
+    ]
+    # Step 5: Reconstruct the unique strings
+    return ['_'.join(parts) for parts in unique_parts]

@@ -29,7 +29,11 @@ def process_id_results(id_file,
                         lib_file, 
                         ms_files,
                         out_dir,
-                        min_runs_quant=MinRunsQuant):
+                        min_runs_quant=MinRunsQuant,
+                        min_runs_model=MinRunsModel,
+                        min_runs_cal=MinRunsCal,
+                        min_qvalue_cal=MinQvalueCal,
+                        max_mass_cal=MaxMassCal,):
     # id_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\report.parquet"
     # lib_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\report-lib.parquet"
     # out_dir = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\test_20250602"
@@ -90,24 +94,10 @@ def process_id_results(id_file,
     lib_df.to_parquet(lib_file_filtered, index=False)
     logging.info(f"Filtered spectral library saved to {lib_file_filtered}\n")
     
-    cycle_time = get_cycle_time(ms_files[0])
-    return is_tims, id_df, rt_mat, im_mat, lib_df_uniq_prec, cycle_time
-
-def get_precursor_locations(is_tims,
-                            id_df,
-                            rt_mat, 
-                            im_mat,
-                            lib_df_uniq_prec,
-                            cycle_time, 
-                            out_dir,
-                            min_runs_model=MinRunsModel,
-                            min_runs_cal=MinRunsCal,
-                            min_qvalue_cal=MinQvalueCal,
-                            max_mass_cal=MaxMassCal,
-                            ):
     ###############################
     # build RT model for each run #
     ###############################
+    logging.info("Predicting precursor RTs (and IMs)") 
     rt_dict, rt_segments = collect_model_data(rt_mat,  
                                               min_runs_model,
                                               lib_df_uniq_prec,
@@ -117,6 +107,7 @@ def get_precursor_locations(is_tims,
     rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, 5)
     rt_mat_pred.to_csv(Path(out_dir) / "rt_mat_after_prediction.csv")
     
+    cycle_time = get_cycle_time(ms_files[0])
     logging.info(f"Cycle time: {cycle_time} ({np.round(cycle_time*60, 3)} seconds)")
     average_model_acc = np.mean(model_accs)
     average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
@@ -141,10 +132,10 @@ def get_precursor_locations(is_tims,
     id_df_cal = id_df[id_df['Q.Value'] < min_qvalue_cal]
     rt_mat_cal = rt_mat[(rt_mat.shape[1] - rt_mat.isna().sum(axis=1)) >= min_runs_cal]
     mass_cal_precs = list(set(rt_mat_cal.index.values).intersection(set(id_df_cal['Precursor.Id'].drop_duplicates())))
-    logging.debug(f"{len(mass_cal_precs)} precursors with Q-values < {min_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
+    logging.info(f"{len(mass_cal_precs)} precursors with Q-values < {min_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
     random.seed(42)
     mass_cal_precs = random.sample(mass_cal_precs, min(len(mass_cal_precs), max_mass_cal))
-    logging.debug(f"{len(mass_cal_precs)} of them are randomly selected for mass calibration\n")
+    logging.info(f"{len(mass_cal_precs)} of them are randomly selected for mass calibration\n")
     
     # mark precursors used for calibration
     lib_df_uniq_prec['mass_cal'] = 0
@@ -235,7 +226,7 @@ def modeling_and_prediction(data_dict,
     for run_name in data_dict.keys():
         # run_name = list(data_dict.keys())[0]
         # build the model for predicting RT from iRT
-        logging.debug(f"Building {data_type.upper()} prediction model for run {run_name}")
+        logging.info(f"Building {data_type.upper()} prediction model for run {run_name}")
         model_data = data_dict[run_name]
         x, y = convert_to_arrays(model_data)
         model_coeff, model_points = refine_spline(x, y, n_segments)
@@ -243,7 +234,7 @@ def modeling_and_prediction(data_dict,
         delta_percentile=0.8
         model_acc = check_model_accuracy(model_data, model_coeff, model_points, delta_percentile)
         spline_fitting_plot(model_data, model_coeff, model_points, model_acc, show_window=False, model=data_type.upper(), out_dir=out_dir, run_name=run_name)
-        logging.debug(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {np.round(model_acc, 4)}")
+        logging.info(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {np.round(model_acc, 4)}")
         model_accs.append(model_acc)
         
         # predict RT for precursors with no RT        
@@ -314,12 +305,12 @@ def convert_ndarray(obj):
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
     
 # 
-def get_protein_info(report_file, out_dir):
-    
-    prec_prot_info = pd.read_parquet(report_file, columns=[
-                                                      'Precursor.Id', 
-                                                      'Protein.Ids', 'Protein.Group',
-                                                      'Protein.Names', 'Genes'])
+def get_protein_info(lib_file, out_dir):
+    prec_prot_info = pd.read_parquet(lib_file, columns=['Precursor.Id', 
+                                                        'Protein.Ids', 
+                                                        'Protein.Group',
+                                                        'Protein.Names', 
+                                                        'Genes'])
     prec_prot_info = prec_prot_info.drop_duplicates(ignore_index=True)
     prec_prot_info.to_csv(Path(out_dir) / "prec_prot_info.csv", index=False)
     

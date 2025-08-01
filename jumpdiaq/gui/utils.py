@@ -16,29 +16,6 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"  # Fallback to localhost
 
-def extract_unique_parts(strings):
-    if not strings:
-        return strings
-
-    # Step 1: Split each string by '_' and '-'
-    split_strings = [re.split(r'[-_]', s) for s in strings]
-
-    # Step 2: Transpose the list to identify common elements **at the same position**
-    transposed = list(zip(*split_strings))
-
-    # Step 3: Identify indices where all elements are identical
-    common_indices = {i for i, values in enumerate(transposed) if len(set(values)) == 1}
-
-    # Step 4: Remove elements at common indices
-    unique_parts = [
-        [value for i, value in enumerate(parts) if i not in common_indices]
-        for parts in split_strings
-    ]
-
-    # Step 5: Reconstruct the unique strings
-    return ['_'.join(parts) for parts in unique_parts]
-
-
 def ratio_violin_plot(ratios, labels, colors, ylim=None, text_cex=1):
     df = pd.DataFrame({'Value': ratios, 'Label': labels})
     df = df[df['Value'].notna()]  

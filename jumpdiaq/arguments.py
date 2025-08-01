@@ -7,7 +7,7 @@ import argparse
 import configparser
 from typing import List, Optional
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 import logging
 # local
 import jumpdiaq
@@ -25,9 +25,8 @@ class Arguments:
     fastas: List[str] = field(default_factory=list)
     out_dir: str = ""
     
-    # General settings
-    log_level: int = 5
-    use_saved_rts: int = 0
+    # Use existing results
+    skip_id_process: int = 0
     use_saved_xic: int = 0
     use_xic_report: int = 0
     
@@ -38,7 +37,8 @@ class Arguments:
     min_qvalue_cal: float = 0.0001
     max_mass_cal: int = 5000
     
-    # Mass calibration
+    # XIC extraction
+    ## Mass calibration
     mass_calibration: int = 1    
     mass_cal_acc: float = 30.0   # calibration mass accuracy
     mass_cal_bins: int = 1
@@ -48,13 +48,13 @@ class Arguments:
     mass_acc_ms1: float = 15.0
     individual_mass_acc: int = 0
     
-    # IM window
+    ## IM window settings
     im_window_cal: float = 0.03
     fix_im_window: int = 0
     im_window: float = 0.01
     individual_im_window: int = 0
     
-    # XIC extraction and scoring
+    # XIC quantification
     min_quan_fr: int = 3
     max_quan_fr: int = 6
     n_isotops: int = 2
@@ -67,19 +67,18 @@ class Arguments:
     min_xic_intensity: float = 10.0
     min_apex_intensity: float = 30.0
     min_apex_evidence: float = 0.99
-    optimal_xic_source: int = 0
-    
-    # Interference removal
+    optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     intf_removal: int = 1
     intf_removal_corr: float = 0.0
     intf_filter_factor: float = 1.5
     
-    # Normalization
+    # Precursor normalization
     norm_species: str = "HUMAN"
-    norm_method: int = 0
+    norm_method: str = "median"       # Other options: 'mean'
     trim_percentage: int = 5
     
     # Protein summarization
+    prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     ms2_priority_quality: float = 0.75
     max_n_precs: int = 100
     prot_quality_cutoffs: float = 0.8
@@ -90,7 +89,11 @@ class Arguments:
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
     
-    # Internal use
+    # Config file
+    gen_params: str = ""
+    config_file: str = ""
+    
+    # Progress bar dispaly
     show_progress: int = 1
     inter_progress: int = 0    
     
@@ -101,10 +104,9 @@ class Arguments:
         if cls._instance is None:
             cls._instance = super(Arguments, cls).__new__(cls)
             # Initialize dataclass fields here
-            from dataclasses import fields
-            for field in fields(cls):
-                if not hasattr(cls._instance, field.name):
-                    setattr(cls._instance, field.name, field.default_factory() if field.default_factory is not field.default_factory else field.default)
+            for _field in fields(cls):
+                if not hasattr(cls._instance, _field.name):
+                    setattr(cls._instance, _field.name, _field.default_factory() if _field.default_factory is not _field.default_factory else _field.default)
             cls._instance._initialized = False
         return cls._instance
 
@@ -112,16 +114,48 @@ class Arguments:
         if getattr(self, '_initialized', False):
             return
         self._initialized = True
-
-
+        
+    def generate_file(self, output_path="jumpdiaq.params"):
+        with open(output_path, 'w') as f:
+            f.write("# Inputs\n")
+            for fdef in fields(self):
+                if fdef.name == "gen_params":
+                    break
+                if fdef.name == "skip_id_process":
+                    f.write("\n# Use existing results\n")
+                if fdef.name == "min_runs_quant":
+                    f.write("\n# ID results processing\n")
+                if fdef.name == "mass_calibration":
+                    f.write("\n# XIC extraction\n")
+                if fdef.name == "min_quan_fr":
+                    f.write("\n# XIC quantification\n")
+                if fdef.name == "norm_species":
+                    f.write("\n# Precursor normalization\n")
+                if fdef.name == "prec_quant_level":
+                    f.write("\n# Protein summarization\n")
+                if fdef.name == "tims_centroid":
+                    f.write("\n# timsTOF data preprocessing\n")
+                value = getattr(self, fdef.name)
+                if isinstance(value, list):
+                    f.write(f"{fdef.name} = \n")
+                    for item in value:
+                        f.write(f"{item}\n")
+                else:
+                    f.write(f"{fdef.name} = {value}\n")
+        print(f"Parameter file generated to: {output_path}")
+        
 def create_parser() -> argparse.ArgumentParser:
+    VERSION = jumpdiaq.__version__
     parser = argparse.ArgumentParser(
-        description=f"JUMPdiaq (v{jumpdiaq.__version__})",
+        description=f"JUMPdiaq (v{VERSION})",
         formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=120)
     )
+    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     
     # Add positional argument for params file
     parser.add_argument("params_file", type=str, nargs='?', help="Use a parameter file")
+    parser.add_argument("--gen-params", type=str, nargs='?', const="jumpdiaq.params", metavar="PARAMS_FILE",
+                        help="Generate a parameter file with default values (default: %(const)s)")
     
     # Create argument groups   
     required_group = parser.add_argument_group('required arguments')
@@ -134,9 +168,8 @@ def create_parser() -> argparse.ArgumentParser:
     required_group.add_argument("--fastas", help="Paths of Fasta files", nargs='*', default=[])
     required_group.add_argument("--out-dir", type=str, help="Output directory name")
     
-    # General settings
-    optional_group.add_argument("--log-level", type=int, help="Level of log messages")
-    optional_group.add_argument("--use-saved-rts", type=int, help="Use existing precursor RTs (and IMs)")
+    # Use existing results
+    optional_group.add_argument("--skip-id-process", type=int, help="Use existing filterd library and precursor RT/IM")
     optional_group.add_argument("--use-saved-xic", type=int, help="Use existing XIC files")
     optional_group.add_argument("--use-xic-report", type=int, help="Use existing XIC quant report file")
     
@@ -147,7 +180,8 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-qvalue-cal", type=float, help="")
     optional_group.add_argument("--max-mass-cal", type=int, help="")
     
-    # Mass calibration
+    # XIC extraction
+    ## Mass calibration
     optional_group.add_argument("--mass-calibration", type=int, help="") 
     optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
     optional_group.add_argument("--mass-cal-bins", type=int, help="")
@@ -157,13 +191,13 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--mass-acc-ms1", type=float, help="")
     optional_group.add_argument("--individual-mass-acc", type=int, help="")
     
-    # IM window 
+    ## IM window settings
     optional_group.add_argument("--im-window-cal", type=float, help="")
     optional_group.add_argument("--fix-im-window", type=int, help="")
     optional_group.add_argument("--im-window", type=float, help="")
     optional_group.add_argument("--individual-im-window", type=int, help="")
     
-    # XIC extraction and scoring
+    # XIC quantification
     optional_group.add_argument("--min-quan-fr", type=int, help="")
     optional_group.add_argument("--max-quan-fr", type=int, help="")
     optional_group.add_argument("--n-isotops", type=int, help="")
@@ -176,35 +210,34 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-xic-intensity", type=float, help="")
     optional_group.add_argument("--min-apex-intensity", type=float, help="")
     optional_group.add_argument("--min-apex-evidence", type=float, help="")   
-    optional_group.add_argument("--optimal-xic-source", type=int, help="")
-    
-    # Interference removal 
+    optional_group.add_argument("--optimal-xic-source", type=str, help="")
     optional_group.add_argument("--intf-removal", type=int, help="")
     optional_group.add_argument("--intf-removal-corr", type=float, help="")
     optional_group.add_argument("--intf-filter-factor", type=float, help="")
     
-    # Normalization
+    # Precursor normalization
     optional_group.add_argument("--norm-species", type=str, help="")
-    optional_group.add_argument("--norm-method", type=int, help="")
+    optional_group.add_argument("--norm-method", type=str, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
     # Protein summarization
+    optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--ms2-priority-quality", type=float, help="")
     optional_group.add_argument("--max-n-precs", type=int, help="")
     optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")
     
     # timsTOF data preprocessing
-    parser.add_argument("--tims-centroid", type=int, help="")
-    parser.add_argument("--weighted-centroid", type=int, help="")
-    parser.add_argument("--mass-acc-centroid", type=int, help="")
-    parser.add_argument("--im-window-centroid", type=float, help="")
+    optional_group.add_argument("--tims-centroid", type=int, help="")
+    optional_group.add_argument("--weighted-centroid", type=int, help="")
+    optional_group.add_argument("--mass-acc-centroid", type=int, help="")
+    optional_group.add_argument("--im-window-centroid", type=float, help="")
     
-    #
-    parser.add_argument("--show-progress", type=int, help="")
-    parser.add_argument("--inter-progress", type=int, help="")
-    
-    #
+    # Config file
     parser.add_argument("--config-file", type=str, help="Path to a configuration file")
+    
+    # Progress bar dispaly
+    parser.add_argument("--show-progress", type=int, help="Show progress bars for some processes")
+    parser.add_argument("--inter-progress", type=int, help="Show intermittent progress bars")
     
     return parser
 
@@ -260,9 +293,6 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
                 print(f"WARNING: Skipping {file_path} - invalid raw MS data format")
                 continue
             arguments.ms_files.append(file_path)   
-
-    if not arguments.spec_lib:
-        print("WARNING: no spectral library provided: nothing to do\n")
         
     if arguments.fix_mass_acc:
         arguments.individual_mass_acc = False
@@ -388,14 +418,10 @@ def params_to_args(param_file):
     return commands 
     
 
-def setup_logger(log_level, show_log_level, out_dir):
+def setup_logger(show_log_level, out_dir):
     """Sets up the main logger with console, file, and queue handlers."""
     
-    level = logging.WARNING  # Default level
-    if log_level == 5:
-        level = logging.DEBUG
-    elif log_level == 4:
-        level = logging.INFO
+    level = logging.INFO  # Default level
 
     # Create a named logger
     logger = logging.getLogger()

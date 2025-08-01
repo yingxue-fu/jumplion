@@ -126,18 +126,10 @@ sidebar = html.Div(
                 dbc.Card([
                     dbc.CardHeader(html.Label("Parameters", style={"font-weight": "bold"})),
                     dbc.CardBody([
-                        html.P('General settings', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        html.P('Use existing results', style={"font-weight": "bold"}, className="mt-1 mb-0"),
                         dbc.Row([
-                            dbc.Col(html.Label("log_level"), width=8),  
-                            dbc.Col(dbc.Input(id="log-level", 
-                                              type="number", 
-                                              value=5, 
-                                              style={"width": "80px", "height": "20px"}), 
-                                    width=4),  
-                        ], className="mt-0 mb-1"),
-                        dbc.Row([
-                            dbc.Col(html.Label("use_saved_rts"), width=8),  
-                            dbc.Col(dbc.Checklist(id="use-saved-rts",
+                            dbc.Col(html.Label("skip_id_process"), width=8),  
+                            dbc.Col(dbc.Checklist(id="skip-id-process",
                                                   options=[{"label": "Enabled", "value": "yes"}],
                                                   value=[],
                                                   inline=True), 
@@ -184,7 +176,7 @@ sidebar = html.Div(
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
-                        html.P('XIC extraction', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        html.P('XIC extraction and quantification', style={"font-weight": "bold"}, className="mt-1 mb-0"),
                         dbc.Row([
                             dbc.Col(html.Label("mass_calibration"), width=8),  
                             dbc.Col(dbc.Checklist(id="mass-calibration",
@@ -202,7 +194,7 @@ sidebar = html.Div(
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("mass_acc_ms2"), width=8),  
+                            dbc.Col(html.Label("mass_acc_ms2 (ppm)"), width=8),  
                             dbc.Col(dbc.Input(id="mass-acc-ms2", 
                                               type="number", 
                                               value=15, 
@@ -210,7 +202,7 @@ sidebar = html.Div(
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("mass_acc_ms1"), width=8),  
+                            dbc.Col(html.Label("mass_acc_ms1 (ppm)"), width=8),  
                             dbc.Col(dbc.Input(id="mass-acc-ms1", 
                                               type="number", 
                                               value=15, 
@@ -219,10 +211,19 @@ sidebar = html.Div(
                         ], className="mt-0 mb-1"),
                         dbc.Row([
                             dbc.Col(html.Label("optimal_xic_source"), width=8),  
-                            dbc.Col(dbc.Input(id="optimal-xic-source", 
-                                              type="number", 
-                                              value=0, 
-                                              style={"width": "80px", "height": "20px"}), 
+                            dbc.Col(dbc.Select(id="optimal-xic-source", 
+                                               options=[
+                                                   {"label": "MS1", "value": "ms1"},
+                                                   {"label": "MS2", "value": "ms2"},
+                                                   {"label": "MS1/MS2", "value": "ms1_ms2"},
+                                               ], 
+                                               value="ms1_ms2", 
+                                               style={"width": "80px", "height": "20px", 
+                                                      "fontSize": "13px",
+                                                      "padding": "0px",
+                                                      "paddingLeft": "3px",
+                                                      "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
+                                                      "backgroundSize": "10px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
@@ -233,7 +234,7 @@ sidebar = html.Div(
                                                   inline=True), 
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
-                        html.P('Normalization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        html.P('Precursor normalization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
                         dbc.Row([
                             dbc.Col(html.Label("norm_species"), width=8),  
                             dbc.Col(dbc.Input(id="norm-species", 
@@ -244,11 +245,19 @@ sidebar = html.Div(
                         ], className="mt-0 mb-1"),
                         dbc.Row([
                             dbc.Col(html.Label("norm_method"), width=8),  
-                            dbc.Col(dbc.Input(id="norm-method", 
-                                              type="number", 
-                                              value=0, 
-                                              style={"width": "80px", "height": "20px"}), 
-                                    width=4),  
+                            dbc.Col(dbc.Select(id="norm-method", 
+                                               options=[
+                                                   {"label": "median", "value": "median"},
+                                                   {"label": "mean", "value": "mean"},
+                                               ], 
+                                               value="median", 
+                                               style={"width": "80px", "height": "20px", 
+                                                      "fontSize": "14px",
+                                                      "padding": "0px",
+                                                      "paddingLeft": "8px",
+                                                      "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
+                                                      "backgroundSize": "10px"}), 
+                                    width=4)  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
                             dbc.Col(html.Label("trim_percentage"), width=8),  
@@ -260,10 +269,27 @@ sidebar = html.Div(
                         ], className="mt-0 mb-1"),
                         html.P('Protein summarization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
                         dbc.Row([
+                            dbc.Col(html.Label("prec_quant_level"), width=8),  
+                            dbc.Col(dbc.Select(id="prec-quant-level", 
+                                               options=[
+                                                   {"label": "MS1", "value": "ms1"},
+                                                   {"label": "MS2", "value": "ms2"},
+                                                   {"label": "MS1/MS2", "value": "ms1_ms2"},
+                                               ], 
+                                               value="ms1_ms2", 
+                                               style={"width": "80px", "height": "20px", 
+                                                      "fontSize": "13px",
+                                                      "padding": "0px",
+                                                      "paddingLeft": "3px",
+                                                      "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
+                                                      "backgroundSize": "10px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
                             dbc.Col(html.Label("ms2_priority_quality"), width=8),  
                             dbc.Col(dbc.Input(id="ms2-priority-quality", 
                                               type="number", 
-                                              value='0.75', 
+                                              value=0.75, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
@@ -271,7 +297,7 @@ sidebar = html.Div(
                             dbc.Col(html.Label("max_n_precs"), width=8),  
                             dbc.Col(dbc.Input(id="max-n-precs", 
                                               type="number", 
-                                              value='100', 
+                                              value=100, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
@@ -773,8 +799,7 @@ def update_process_state(log_value, n_intervals, process_state):
     State('fasta-path', 'value'), 
     State('fasta-selector', 'value'),
     State('outdir-path', 'value'),
-    State('log-level', 'value'),
-    State('use-saved-rts', 'value'),
+    State('skip-id-process', 'value'),
     State('use-saved-xic', 'value'),
     State('use-xic-report', 'value'),
     State('min-runs-quant', 'value'),
@@ -789,6 +814,7 @@ def update_process_state(log_value, n_intervals, process_state):
     State('norm-species', 'value'),
     State('norm-method', 'value'),
     State('trim-percentage', 'value'),
+    State('prec-quant-level', 'value'),
     State('ms2-priority-quality', 'value'),
     State('max-n-precs', 'value'),
     State('prot-quality-cutoffs', 'value'),
@@ -804,8 +830,7 @@ def run_jumpdiaq(
         fasta_path,
         fastas,
         outdir,
-        log_level,
-        use_saved_rts,
+        skip_id_process,
         use_saved_xic,
         use_xic_report,
         min_runs_quant,
@@ -820,6 +845,7 @@ def run_jumpdiaq(
         norm_species,
         norm_method,
         trim_percentage,
+        prec_quant_level,
         ms2_priority_quality,
         max_n_precs,
         prot_quality_cutoffs
@@ -867,12 +893,8 @@ def run_jumpdiaq(
         cmd_args.append(outdir)
     
     # 
-    cmd_args.append("--log-level")
-    cmd_args.append(str(log_level))
-    
-    # 
-    if 'yes' in use_saved_rts:
-        cmd_args.append("--use-saved-rts")
+    if 'yes' in skip_id_process:
+        cmd_args.append("--skip-id-process")
         cmd_args.append("1")
         
     # 
@@ -905,7 +927,7 @@ def run_jumpdiaq(
         cmd_args.append(str(mass_acc_ms1))
         
     cmd_args.append("--optimal-xic-source")
-    cmd_args.append(str(optimal_xic_source))
+    cmd_args.append(optimal_xic_source)
     
     # Add interference removal option
     if 'yes' not in intf_removal:
@@ -913,12 +935,15 @@ def run_jumpdiaq(
         cmd_args.append("0")
     
     cmd_args.append("--norm-species")
-    cmd_args.append(str(norm_species))
+    cmd_args.append(norm_species)
     cmd_args.append("--norm-method")
-    cmd_args.append(str(norm_method))
+    cmd_args.append(norm_method)
     cmd_args.append("--trim-percentage") 
     cmd_args.append(str(trim_percentage))
     
+    # 
+    cmd_args.append("--prec-quant-level")
+    cmd_args.append(prec_quant_level)
     cmd_args.append("--ms2-priority-quality")
     cmd_args.append(str(ms2_priority_quality))
     cmd_args.append("--max-n-precs")
