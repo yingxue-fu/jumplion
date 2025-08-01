@@ -1,24 +1,24 @@
-### Introduction
-JUMPdiaq is a tool used for quantifying DIA-MS-based proteomics data.
+
+JUMPdiaq is a software designed for the quantification of proteomics data generated using data-independent acquisition mass spectrometry (DIA-MS).
 
 ### Installation
-JUMPdiaq is a Python package that can be installed via pip and runs on both Windows and Linux systems. 
+JUMPdiaq can be installed via pip and is compatible with both Windows and Linux operating systems.
 ```bash
 conda create -n jumpdiaq python=3.12
 conda activate jumpdiaq
 conda install mono # required in Linux for reading Thermo .raw file; skip this line for Windows
-pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" 
-# after publishing, the command will be 'pip install jumpdiaq'
+pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" # after publishing, the command will be 'pip install jumpdiaq'
 ```
-After installation, the most easy way to start your analysis is to use the JUMPdiaq-GUI by input the following command in the terminal:
+After installation, the easiest way to begin your analysis is by launching the JUMPdiaq GUI using the following command in the terminal:
 ```bash
 jumpdiaq-gui
 ```
-You can also use JUMPdiaq in command line mode. Check more details in section `Use the CLI`.
+An HTTP address will appear in the terminal; you can paste it into your browser to open the interface. Alternatively, JUMPdiaq can be used in command-line mode, see the [Use the CLI](#use-the-cli) section for more details.
 
 ### Inputs
-**DIA-MS files**: Supported MS file formats: Bruker .d (diaPASEF), Thermo .raw, and .mzML (converted from .raw).  
-**Precursor-level identification report**: A long format table containing the identified precursors in each run and their RT, IM (for timsTOF data) and Q-value (Precursor-level). Below is an example:  
+**DIA-MS Files**: Supported mass spectrometry file formats include Bruker `.d` (diaPASEF), Thermo `.raw`, and `.mzML` files converted from `.raw`.  
+**Precursor-Level Identification Report**: This is a table listing the identified precursors for each run, along with their retention time (RT), ion mobility (IM, for timsTOF data), and precursor-level Q-value. An example is shown below:   
+
 |Run|Precursor.Id|RT|IM|Q.Value|
 |---|---|---|---|---|
 |Run_1|AAAAAAALQAK2|8.13581|0.8512|8.96e-06|
@@ -26,11 +26,11 @@ You can also use JUMPdiaq in command line mode. Check more details in section `U
 |Run_3|AAAAAAALQAK2|8.10539|0.8548|0.00165|  
 |Run_1|AAAIGIDLGTTYSCVGVFQHGK3|32.08232|0.9773|8.96e-06|
 |Run_2|AAAIGIDLGTTYSCVGVFQHGK3|32.11453|0.9774|1.41e-05|
-|Run_3|AAAIGIDLGTTYSCVGVFQHGK3|32.11588|0.9798|0.00125|
-
-**Spectral library**: The spectral library should contain information of precursors, e.g, m/z, charge, and peptide sequence and the information of their product ions e.g., m/z, charge, ion type (b/y ions), etc. Supported spectral library formats: comma-separated (.csv), tab-separated (.tsv, .xls or .txt) or .parquet files.  
-**Fasta files**: Fasta file(s) used to create the spectral library, which will be used to calculate protein coverage percentage.  
-**Output directory**: Specify the name/path where the output results will be stored.
+|Run_3|AAAIGIDLGTTYSCVGVFQHGK3|32.11588|0.9798|0.00125|  
+   
+**Spectral library**: The spectral library should include information about the precursors, such as m/z, charge, and peptide sequence, as well as details of their corresponding product ions, including m/z, charge, ion type (e.g., b/y ions), and more. Supported spectral library formats include comma-separated (.csv), tab-separated (.tsv, .xls, or .txt), and .parquet files.   
+**FASTA file(s)**: The FASTA file(s) used to generate the spectral library. These files are utilized to calculate the protein coverage percentage.  
+**Output directory**: Specify the name or path where the output results will be saved.
 
 ### Parameters
 |Category|Parameter|Command|Description|Values|
@@ -71,7 +71,7 @@ You can also use JUMPdiaq in command line mode. Check more details in section `U
 ||intf_removal|--intf-removal|Interference removal for a XIC|0 = off, 1 = on, default: 1|
 ||int_removal_corr|--intf-removal-corr|Minimum correlation for a XIC to be subject to interference removal|default: 0.0|
 ||int_filter_factor|--intf-filter-factor|Interference filtering factor|default: 1.5|
-|**Normalization**|norm_species|--norm-species|The species of peptides used for intensity normalization|default: HUMAN|
+|**Precursor normalization**|norm_species|--norm-species|The species of peptides used for intensity normalization|default: HUMAN|
 ||norm_method|--norm-method|Normalization method|median or mean, default: median|
 ||trim_percentage|--trim-percentage|Percentage trimmed on each side for normalization|default: 5|
 |**Protein summarization**|prec_quant_level|--prec-quant-level|Use which level of precursor quantification to summarize to protein|ms1_ms2 = MS1/MS2, ms1 = MS1 only, ms2 = MS2 only, default: ms1_ms2|
@@ -84,14 +84,13 @@ You can also use JUMPdiaq in command line mode. Check more details in section `U
 ||im_window_centroid|--im-window-centroid|Max ion mobility difference to centroid peaks|default: 0.005|
 
 ### Outputs
-The final protein-level quantification report can be found in the output directory with file name like `Protein.Group_Quan_QTX.X_qualityX.X.csv`.
+The final protein-level quantification report can be found in the output directory, with a filename such as `Protein.Group_Quan_QTX.X_qualityX.X.csv`.
 
 ### Use the GUI
-At the home page, click `Start Analyis` to go to the parameter setting page. Input the path for required files. Then click `Settings` to adjust parameters. After finished setting, click `Run` to start the analysis.  
-<img src="jumpdiaq/gui/assets/gui_input1.png" width="300" height="550">
-<img src="jumpdiaq/gui/assets/gui_input2.png" width="220" height="550">
+On the home page, click `Start Analysis` to navigate to the parameter settings page. Enter the paths for the required files, then click `Settings` to configure the parameters. Once all settings are complete, click `Run` to begin the analysis.  
+
 ### Use the CLI
-A easy way to run JUMPdiaq CLI is to use a parameter file. Run the following commands to generate a parameter file in the current working directory, then fill in required inputs and run the program.
+One convenient way to execute the JUMPdiaq CLI is by using a parameter file. Use the following commands to generate a parameter file in the current working directory, then complete the required inputs and run the program.
 ```bash
 jumpdiaq --gen-params jumpdiaq.params
 jumpdiaq jumpdiaq.params
