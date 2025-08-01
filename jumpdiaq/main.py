@@ -53,7 +53,7 @@ def main():
     if not LibFile:
         logging.warning("WARNING: no spectral library provided: nothing to do\n")
     # 
-    SkipPreprocess = args.skip_preprocess
+    SkipIDprocess = args.skip_id_process
     UseSavedXIC = args.use_saved_xic
     UseXICReport = args.use_xic_report
     #
@@ -95,9 +95,9 @@ def main():
         logging.info(f"Using existing XIC quantification report: {report_file}") 
     else:
         logging.info(f"{len(MSFiles)} runs will be analyzed")
-        if SkipPreprocess:
+        if SkipIDprocess:
             prec_locations_file = Path(OutDir) / "precursor_locations.csv"
-            logging.info(f"Preprocess skipped. Using existing precursor RTs (and IMs): {prec_locations_file}\n") 
+            logging.info(f"ID results processing skipped. Using existing precursor RTs (and IMs): {prec_locations_file}\n") 
             prec_locations = pd.read_csv(prec_locations_file)
             prec_locations.set_index('Precursor.Id', inplace=True)
         else:
