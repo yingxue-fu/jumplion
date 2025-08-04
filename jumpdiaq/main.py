@@ -170,15 +170,14 @@ def main():
     # filter based on quality
     value_columns = prot_quality_table.columns[3:-1]
     if ProtQualityCutoffs < 1:
-        quantiles = np.array(np.nan)
+        quantiles = np.array([np.nan])
         QualityCutoffs = [ProtQualityCutoffs]
     else:
-        quantiles = np.round(np.arange(0.0, 1.0, 1 / ProtQualityCutoffs)[1:], 2)
+        quantiles = np.round(np.arange(0.0, 1.0, 1 / ProtQualityCutoffs), 2)
         QualityCutoffs = np.nanquantile(prot_quality_table.select(value_columns).to_numpy().flatten(), quantiles)
         QualityCutoffs = np.round(QualityCutoffs, 2)
         
-    quality_hist_plot(prot_quality_table.to_pandas(), value_columns, 
-                      QualityCutoffs, Path(OutDir))
+    quality_hist_plot(prot_quality_table.to_pandas(), value_columns, QualityCutoffs, Path(OutDir))
     prot_quant_table_filtered = filter_based_on_quality(prot_quant_table.to_pandas(), 
                                                         prot_quality_table.to_pandas(),
                                                         tag_column='Protein.Group',
@@ -190,8 +189,9 @@ def main():
                                                         str(Path(OutDir)))
     else:
         logging.warning("WARNING: no Fasta files are provided, protein coverage will not be calculated.")
+        
     prot_quant_table = prot_prec_pep_info.merge(prot_quant_table.to_pandas(), how='right')
-    prot_quant_table.to_csv(Path(OutDir) / "Protein.Group_Quan_QT0.0.csv", index=False)
+    prot_quant_table.to_csv(Path(OutDir) / "Protein.Group_Quan_noFiltering.csv", index=False)
     
     for i, (qt, cutoff) in enumerate(zip(quantiles, QualityCutoffs)):
         prot_quant_table_f = prot_quant_table_filtered[i]

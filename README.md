@@ -78,7 +78,7 @@ An HTTP address will appear in the terminal; you can paste it into your browser 
 ||ms2_priority_quality|--ms2-priority-quality|If both MS1- and MS2-level quality are good (> cutoff), MS2-level quantity will be used.|default: 0.75|
 ||max_n_precs|--max-n-precs|Maximum number of precursors used to summarize to protein-level quantity|default: 100|
 ||prot_quality_cutoffs|--prot-quality-cutoffs|Quality cutoff for protein-level quantification. Use a value < 1.0 will generate only one file filtered by that quality cutoff. Use a value (n) > 1.0 will generate n files with a set of qulaity cutoffs calculated based on quality quantiles|default: 0.8|
-|**timsTOF data preprocessing**|tims_centroid|--tims-centroid|Wheather to perform peaks centroid for timsTOF data|default: 0|
+|**timsTOF data preprocessing**|tims_centroid|--tims-centroid|Wheather to perform peaks centroid for timsTOF data|0 = no, 1 = yes, default: 0|
 ||weighted_centroid|--weighted-centroid|Use weighted average of m/z and IM for centroid peaks|0 = no, 1 = yes, default: 1|
 ||mass_acc_centroid|--mass-acc-centroid|Max mass tolerance to centroid peaks|default: 5|
 ||im_window_centroid|--im-window-centroid|Max ion mobility difference to centroid peaks|default: 0.005|

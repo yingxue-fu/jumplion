@@ -31,9 +31,9 @@ class Arguments:
     use_xic_report: int = 0
     
     # ID results processing
-    min_runs_quant: int = 1
-    min_runs_model: int = 2
-    min_runs_cal: int = 3
+    min_runs_quant: int = 3
+    min_runs_model: int = 3
+    min_runs_cal: int = 6
     min_qvalue_cal: float = 0.0001
     max_mass_cal: int = 5000
     
@@ -81,7 +81,7 @@ class Arguments:
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     ms2_priority_quality: float = 0.75
     max_n_precs: int = 100
-    prot_quality_cutoffs: float = 0.8
+    prot_quality_cutoffs: float = 10
     
     # timsTOF data preprocessing
     tims_centroid: int = 0
