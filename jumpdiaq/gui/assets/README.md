@@ -7,7 +7,7 @@ JUMPdiaq can be installed via pip and is compatible with both Windows and Linux 
 conda create -n jumpdiaq python=3.12
 conda activate jumpdiaq
 conda install mono # required in Linux for reading Thermo .raw file; skip this line for Windows
-pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" # after publishing, the command will be 'pip install jumpdiaq'
+pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" # after publishing, the command will be 'pip install jumpdiaq'
 ```
 After installation, the easiest way to begin your analysis is by launching the JUMPdiaq GUI using the following command in the terminal:
 ```bash
@@ -69,8 +69,8 @@ An HTTP address will appear in the terminal; you can paste it into your browser 
 ||min_apex_evidence|--min-apex-evidence|Apex point should be higher than X% of highest neighbor points|default: 0.99|
 ||optimal_xic_source|--optimal-xic-source|MS level of the optimal XIC|ms1_ms2 = MS1/MS2, ms1 = MS1 only, ms2 = MS2 only, default: ms1_ms2|
 ||intf_removal|--intf-removal|Interference removal for a XIC|0 = off, 1 = on, default: 1|
-||int_removal_corr|--intf-removal-corr|Minimum correlation for a XIC to be subject to interference removal|default: 0.0|
-||int_filter_factor|--intf-filter-factor|Interference filtering factor|default: 1.5|
+||intf_removal_corr|--intf-removal-corr|Minimum correlation for a XIC to be subject to interference removal|default: 0.0|
+||intf_filter_factor|--intf-filter-factor|Interference filtering factor|default: 1.5|
 |**Precursor normalization**|norm_species|--norm-species|The species of peptides used for intensity normalization|default: HUMAN|
 ||norm_method|--norm-method|Normalization method|median or mean, default: median|
 ||trim_percentage|--trim-percentage|Percentage trimmed on each side for normalization|default: 5|
