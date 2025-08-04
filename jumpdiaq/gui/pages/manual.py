@@ -45,7 +45,7 @@ def preprocess_markdown_with_anchors(md_text):
             processed_lines.append(f'{match.group(1)} <a id="{anchor_id}"></a>{title}')
             
             # Add to TOC if level <= 3
-            if level <= 3:
+            if level == 3:
                 toc_links.append(
                     html.Li([
                         html.A(
@@ -85,7 +85,7 @@ layout = html.Div([
         dbc.Col(sidebar, width=3),
         # Main Markdown content
         dbc.Col([
-            dcc.Markdown(processed_markdown, dangerously_allow_html=True),
-        ], width=9, style={'marginTop': '40px'})
+            dcc.Markdown(processed_markdown, dangerously_allow_html=True, className='markdown-container'),
+        ], width=8, style={'marginTop': '50px'})
     ])
 ])
