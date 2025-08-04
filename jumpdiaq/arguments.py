@@ -117,11 +117,14 @@ class Arguments:
         
     def generate_file(self, output_path="jumpdiaq.params"):
         with open(output_path, 'w') as f:
-            f.write("# Inputs\n")
+            f.write("[required]\n")
+            f.write("\n# Inputs\n")
+            f.write("# Leave the 'input_runs = ' row empty when there are multiple MS files. The same applies to the 'fastas = ' parameter.\n")
             for fdef in fields(self):
                 if fdef.name == "gen_params":
                     break
                 if fdef.name == "skip_id_process":
+                    f.write("\n[optional]\n")
                     f.write("\n# Use existing results\n")
                 if fdef.name == "min_runs_quant":
                     f.write("\n# ID results processing\n")
