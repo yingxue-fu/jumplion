@@ -86,6 +86,6 @@ layout = html.Div([
         # Main Markdown content
         dbc.Col([
             dcc.Markdown(processed_markdown, dangerously_allow_html=True, className='markdown-container'),
-        ], width=8, style={'marginTop': '50px'})
+        ], width=9, style={'marginTop': '50px'})
     ])
 ])
