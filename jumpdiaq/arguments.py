@@ -118,14 +118,22 @@ class Arguments:
     def generate_file(self, output_path="jumpdiaq.params"):
         with open(output_path, 'w') as f:
             f.write("[required]\n")
-            f.write("\n# Inputs\n")
-            f.write("# Leave the 'input_runs = ' row empty when there are multiple MS files. The same applies to the 'fastas = ' parameter.\n")
+            f.write("# Input runs: .raw/.mzML files for Thermo instruments or diaPASEF .d files for timsTOF instruments\n")
+            f.write("# Leave the 'input_runs = ' row empty when there are multiple files. The same applies to the 'fastas = ' parameter.\n")
             for fdef in fields(self):
                 if fdef.name == "gen_params":
                     break
+                if fdef.name == "id_report":
+                    f.write("\n# Precursor-level idetification report\n")
+                if fdef.name == "spec_lib":
+                    f.write("\n# Spectral library (support .tsv/.csv/.parquet format)\n") 
+                if fdef.name == "fastas":
+                    f.write("\n# Fasta files\n") 
+                if fdef.name == "out_dir":
+                    f.write("\n# Output directory name\n")
                 if fdef.name == "skip_id_process":
                     f.write("\n[optional]\n")
-                    f.write("\n# Use existing results\n")
+                    f.write("# Use existing results\n")
                 if fdef.name == "min_runs_quant":
                     f.write("\n# ID results processing\n")
                 if fdef.name == "mass_calibration":

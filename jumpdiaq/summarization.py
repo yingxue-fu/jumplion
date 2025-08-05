@@ -352,8 +352,8 @@ def protein_summarize(prec_quant_table,
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
         # Summarization
-        # Limit the number of PSMs when there are too many precursors
-        # Choose top-n precursors according to the PSM-wise total intensity
+        # Limit the number of precursors when there are too many precursors
+        # Choose top-n precursors according to the precursor-wise total intensity
         if quant_mat.shape[0] > max_n_precs:
             row_means = np.nanmean(quant_mat, axis=1)
             sorted_indices = np.argsort(-row_means)
@@ -377,8 +377,7 @@ def protein_summarize(prec_quant_table,
 
 def quantify_proteins(prec_quant_table, 
                       prec_quality_table, 
-                      max_n_precs
-                      ):
+                      max_n_precs):
     logging.info("Quantifying proteins")
     other_cols = {'Precursor.Id',
                   'Protein.Group',
@@ -520,14 +519,10 @@ def maxLFQ(mat):
 
     return w
 
-########################## JUMPq summarization method #########################
-# mat=quant_matrices['TAGLQPSDLIIVAAR2']
-#X_df = pd.DataFrame(mat).T.reset_index(drop=False)
-#X_df.plot(x='index', kind='line', marker='o', figsize=(10, 6), ylabel='Intensity')
+##########################  #########################
 def median_summ(mat, log2values=True):
     if not log2values:
         mat = np.log2(mat)
-    #keep_mask = np.ones(mat.shape[0], dtype=bool)
     if mat.shape[0] == 1:
         return mat[0, :]#, keep_mask
     rowMeans = np.nanmean(mat, axis=1)

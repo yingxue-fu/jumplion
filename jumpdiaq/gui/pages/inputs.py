@@ -323,7 +323,7 @@ sidebar = html.Div(
 # Enhanced layout with smart scrolling
 layout = html.Div(children=[
     dcc.Store(id="selected-msfiles"),
-    dcc.Store(id="process-state", data={"running": False, "start_time": None}),
+    dcc.Store(id="process-state", data={"running": None, "start_time": None}),
     dcc.Store(id="scroll-state", data={"auto_scroll": True, "user_scrolled": False}),
                     
     # Interval for real-time log updates
@@ -722,7 +722,7 @@ def update_process_state(log_value, n_intervals, process_state):
     
     # Initialize process_state if None
     if process_state is None:
-        process_state = {"running": False, "start_time": None}
+        process_state = {"running": None, "start_time": None}
     
     # Check if process is currently running
     if process_running and current_process and log_value:
@@ -757,7 +757,7 @@ def update_process_state(log_value, n_intervals, process_state):
                       style={"marginRight": "10px", "color": "red"}),
                 "Stopped!"
             ])
-        else:
+        elif log_value.split('\n')[-1] == "[INFO] Process completed with return code: 0":
             status_text = html.Div([
                 html.I(className="fas fa-check-circle", 
                       style={"marginRight": "10px", "color": "green"}),
@@ -971,15 +971,22 @@ def run_jumpdiaq(
     Output("spinner-container", "style"),
     Input("run-button", "n_clicks"),
     Input("stop-button", "n_clicks"),
-    State("selected-msfiles", "data"),
-    State("process-state", "data"),
+    Input("process-state", "data"),
     prevent_initial_call=True
 )
-def running_indicator(run_clicks, stop_clicks, selected_msfiles, process_state):
-    if ctx.triggered_id == "run-button" and selected_msfiles:
-        return {"display": "inline-block", "marginLeft": "10px"}
-    elif ctx.triggered_id == "stop-button" or process_state.get("running", False):
+def running_indicator(run_clicks, stop_clicks, process_state):
+    # If stop button was clicked, hide spinner immediately
+    if ctx.triggered_id == "stop-button":
         return {"display": "none"}
+    
+    # If run button was clicked or process is running, show spinner
+    if ctx.triggered_id == "run-button" or process_state.get("running", False):
+        return {"display": "inline-block", "marginLeft": "10px"}
+    
+    # If process is not running, hide spinner
+    if (process_state.get("running") is not None) and (not process_state.get("running", False)):
+        return {"display": "none"}
+    
     return dash.no_update
 
 
