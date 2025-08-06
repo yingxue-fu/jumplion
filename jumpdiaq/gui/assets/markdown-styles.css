@@ -36,6 +36,7 @@
 
 .markdown-container h2 {
     font-size: 2em;
+    margin-top: 0.0em;
     border-bottom: 2px solid #e74c3c;
     padding-bottom: 8px;
 }
