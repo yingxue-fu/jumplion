@@ -1,4 +1,6 @@
 
+## JUMPdiaq
+
 JUMPdiaq is a software designed for the quantification of proteomics data generated using data-independent acquisition mass spectrometry (DIA-MS).
 
 ### Installation
@@ -77,8 +79,8 @@ An HTTP address will appear in the terminal; you can paste it into your browser 
 |**Protein summarization**|prec_quant_level|--prec-quant-level|Use which level of precursor quantification to summarize to protein|ms1_ms2 = MS1/MS2, ms1 = MS1 only, ms2 = MS2 only, default: ms1_ms2|
 ||ms2_priority_quality|--ms2-priority-quality|If both MS1- and MS2-level quality are good (> cutoff), MS2-level quantity will be used.|default: 0.75|
 ||max_n_precs|--max-n-precs|Maximum number of precursors used to summarize to protein-level quantity|default: 100|
-||prot_quality_cutoffs|--prot-quality-cutoffs|Quality cutoff for protein-level quantification. Use a value < 1.0 will generate only one file filtered by that quality cutoff. Use a value (n) > 1.0 will generate n files with a set of qulaity cutoffs calculated based on quality quantiles|default: 0.8|
-|**timsTOF data preprocessing**|tims_centroid|--tims-centroid|Wheather to perform peaks centroid for timsTOF data|default: 0|
+||prot_quality_cutoffs|--prot-quality-cutoffs|Quality Cutoff for Protein-Level Quantification. If a value less than 1.0 is specified, a single output file will be generated, filtered by the specified quality cutoff. If a value greater than 1.0 is provided (e.g., n), n output files will be generated, each filtered using a different quality threshold based on quality quantiles.|default: 0.8|
+|**timsTOF data preprocessing**|tims_centroid|--tims-centroid|Wheather to perform peaks centroid for timsTOF data|0 = no, 1 = yes, default: 0|
 ||weighted_centroid|--weighted-centroid|Use weighted average of m/z and IM for centroid peaks|0 = no, 1 = yes, default: 1|
 ||mass_acc_centroid|--mass-acc-centroid|Max mass tolerance to centroid peaks|default: 5|
 ||im_window_centroid|--im-window-centroid|Max ion mobility difference to centroid peaks|default: 0.005|
