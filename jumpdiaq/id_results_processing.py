@@ -298,9 +298,6 @@ def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""
     ax1.set_ylabel("Frequency")
     ax1.set_title("Before prediction")
     
-    mat_stat = calculate_mat_stats(mat)
-    mat_median_diff = mat.sub(mat_stat['median'].values, axis=0)
-    
     logging.info("Adjusting RT prediction outliers\n")
     initial_n_iter = n_iter
     while n_iter > 0:

@@ -47,7 +47,7 @@ MinApexEvidence = args.min_apex_evidence
 OptimalXicSource = args.optimal_xic_source
 
 MinBinPoints = 500
-MassCalXicCorr = 0.8
+MassCalXicCorr = 0.9
 
 @dataclass
 class XICGroupInfo:
