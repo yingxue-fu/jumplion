@@ -289,20 +289,24 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
 
     quant_csv_path = os.path.join(outdir_path, selected_table)
     quality_csv_path = os.path.join(outdir_path, "Protein.Group_Quan_Quality.csv")
+    prot_pep_info_path = os.path.join(outdir_path, "prot_prec_pep_info.csv")
     
     try:
         quant_df = pd.read_csv(quant_csv_path)
         meta = pd.read_csv(meta_path)
         # Make the samples the same order as in the meta file
         sample_names = meta['Sample'].values.tolist()
-        quant_df = quant_df.loc[:, quant_df.columns[0:12].values.tolist() + sample_names + [quant_df.columns[-1]]]
+        quant_df = quant_df.loc[:, quant_df.columns[0:3].values.tolist() + sample_names + [quant_df.columns[-1]]]
         # Simplify the sample name
         simple_sample_names = extract_unique_parts(sample_names)
         quant_df.columns = (
-            quant_df.columns[0:12].values.tolist() + 
+            quant_df.columns[0:3].values.tolist() + 
             simple_sample_names + 
             [quant_df.columns[-1]]
         )
+        # Combine with protein coverage info
+        prot_pep_df = pd.read_csv(prot_pep_info_path)
+        quant_df = prot_pep_df.merge(quant_df, how='right')
         # Convert the string to an actual list of tuples
         quant_df['Peptide.Positions'] = quant_df['Peptide.Positions'].apply(ast.literal_eval)
         
@@ -313,7 +317,6 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
         quality_tier, quality_cutoff = tuple(extracted_cutoffs)
         
         quality_df = pd.read_csv(quality_csv_path)
-        quality_df = quality_df.drop(columns=['Accession.Number', 'Protein.Description', 'Sequence', 'Precursors', 'n.Precursors', 'Peptides', 'n.Peptides', 'Peptide.Positions', 'Coverage.Percentage', 'Protein.Names', 'Genes', 'Average'])
         quality_df = quality_df.loc[:, ['Protein.Group'] + meta['Sample'].values.tolist()]
         
         return (quant_df_to_show.to_dict('records'), 

@@ -189,7 +189,7 @@ def density_scatter(x, y, ax, bins=100, **kwargs):
     return sc
 
 
-def mass_calibration_plot(df, ms_level, out_dir, run_name="", bins=100, s=30):
+def mass_calibration_plot(df, ms_level, bins=100, s=30, run_name="", save_plot=True, out_dir=""):
     """
     Generate improved mass calibration visualization plots.
     
@@ -341,13 +341,15 @@ def mass_calibration_plot(df, ms_level, out_dir, run_name="", bins=100, s=30):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     
     # Save figure
-    output_file = out_dir / f"{run_name}_{ms_level}_calibration_plot.pdf"
-    fig.savefig(output_file, format='pdf', dpi=300, bbox_inches='tight')
+    if save_plot:
+        output_file = out_dir / f"{run_name}_{ms_level}_calibration_plot.pdf"
+        fig.savefig(output_file, format='pdf', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+    else:
+        plt.show()
     
-    plt.close(fig)
     
-    
-def im_error_plot(df, out_dir, run_name="", bins=100, s=30):    
+def im_error_plot(df, run_name="", bins=100, s=30, save_plot=True, out_dir=""):    
     # Set style for better aesthetics
     plt.style.use('seaborn-v0_8-whitegrid')
     sns.set_palette("viridis")
@@ -423,11 +425,13 @@ def im_error_plot(df, out_dir, run_name="", bins=100, s=30):
     # Adjust layout
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     
-    # Save figure
-    output_file = out_dir / f"{run_name}_im_error_plot.pdf"
-    fig.savefig(output_file, format='pdf', dpi=300, bbox_inches='tight')
-    
-    plt.close(fig)
+    if save_plot:
+        # Save figure
+        output_file = out_dir / f"{run_name}_im_error_plot.pdf"
+        fig.savefig(output_file, format='pdf', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+    else:
+        plt.show()
     
 ############################ RT/IM spline modeling ############################
 def convert_to_arrays(data):
@@ -634,7 +638,8 @@ def spline_fitting_plot(
         model,
         out_dir,
         run_name,
-        figsize=(8, 8)
+        figsize=(8, 8),
+        save_plot=True
         ):
     
     x, y = convert_to_arrays(data)
@@ -680,7 +685,10 @@ def spline_fitting_plot(
     
     plt.setp(ax_x_hist.get_xticklabels(), visible=False)
     plt.setp(ax_y_hist.get_yticklabels(), visible=False)
-    
     plt.tight_layout()
-    plt.savefig(Path(out_dir) / f'{run_name}_{model}_fitting_plot.pdf')
-    plt.close()
+    
+    if save_plot:
+        plt.savefig(Path(out_dir) / f'{run_name}_{model}_fitting_plot.pdf')
+        plt.close()
+    else:
+        plt.show()

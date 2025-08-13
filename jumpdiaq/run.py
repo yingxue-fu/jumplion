@@ -574,15 +574,15 @@ class Run:
         self.calibrate_mass()
         logging.info("Identifying optimal XIC for each precursor")
         for entry in progress_bar(self.entries, args.show_progress, args.inter_progress):   
-            entry.get_optimal_xic(stage=1, n_xic_points=args.n_xic_points)
+            entry.get_optimal_xic(stage=1, n_xic_points=args.min_xic_points)
         self.export_xics()
 
 
     def calibrate_mass(self): 
         if Calibrate:
-            self.MassAccuracyMS2 = MassCalAcc / 1000000.0
             self.MassAccuracyMS1 = MassCalAcc / 1000000.0
-            logging.info(f"Initital mass accuracy used for calibration: {MassCalAcc}, {MassCalAcc} ppm (MS2, MS1)")
+            self.MassAccuracyMS2 = MassCalAcc / 1000000.0
+            logging.info(f"Initital mass accuracy used for calibration: {MassCalAcc}, {MassCalAcc} ppm (MS1, MS2)")
         
         if self.tims:
             if not args.fix_im_window:
@@ -599,7 +599,7 @@ class Run:
             self.check_ion_mobility_error(save_cal_info=False)
         
         if self.acc_ms2_calibrated:
-            logging.info(f"Refined mass accuracy used for calibration: {self.MassAccuracyMS2*1e6}, {self.MassAccuracyMS1*1e6} ppm (MS2, MS1)")
+            logging.info(f"Refined mass accuracy used for calibration: {self.MassAccuracyMS1*1e6}, {self.MassAccuracyMS2*1e6} ppm (MS1, MS2)")
             if self.tims and not args.fix_im_window:
                 logging.info(f"Refined ion mobility window: {self.IM_window}")
             self.do_mass_calibration(save_cal_info=True)
@@ -609,18 +609,18 @@ class Run:
     
         # optimizing mass accuracy for XIC extraction
         if self.acc_ms2_calibrated and not args.fix_mass_acc:
-            logging.info(f"Using XIC extraction mass accuracy calculated by 'Mean + 3*SD + 5': {self.MassAccuracyMS2*1e6}, {self.MassAccuracyMS1*1e6} ppm (MS2, MS1)")
-            args.mass_acc_ms2 = self.MassAccuracyMS2 * 1000000.0
+            logging.info(f"Using XIC extraction mass accuracy calculated by 'Mean + 3*SD + 5': {self.MassAccuracyMS1*1e6}, {self.MassAccuracyMS2*1e6} ppm (MS1, MS2)")
             args.mass_acc_ms1 = self.MassAccuracyMS1 * 1000000.0
+            args.mass_acc_ms2 = self.MassAccuracyMS2 * 1000000.0
             
         if self.tims and not args.fix_im_window and not IndividualIMWindow:
             logging.info(f"Final ion mobility window for XIC extraction: {self.IM_window}")
             args.im_window = self.IM_window
         
         if args.fix_mass_acc:
-            logging.info(f"XIC extraction mass accuracy set to: {args.mass_acc_ms2}, {args.mass_acc_ms1} ppm (MS2, MS1)")
-            self.MassAccuracyMS2 = args.mass_acc_ms2 / 1000000.0
+            logging.info(f"XIC extraction mass accuracy set to: {args.mass_acc_ms1}, {args.mass_acc_ms2} ppm (MS1, MS2)")
             self.MassAccuracyMS1 = args.mass_acc_ms1 / 1000000.0
+            self.MassAccuracyMS2 = args.mass_acc_ms2 / 1000000.0
         
         if not IndividualMassAcc:
             args.fix_mass_acc = 1
@@ -666,8 +666,7 @@ class Run:
 
         mass_cali_data = pl.DataFrame(mass_cali_data)
                 
-        #return mass_cali_data
-        #mass_cali_data = self.collect_mass_calibration_data()
+        # sort by RT
         mass_cali_data = mass_cali_data.sort("experimental_rt")
         
         # setup for mass calibration bins
@@ -682,13 +681,13 @@ class Run:
         
         # calibration       
         logging.info(f"{len(mass_cali_data)} MS1 m/z and MS2 m/z are used for mass calibration") 
-        mass_cali_data = self.mass_calibration(mass_cali_data, level='ms2')
         mass_cali_data = self.mass_calibration(mass_cali_data, level='ms1')
+        mass_cali_data = self.mass_calibration(mass_cali_data, level='ms2')
         
         if save_cal_info:
             mass_cali_data.write_csv(Path(OutDir) / (self.run_name + "_mass_cal.csv"))
-            mass_calibration_plot(mass_cali_data, 'ms1', Path(OutDir), self.run_name)
-            mass_calibration_plot(mass_cali_data, 'ms2', Path(OutDir), self.run_name)
+            mass_calibration_plot(mass_cali_data, 'ms1', run_name=self.run_name, out_dir=Path(OutDir))
+            mass_calibration_plot(mass_cali_data, 'ms2', run_name=self.run_name, out_dir=Path(OutDir))
 
         self.mz_calibrated = True
 
@@ -700,8 +699,16 @@ class Run:
         delta_col = f'mass_delta_{level}'
         obs_col = f'observed_mz_{level}'
         query_col = f'query_mz_{level}'
-    
-        # Step 1: Calibration model
+        
+        # Step 1: Check mass error before correction
+        theo = mass_cali_data[theo_col].to_numpy()
+        b_r = mass_cali_data[delta_col].to_numpy() / theo
+        mean = np.mean(b_r)
+        sd = np.std(b_r)
+        logging.info(f"Mean and SD of {level.upper()} mass error before calibration: {np.round(mean * 1e6, 2)} and {np.round(sd * 1e6, 2)} ppm")
+        acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 5) / 1e6
+        
+        # Step 2: Build calibration model
         correction = build_mass_cali_model(
             theoretical_mzs = mass_cali_data[theo_col].to_numpy(),
             delta_mzs = mass_cali_data[delta_col].to_numpy(),
@@ -711,7 +718,7 @@ class Run:
         )
         setattr(self, f'MassCorrection{level.upper()}', correction)
     
-        # Step 2: Recalculate m/z
+        # Step 3: Recalculate query m/z
         query_mz = predicted_mz_parallel(
             correction,
             mass_cali_data[theo_col].to_numpy().reshape(-1, 1),
@@ -723,9 +730,8 @@ class Run:
             pl.Series(name=query_col, values=query_mz)
         )
     
-        # Step 3: Compute mass error
+        # Step 4: Compute mass error
         observed = mass_cali_data[obs_col].to_numpy()
-        theo = mass_cali_data[theo_col].to_numpy()
         b_r = (observed - query_mz) / theo
         mean = np.mean(b_r)
         sd = np.std(b_r)
@@ -734,13 +740,6 @@ class Run:
         setattr(self, f'MassAccuracy{level.upper()}', acc)
         setattr(self, f'acc_{level}_calibrated', True)
     
-        # Step 4: Check mass error before correction
-        b_r = mass_cali_data[delta_col].to_numpy() / theo
-        mean = np.mean(b_r)
-        sd = np.std(b_r)
-        logging.info(f"Mean and SD of {level.upper()} mass error before calibration: {np.round(mean * 1e6, 2)} and {np.round(sd * 1e6, 2)} ppm")
-        acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 5) / 1e6
-        
         if acc_no_cal < acc:
             logging.info(f"No {level.upper()} mass correction required")
             setattr(self, f'MassAccuracy{level.upper()}', acc_no_cal)
@@ -782,7 +781,7 @@ class Run:
 
         if save_cal_info:
             im_cali_data.write_csv(Path(OutDir) / (self.run_name + "_im_error.csv"))
-            im_error_plot(im_cali_data, Path(OutDir), self.run_name)
+            im_error_plot(im_cali_data, run_name=self.run_name, out_dir=Path(OutDir))
         
         
     def export_xics(self):

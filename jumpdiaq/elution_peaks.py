@@ -294,11 +294,11 @@ def identify_optimal_xic(ms1, ms2,
                                              shape_weighted, 
                                              intensity_weighted)
     # Sort descending by combined score
-    scores = corr_scores * shape_scores * intensity_scores
+    #scores = corr_scores * shape_scores * intensity_scores
+    scores = (0.5*corr_scores) + (0.3*intensity_scores) + (0.2*shape_scores) 
     indices = np.argsort(scores)[::-1]
     
     for idx in indices:
-        # idx=indices[0]
         ion_xic = xics[region, idx]
         elution = smooth(ion_xic)
         elution_apex = np.argmax(elution)
@@ -459,15 +459,27 @@ def extract_ms1_ms2_from_xic_file(xic_file, precursor_id):
         raise ValueError("No XIC data found for selected precursor")
         
     xic_mask = xic_data['row_type'] == 'xic_row'
-    ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns
-    ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns
-    ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns
+    mz_mask = xic_data['row_type'] == 'mz_row'
+    ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns.to_list()
+    ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns.to_list()
+    ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns.to_list()
     
-    ms1 = xic_data.loc[xic_mask, ms1_intensity_cols].values
-    ms2 = xic_data.loc[xic_mask, ms2_intensity_cols].values
-    ms1_i = xic_data.loc[xic_mask, ms1_interpol_cols].values
+    ms1_df = xic_data.loc[xic_mask, ['ms1_rt'] + ms1_intensity_cols]
+    ms2_df = xic_data.loc[xic_mask, ['ms2_rt'] + ms2_intensity_cols]
+    ms1_i_df = xic_data.loc[xic_mask, ['ms2_rt'] + ms1_interpol_cols]
     
-    return ms1, ms2, ms1_i
+    ms1_mzs = np.round(xic_data.loc[mz_mask, ms1_intensity_cols].values[0], 4).tolist()
+    ms1_df.columns = ['ms1_rt'] + ms1_mzs
+    ms1_i_df.columns = ['ms2_rt'] + ms1_mzs
+    
+    ms2_mzs = np.round(xic_data.loc[mz_mask, ms2_intensity_cols].values[0], 4).tolist()
+    ms2_df.columns = ['ms2_rt'] + ms2_mzs
+    
+    ms1_df.reset_index(drop=True, inplace=True)
+    ms1_i_df.reset_index(drop=True, inplace=True)
+    ms2_df.reset_index(drop=True, inplace=True)
+    
+    return ms1_df, ms2_df, ms1_i_df
 
 
 def update_xic_file(

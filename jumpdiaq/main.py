@@ -36,6 +36,7 @@ def main():
     from jumpdiaq.library import Library
     from jumpdiaq.run import Run
     from jumpdiaq.id_results_processing import (process_id_results, 
+                                                determine_n_XIC_points,
                                                 get_protein_info, 
                                                 calculate_protein_coverage)
     from jumpdiaq.summarization import (quantify_precursors, 
@@ -103,6 +104,10 @@ def main():
         else:
             prec_locations = process_id_results(IdFile, LibFile, MSFiles, OutDir)
         
+        # Determine how many points to extract for an XIC
+        RT_model_file = Path(OutDir) / 'RT_models.json'
+        args.min_xic_points = determine_n_XIC_points(RT_model_file, MSFiles)
+        
         # load library
         lib = Library()
         if not lib.load(Path(OutDir) / 'splib_quan.parquet'):
@@ -163,9 +168,12 @@ def main():
     prec_quant_table_norm.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table_Norm.parquet")
     
     prot_quant_table, prot_quality_table = quantify_proteins(
-                                                    prec_quant_table_norm, 
-                                                    prec_quality_table, 
-                                                    max_n_precs=MaxNPrecs)
+                                               prec_quant_table_norm, 
+                                               prec_quality_table, 
+                                               max_n_precs=MaxNPrecs
+                                               )
+    prot_quant_table.write_csv(Path(OutDir) / "Protein.Group_Quan_noFiltering.csv")
+    prot_quality_table.write_csv(Path(OutDir) / "Protein.Group_Quan_Quality.csv")
                            
     # filter based on quality
     value_columns = prot_quality_table.columns[3:-1]
@@ -178,27 +186,23 @@ def main():
         QualityCutoffs = np.round(QualityCutoffs, 2)
         
     quality_hist_plot(prot_quality_table.to_pandas(), value_columns, QualityCutoffs, Path(OutDir))
+    logging.info(f"Filtering based on protein quality cutoffs: {QualityCutoffs}")
     prot_quant_table_filtered = filter_based_on_quality(prot_quant_table.to_pandas(), 
                                                         prot_quality_table.to_pandas(),
                                                         tag_column='Protein.Group',
                                                         value_columns=prot_quant_table.columns[3:-1],
                                                         quality_cutoffs=QualityCutoffs)
+    for i, (qt, cutoff) in enumerate(zip(quantiles, QualityCutoffs)):
+        prot_quant_table_f = prot_quant_table_filtered[i]
+        prot_quant_table_f.to_csv(Path(OutDir) / f"Protein.Group_Quan_QT{qt}_quality{cutoff}.csv", index=False)
+    
     if len(FastaFiles):
         prot_prec_pep_info = calculate_protein_coverage(Path(OutDir) / 'xic_quan_report.parquet', 
                                                         FastaFiles, 
                                                         str(Path(OutDir)))
+        prot_prec_pep_info.to_csv(Path(OutDir) / "prot_prec_pep_info.csv", index=False)
     else:
         logging.warning("WARNING: no Fasta files are provided, protein coverage will not be calculated.")
-        
-    prot_quant_table = prot_prec_pep_info.merge(prot_quant_table.to_pandas(), how='right')
-    prot_quant_table.to_csv(Path(OutDir) / "Protein.Group_Quan_noFiltering.csv", index=False)
     
-    for i, (qt, cutoff) in enumerate(zip(quantiles, QualityCutoffs)):
-        prot_quant_table_f = prot_quant_table_filtered[i]
-        prot_quant_table_f = prot_prec_pep_info.merge(prot_quant_table_f, how='right')
-        prot_quant_table_f.to_csv(Path(OutDir) / f"Protein.Group_Quan_QT{qt}_quality{cutoff}.csv", index=False)
-        
-    prot_quality_table = prot_prec_pep_info.merge(prot_quality_table.to_pandas(), how='right')
-    prot_quality_table.to_csv(Path(OutDir) / "Protein.Group_Quan_Quality.csv", index=False)
-    
+    logging.info("Finished!")
     close_logger(logger)

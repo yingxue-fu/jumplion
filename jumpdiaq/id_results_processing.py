@@ -7,6 +7,7 @@ from pathlib import Path
 # external
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from Bio import SeqIO
 # local
 from jumpdiaq.arguments import Arguments
@@ -26,14 +27,14 @@ MaxMassCal = args.max_mass_cal
 MinXICPoints = args.min_xic_points
 
 def process_id_results(id_file, 
-                        lib_file, 
-                        ms_files,
-                        out_dir,
-                        min_runs_quant=MinRunsQuant,
-                        min_runs_model=MinRunsModel,
-                        min_runs_cal=MinRunsCal,
-                        min_qvalue_cal=MinQvalueCal,
-                        max_mass_cal=MaxMassCal,):
+                       lib_file, 
+                       ms_files,
+                       out_dir,
+                       min_runs_quant=MinRunsQuant,
+                       min_runs_model=MinRunsModel,
+                       min_runs_cal=MinRunsCal,
+                       min_qvalue_cal=MinQvalueCal,
+                       max_mass_cal=MaxMassCal,):
     # id_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\report.parquet"
     # lib_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\report-lib.parquet"
     # out_dir = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\test_20250602"
@@ -102,18 +103,9 @@ def process_id_results(id_file,
                                               min_runs_model,
                                               lib_df_uniq_prec,
                                               data_type="rt")
-    rt_mat_pred, model_accs = modeling_and_prediction(rt_dict, rt_segments, rt_mat, lib_df_uniq_prec, data_type="rt", out_dir=out_dir)
-    logging.info("Adjust RT prediction outliers")
-    rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, 5)
+    rt_mat_pred = modeling_and_prediction(rt_dict, rt_segments, rt_mat, lib_df_uniq_prec, data_type="rt", out_dir=out_dir)
+    rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, n_iter=5, out_dir=out_dir)
     rt_mat_pred.to_csv(Path(out_dir) / "rt_mat_after_prediction.csv")
-    
-    cycle_time = get_cycle_time(ms_files[0])
-    logging.info(f"Cycle time: {cycle_time} ({np.round(cycle_time*60, 3)} seconds)")
-    average_model_acc = np.mean(model_accs)
-    average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
-    logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
-    args.n_xic_points = max(MinXICPoints, average_model_acc_n_points * 4 + 1)
-    logging.info(f"Number of data points to extract for a XIC set to: {args.n_xic_points}\n")
     
     if is_tims:
         ###############################
@@ -123,7 +115,7 @@ def process_id_results(id_file,
                                                   min_runs_model,
                                                   lib_df_uniq_prec,
                                                   data_type="im")
-        im_mat_pred, _ = modeling_and_prediction(im_dict, im_segments, im_mat, lib_df_uniq_prec, data_type="im", out_dir=out_dir)
+        im_mat_pred = modeling_and_prediction(im_dict, im_segments, im_mat, lib_df_uniq_prec, data_type="im", out_dir=out_dir)
         im_mat_pred.to_csv(Path(out_dir) / "im_mat_after_prediction.csv")
     
     ##########################################
@@ -151,6 +143,24 @@ def process_id_results(id_file,
     prec_locations.to_csv(Path(out_dir) / "precursor_locations.csv")
         
     return prec_locations
+
+
+def determine_n_XIC_points(RT_model_file, ms_files):
+    logging.info("Determining the number of data points to extract for an XIC")
+    with open(RT_model_file, "r") as f:
+        rt_models = json.load(f)
+    
+    cycle_time = get_cycle_time(ms_files[0])
+    logging.info(f"Cycle time: {cycle_time} ({np.round(cycle_time*60, 3)} seconds)")
+    
+    model_accs = rt_models["model_accs"] 
+    average_model_acc = np.mean(model_accs)
+    average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
+    logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
+    n_xic_points = max(MinXICPoints, average_model_acc_n_points * 4 + 1)
+    logging.info(f"Number of data points to extract for a XIC set to: {n_xic_points}\n")
+    
+    return n_xic_points
 
 
 def collect_model_data(mat, 
@@ -202,10 +212,10 @@ def collect_model_data(mat,
     return data_dict, n_segments
 
 
-def calculate_mat_stats(mat):
-    mat_stat = pd.DataFrame({'mean': mat.mean(axis=1),
-                             'median': mat.median(axis=1),
-                             'std': mat.std(axis=1)})
+def calculate_mat_stats(mat, axis=1):
+    mat_stat = pd.DataFrame({'mean': mat.mean(axis=axis),
+                             'median': mat.median(axis=axis),
+                             'std': mat.std(axis=axis)})
     # calculate CVs
     mat_stat = mat_stat.assign(CV = mat_stat['std'] / mat_stat['mean'])
     
@@ -218,13 +228,13 @@ def modeling_and_prediction(data_dict,
                             lib_df_uniq_prec, 
                             data_type, 
                             out_dir,
+                            save_plot=True,
                             save_model=True):
 
     models = {}
     model_accs = []
     mat_pred = mat.copy()
     for run_name in data_dict.keys():
-        # run_name = list(data_dict.keys())[0]
         # build the model for predicting RT from iRT
         logging.info(f"Building {data_type.upper()} prediction model for run {run_name}")
         model_data = data_dict[run_name]
@@ -233,10 +243,15 @@ def modeling_and_prediction(data_dict,
         models[run_name] = {"coeff": model_coeff, "points": model_points}
         delta_percentile=0.8
         model_acc = check_model_accuracy(model_data, model_coeff, model_points, delta_percentile)
-        spline_fitting_plot(model_data, model_coeff, model_points, model_acc, show_window=False, model=data_type.upper(), out_dir=out_dir, run_name=run_name)
         logging.info(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {np.round(model_acc, 4)}")
         model_accs.append(model_acc)
-        
+        if save_plot:
+            spline_fitting_plot(model_data, model_coeff, 
+                                model_points, model_acc, 
+                                show_window=False, model=data_type.upper(), 
+                                out_dir=out_dir, run_name=run_name,
+                                save_plot=save_plot)
+            
         # predict RT for precursors with no RT        
         # Identify missing RTs
         missing_mask = mat[run_name].isna()
@@ -253,32 +268,51 @@ def modeling_and_prediction(data_dict,
         # Batch update
         mat_pred.loc[lib_subset.index, run_name] = predicted_rts
     
+    models["model_accs"] = model_accs
     if save_model:
         json_file = Path(out_dir) / f'{data_type.upper()}_models.json'
-        logging.info(f"{data_type.upper()} prediction models saved to {json_file}\n")
         with open(json_file, "w") as f:
             json.dump(models, f, indent=4, default=convert_ndarray)
+        logging.info(f"{data_type.upper()} prediction models saved to {json_file}\n")
     
-    return mat_pred, model_accs
+    return mat_pred
 
 # mat = pd.read_csv(r"C:\Users\yfu\Downloads\miss_dia_test_data\ya_data\test_ya_20250521\rt_mtx_before_prediction.csv")
 # mat = mat.set_index("Precursor.Id")
 # mat_pred = pd.read_csv(r"C:\Users\yfu\Downloads\miss_dia_test_data\ya_data\test_ya_20250521\rt_mtx_after_prediction.csv")
 # mat_pred = mat_pred.set_index("Precursor.Id")
-def adjust_prediction_outliers(mat_pred, mat, n_iter):
-    # calculate reference deviation range from actual matrix
+def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""):
+    # calculate reference RT deviation range from actual matrix
+    ## medians of each row
+    mat_stat = calculate_mat_stats(mat)
+    ## diffs with row medians
+    mat_median_diff = mat.sub(mat_stat['median'].values, axis=0)
+    ## min and max of diffs
+    median_diff = mat_median_diff.values.flatten()
+    diff_max = np.round(np.nanmax(median_diff), 4)
+    diff_min = np.round(np.nanmin(median_diff), 4)
+    logging.info(f"Min and max RT differences across runs before RT prediction: {diff_min}, {diff_max}")
+    
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+    ax1.hist(mat_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
+    ax1.set_ylabel("Frequency")
+    ax1.set_title("Before prediction")
+    
     mat_stat = calculate_mat_stats(mat)
     mat_median_diff = mat.sub(mat_stat['median'].values, axis=0)
-    median_diff = mat_median_diff.values.flatten()
-    diff_max = np.nanmax(median_diff)
-    diff_min = np.nanmin(median_diff)
-
+    
+    logging.info("Adjusting RT prediction outliers\n")
+    initial_n_iter = n_iter
     while n_iter > 0:
         # compute prediction deviation from row median
         mat_pred_stat = calculate_mat_stats(mat_pred)
         mat_pred_median_diff = mat_pred.sub(mat_pred_stat['median'].values, axis=0)
         pred_median_diff = mat_pred_median_diff.values.flatten()
-
+        
+        if n_iter == initial_n_iter:
+            ax2.hist(mat_pred_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
+            ax2.set_title("After prediction")
+            
         if np.all(pred_median_diff <= diff_max) and np.all(pred_median_diff >= diff_min):
             break
 
@@ -287,16 +321,22 @@ def adjust_prediction_outliers(mat_pred, mat, n_iter):
         mat_pred = mat_pred_median_diff_masked.add(mat_pred_stat['median'].values, axis=0)
         
         n_iter -= 1
-        #print(n_iter)
-        
+    
+    mat_pred_stat = calculate_mat_stats(mat_pred)
+    mat_pred_median_diff = mat_pred.sub(mat_pred_stat['median'].values, axis=0)
+    ax3.hist(mat_pred_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
+    ax3.set_title("After prediction and outlier adjustment")
+    fig.supxlabel("RT differences across runs compared with median RT")
+    plt.tight_layout()
+    
+    if save_plot:
+        plt.savefig(Path(out_dir) / "rt_diff_histogram.pdf")
+        plt.close()
+    else:
+        plt.show()
+    
     return mat_pred
 
-# mat_pred = adjust_prediction_outliers(mat_pred, mat, 5)
-# mat_stat = calculate_mat_stats(mat_pred)
-# mat_pred_median_diff = mat_pred.sub(mat_stat['median'].values, axis=0)
-# median_diff = mat_pred_median_diff.values.flatten()
-# plt.hist(median_diff, bins=50)
-# mat_pred.loc['SLNSMC(UniMod:4)TELSIPLAR2', :]
 
 # Convert NumPy arrays to lists
 def convert_ndarray(obj):
@@ -346,8 +386,6 @@ def calculate_protein_coverage(report_file, fasta_files, out_dir):
     (prot_prec_pep_info['Peptide.Positions'], 
      prot_prec_pep_info['Coverage.Percentage']) = map_peptides(prot_prec_pep_info['Sequence'].tolist(), 
                                                                     prot_prec_pep_info['Peptides'].tolist())
-
-    prot_prec_pep_info.to_csv(Path(out_dir) / "prot_prec_pep_info.csv", index=False)
     
     return prot_prec_pep_info
 
