@@ -104,7 +104,7 @@ def main():
         else:
             prec_locations = process_id_results(IdFile, LibFile, MSFiles, OutDir)
         
-        # Determine how many points to extract for an XIC
+        # Determine the number of data points to extract for an XIC
         RT_model_file = Path(OutDir) / 'RT_models.json'
         args.min_xic_points = determine_n_XIC_points(RT_model_file, MSFiles)
         

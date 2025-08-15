@@ -15,9 +15,9 @@ from jumpdiaq.utils import E
 def split_into_rt_bins(
         sorted_rt_values, 
         max_num_bins=1, 
-        min_points_per_bin=200, 
+        min_points_per_bin=500, 
         min_rt_length_per_bin=30, 
-        tolerance=1e-6
+        tolerance=E
         ):
     """
     Split data points into RT (retention time) bins for mass calibration.

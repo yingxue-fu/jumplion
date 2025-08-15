@@ -27,6 +27,7 @@ OutDir = args.out_dir
 Calibrate = args.mass_calibration
 MassCalAcc = args.mass_cal_acc
 MassCalBinsMax = args.mass_cal_bins_max
+MassCalScore = args.mass_cal_score
 IndividualMassAcc = args.individual_mass_acc
 #
 IMWindowCal = args.im_window_cal
@@ -46,8 +47,6 @@ MinApexIntensity = args.min_apex_intensity
 MinApexEvidence = args.min_apex_evidence
 OptimalXicSource = args.optimal_xic_source
 
-MinBinPoints = 500
-MassCalXicCorr = 0.9
 
 @dataclass
 class XICGroupInfo:
@@ -204,7 +203,7 @@ class RunEntry:
 
     def collect_calibration_data(self, apex_index, exp_ims,
                                 exp_ms1_mzs, exp_ms2_mzs, 
-                                best_ms2_corr, mono_ms1_corr):
+                                best_ms2_score, mono_ms1_score):
         
         # collect data for mass calibration on the center point of best fragment
         ms1_mz = exp_ms1_mzs[apex_index, 0]
@@ -212,8 +211,8 @@ class RunEntry:
         if self.run.tims:
             im = exp_ims[apex_index, 0]
         
-        if (best_ms2_corr >= MassCalXicCorr and 
-            mono_ms1_corr >= MassCalXicCorr and 
+        if (best_ms2_score >= MassCalScore and 
+            mono_ms1_score >= MassCalScore and 
             ms1_mz > E and 
             self.ms2[apex_index, self.info.best_ms2_xic] >= MinApexIntensity):
             self.info.mass_delta_ms1 = ms1_mz - self.prec.mz
@@ -675,9 +674,7 @@ class Run:
         (args.mass_cal_bins, 
          self.MassCalSplit, 
          self.MassCalCenter) = split_into_rt_bins(mass_cali_data['experimental_rt'].to_numpy(), 
-                                                  max_num_bins=MassCalBinsMax, 
-                                                  min_points_per_bin=MinBinPoints, 
-                                                  tolerance=E) 
+                                                  max_num_bins=MassCalBinsMax) 
         
         # calibration       
         logging.info(f"{len(mass_cali_data)} MS1 m/z and MS2 m/z are used for mass calibration") 

@@ -133,7 +133,7 @@ def get_fwhm(xic):
             count += 1
     if first == -1 or last == -1 or count < 2:
         return 0
-    return last - first
+    return last - first + 1
 
 @njit
 def gaussian_curve(size, center, fwhm, max_value):
@@ -368,13 +368,13 @@ def identify_optimal_xic(ms1, ms2,
 
 
 def calculate_quantity(ms1, ms2, 
-                       start, stop, apex, 
+                       begin, end, apex, 
                        optimal_xic, optimal_xic_type, 
                        corr_method=0, intf_removal=True, 
-                       intf_removal_corr=0.5, filter_factor=1.5):
+                       intf_removal_corr=0.5, intf_filter_factor=1.5):
     
     ms1_ms2 = np.concatenate((ms1, ms2), axis=1)
-    len_ = stop - start + 1
+    len_ = end - begin + 1
     p = ms1_ms2.shape[1]
     
     if optimal_xic_type == 1:
@@ -383,10 +383,10 @@ def calculate_quantity(ms1, ms2,
         elution = smooth(ms2[:, optimal_xic])
         optimal_xic = optimal_xic + ms1.shape[1]
     elif optimal_xic_type == 0:
-        elution_middle = gaussian_curve(len_, -1, len_//3, np.max(ms2[start:stop+1, :]))
-        elution = np.concatenate((np.zeros(start), 
+        elution_middle = gaussian_curve(len_, -1, len_//3, np.max(ms2[begin:end+1, :]))
+        elution = np.concatenate((np.zeros(begin), 
                                   elution_middle, 
-                                  np.zeros(ms2.shape[0] - stop - 1)), 
+                                  np.zeros(ms2.shape[0] - end - 1)), 
                                  axis=0)
     
     # Initialize variables
@@ -395,14 +395,14 @@ def calculate_quantity(ms1, ms2,
     ms1_ms2_filtered = ms1_ms2.copy()
     
     # Compute total intensity for each fragment and precursor
-    quant_corr[:, 0] = np.array([corr(elution[start:stop+1], ms1_ms2[start:stop+1, ion], corr_method) for ion in range(p)])
-    quant_quantity[:, 0] = np.sum(ms1_ms2[start:stop+1, :], axis=0)
+    quant_corr[:, 0] = np.array([corr(elution[begin:end+1], ms1_ms2[begin:end+1, ion], corr_method) for ion in range(p)])
+    quant_quantity[:, 0] = np.sum(ms1_ms2[begin:end+1, :], axis=0)
     
     # Initialize filtered values
     quant_quantity[:, 1] = quant_quantity[:, 0] 
     quant_corr[:, 1] = quant_corr[:, 0]
     
-    # Apply interference removal if there is a best ion
+    # Apply interference removal
     if optimal_xic_type != 0:
         for ion in range(p):
             if ion == optimal_xic:
@@ -424,30 +424,26 @@ def calculate_quantity(ms1, ms2,
                             radj = r
                             e = elution[apex] * 0.5
                             for pos in range(apex - 1, -1, -1): # for the left side of apex point
-                                #print(pos)
                                 if elution[pos] < e:
                                     break
-                                #print(ms2_ms1[pos, ion] / max(E, ms2_ms1[pos, optimal_xic]))
                                 radj = min(radj, ms1_ms2[pos, ion] / max(E, ms1_ms2[pos, optimal_xic]))
                             for pos in range(apex + 1, ms1_ms2.shape[0]): # for the right side of apex point
-                                #print(pos)
                                 if elution[pos] < e:
                                     break
-                                #print(ms2_ms1[pos, ion] / max(E, ms2_ms1[pos, optimal_xic]))
                                 radj = min(radj, ms1_ms2[pos, ion] / max(E, ms1_ms2[pos, optimal_xic]))
                             # final r
                             r = max(r * 0.5, min(r, radj))
             
                         # Apply interference filtering
-                        ms1_ms2_filtered[start:stop+1, ion] = np.minimum(ms1_ms2[start:stop+1, ion], filter_factor * r * elution[start:stop+1])
-                        quant_quantity[ion, 1] = np.sum(ms1_ms2_filtered[start:stop+1, ion])
+                        ms1_ms2_filtered[begin:end+1, ion] = np.minimum(ms1_ms2[begin:end+1, ion], intf_filter_factor * r * elution[begin:end+1])
+                        quant_quantity[ion, 1] = np.sum(ms1_ms2_filtered[begin:end+1, ion])
             else:
-                ms1_ms2_filtered[start:stop+1, ion] = 0.0
+                ms1_ms2_filtered[begin:end+1, ion] = 0.0
                 quant_quantity[ion, 1] = 0.0
     
-        quant_corr[:, 1] = np.array([corr(elution[start:stop+1], ms1_ms2_filtered[start:stop+1, ion], corr_method) for ion in range(p)])
+        quant_corr[:, 1] = np.array([corr(elution[begin:end+1], ms1_ms2_filtered[begin:end+1, ion], corr_method) for ion in range(p)])
     
-    ms1_ms2_filtered = ms1_ms2_filtered[start:stop+1, :]
+    ms1_ms2_filtered = ms1_ms2_filtered[begin:end+1, :]
     
     return ms1_ms2_filtered, elution, quant_corr, quant_quantity
 
@@ -493,7 +489,7 @@ def update_xic_file(
     # Load the full dataset once
     full_data = pd.read_parquet(xic_file)
 
-    for precursor_id, ms1_ms2_filtered, elution, start, stop in zip(
+    for precursor_id, ms1_ms2_filtered, elution, begin, end in zip(
         precursor_ids, ms1_ms2_filtered_list, elution_list, start_list, stop_list
     ):
         # Subset the data for this precursor
@@ -508,9 +504,9 @@ def update_xic_file(
 
         # Modify the subset
         xic_data.loc[corrected_mask, ms1_intensity_columns + ms2_intensity_columns] = ms1_ms2_filtered
-        xic_data.loc[corrected_mask, ['ms1_rt', 'ms2_rt']] = xic_data.loc[original_mask, ['ms1_rt', 'ms2_rt']].values[start:stop+1, :]
+        xic_data.loc[corrected_mask, ['ms1_rt', 'ms2_rt']] = xic_data.loc[original_mask, ['ms1_rt', 'ms2_rt']].values[begin:end+1, :]
         xic_data.loc[original_mask, 'elution'] = elution
-        xic_data.loc[corrected_mask, 'elution'] = elution[start:stop+1]
+        xic_data.loc[corrected_mask, 'elution'] = elution[begin:end+1]
 
         # Replace in the full dataset
         full_data.loc[xic_data.index] = xic_data

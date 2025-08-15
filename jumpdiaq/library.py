@@ -582,7 +582,7 @@ class Info:
                                                        corr_method=CorrMethod, 
                                                        intf_removal=IntfRemoval, 
                                                        intf_removal_corr=IntfRemovalCorr, 
-                                                       filter_factor=IntfFilterFactor)
+                                                       intf_filter_factor=IntfFilterFactor)
                 
                 n_ms1 = len(jt[1].ms1_quant)
                 for prec in range(n_ms1):

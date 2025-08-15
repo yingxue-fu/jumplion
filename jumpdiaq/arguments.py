@@ -43,6 +43,7 @@ class Arguments:
     mass_cal_acc: float = 30.0   # calibration mass accuracy
     mass_cal_bins: int = 1
     mass_cal_bins_max: int = 1
+    mass_cal_score: float = 0.95
     fix_mass_acc: int = 0
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0
@@ -197,6 +198,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
     optional_group.add_argument("--mass-cal-bins", type=int, help="")
     optional_group.add_argument("--mass-cal-bins-max", type=int, help="")
+    optional_group.add_argument("--mass-cal-score", type=float, help="")
     optional_group.add_argument("--fix-mass-acc", type=int, help="")
     optional_group.add_argument("--mass-acc-ms2", type=float, help="")
     optional_group.add_argument("--mass-acc-ms1", type=float, help="")
