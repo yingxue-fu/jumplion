@@ -81,7 +81,7 @@ def process_id_results(id_file,
         im_mat.to_csv(Path(out_dir) / "im_mat_before_prediction.csv")
     else:
         im_mat = None
-    logging.info(f"{len(rt_mat)} precursors are included for re-quantification")
+    logging.info(f"{len(rt_mat)} precursors are included for quantification")
     
     # filter and save new library for re-quantification
     lib_df = lib_df[lib_df['Precursor.Id'].isin(rt_mat.index.values)]

@@ -80,7 +80,7 @@ class Arguments:
     
     # Protein summarization
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
-    ms2_priority_quality: float = 0.75
+    ms2_priority_quality: float = 0.8
     max_n_precs: int = 100
     prot_quality_cutoffs: float = 10
     
