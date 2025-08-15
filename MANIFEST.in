@@ -1,3 +1,2 @@
 recursive-include jumpdiaq/gui/assets *
-recursive-include jumpdiaq/gui/assets/images *
 recursive-include jumpdiaq/ext *

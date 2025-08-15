@@ -30,8 +30,11 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "jumpdiaq.gui.assets" = ["*"]
-"jumpdiaq.gui.assets.images" = ["*"]
 "jumpdiaq.ext" = ["*"]
+
+[tool.setuptools.packages.find]
+include = ["jumpdiaq*"]  # Only include jumpdiaq package
+exclude = ["nbs*"]       # Explicitly exclude nbs
 
 [tool.setuptools.dynamic]
 version = {attr = "jumpdiaq.__version__"}
