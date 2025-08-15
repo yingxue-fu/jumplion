@@ -30,6 +30,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "jumpdiaq.gui.assets" = ["*"]
+"jumpdiaq.gui.assets.images" = ["*"]
 "jumpdiaq.ext" = ["*"]
 
 [tool.setuptools.dynamic]
