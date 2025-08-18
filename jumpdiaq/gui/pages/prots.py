@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 # local
 from jumpdiaq.utils import extract_unique_parts
-from jumpdiaq.gui.app import app, page_sidebar_style, logger
+from jumpdiaq.gui.app import app, to_image_config, page_sidebar_style, logger
 from jumpdiaq.gui.utils import get_valid_ratios, lfqbench_plot
 
 load_figure_template(["vizro", "vizro_dark"])
@@ -198,7 +198,7 @@ layout = html.Div(children=[
                                     # Tab 2:
                                     html.Div(
                                         [
-                                            dcc.Graph(id="prot-prec-quant-plot"),
+                                            dcc.Graph(id="prot-prec-quant-plot", config=to_image_config),
                                             dbc.Button("Check Precursors", id="check-prec-quantity", 
                                                        color="info",  
                                                        style={"font-weight": "bold",  
@@ -210,7 +210,7 @@ layout = html.Div(children=[
                                     # Tab 3:
                                     html.Div(
                                         [
-                                            dcc.Graph(id="prot-prec-quality-plot"),
+                                            dcc.Graph(id="prot-prec-quality-plot", config=to_image_config),
                                             dbc.Button("Check Precursors", id="check-prec-quality", 
                                                        color="info",  
                                                        style={"font-weight": "bold", 

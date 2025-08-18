@@ -25,6 +25,16 @@ page_sidebar_style = {
     "overflowY": "auto",
 }
 
+to_image_config = {
+    'toImageButtonOptions': {
+        'format': 'png',
+        'filename': 'custom_plot',
+        'height': 500,  # Adjust as needed
+        'width': 1000,  # Adjust as needed
+        'scale': 2      # Increase for higher resolution
+    }
+}
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
