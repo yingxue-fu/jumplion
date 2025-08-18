@@ -13,12 +13,10 @@ from jumpdiaq.arguments import Arguments, get_extension
 from jumpdiaq.precursor import (Precursor, to_eg, to_canonical_with_charge, 
                                 pep_name, get_aas, get_sequence_masses, 
                                 peptide_length, Product, annotate_products_charges)
-from jumpdiaq.utils import (remove_extension, 
-                            location_to_file_name, 
-                            get_file_name, progress_bar,
-                            MaxLibFrNum, fTypeB, fTypeY, fExclude, 
-                            char_of_fType, name_of_loss,
-                            loss_none, loss_H2O, loss_NH3, loss_CO, loss_other)
+from jumpdiaq.utils import (progress_bar, remove_extension, location_to_file_name, 
+                            get_file_name, MaxLibFrNum, fTypeB, fTypeY, fExclude, 
+                            char_of_fType, name_of_loss, loss_none, loss_H2O, 
+                            loss_NH3, loss_CO, loss_other)
 from jumpdiaq.elution_peaks import identify_optimal_xic, calculate_quantity
 
 args = Arguments()
@@ -126,7 +124,6 @@ class Library:
         return True
         
     def load_table_format_library(self, file_path):
-        # file_path=Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\jumpdia_test_withIM\splib_quan.parquet")
         try:
             if file_path.suffix == '.parquet':
                 df = pl.read_parquet(file_path)
@@ -332,7 +329,7 @@ class Library:
                         "MS2.XIC.Corr.Adjusted": ";".join([str(fr.corr[1]) for fr in jt[1].ms2_quant])
                     })
                     
-                    ms1_xic_names = ['M+0', 'M+1', 'M+2']
+                    ms1_xic_names = [f'M+{i}' for i in range(10)]
                     row_data.update({
                         "Optimal.XIC": jt[1].optimal_xic,
                         "Optimal.XIC.Type": f"ms{jt[1].optimal_xic_type}",
@@ -499,7 +496,6 @@ class Info:
 
     
     def quantify(self, ms_files, out_dir):
-        
         logging.info("Quantifying XICs")
         
         ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(nIsotops+1)]
@@ -508,8 +504,6 @@ class Info:
         
         data_rows = []
         for pr_index, v in progress_bar(self.map.items(), ShowProgress, InterProgress):
-            # pr_index = 1
-            # v = self.map[pr_index]
             # for each precursor, check overall optimal xic type
             optimal_xic_types = [jt[1].optimal_xic_type for jt in v]
             n_ms1 = optimal_xic_types.count(1)
@@ -530,7 +524,6 @@ class Info:
             
             # quantify
             for j in range(self.n_runs):
-                # j = 4
                 run_name = remove_extension(get_file_name(ms_files[j]))
                 jt = v[j]
                 ms1 = jt[1].ms1_i
@@ -579,10 +572,10 @@ class Info:
                                                       elution_apex, 
                                                       optimal_xic, 
                                                       optimal_xic_type, 
-                                                       corr_method=CorrMethod, 
-                                                       intf_removal=IntfRemoval, 
-                                                       intf_removal_corr=IntfRemovalCorr, 
-                                                       intf_filter_factor=IntfFilterFactor)
+                                                      corr_method=CorrMethod, 
+                                                      intf_removal=IntfRemoval, 
+                                                      intf_removal_corr=IntfRemovalCorr, 
+                                                      intf_filter_factor=IntfFilterFactor)
                 
                 n_ms1 = len(jt[1].ms1_quant)
                 for prec in range(n_ms1):

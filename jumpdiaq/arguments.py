@@ -43,7 +43,7 @@ class Arguments:
     mass_cal_acc: float = 30.0   # calibration mass accuracy
     mass_cal_bins: int = 1
     mass_cal_bins_max: int = 1
-    mass_cal_score: float = 0.95
+    mass_cal_score: float = 0.9
     fix_mass_acc: int = 0
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0

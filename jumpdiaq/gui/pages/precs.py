@@ -16,7 +16,7 @@ from jumpdiaq.gui.app import app, page_sidebar_style, logger
 
 
 load_figure_template(["vizro", "vizro_dark"])
-ms1_colors = dict(zip(["M+0", "M+1", "M+2"], px.colors.qualitative.T10[0:3]))
+ms1_colors = dict(zip([f'M+{i}' for i in range(10)], px.colors.qualitative.T10[0:10]))
 ms2_colors = px.colors.qualitative.T10[3:]
 
 sidebar = html.Div(
