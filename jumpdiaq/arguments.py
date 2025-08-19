@@ -58,7 +58,7 @@ class Arguments:
     # XIC quantification
     min_quan_fr: int = 3
     max_quan_fr: int = 6
-    n_isotops: int = 2
+    max_isotopes: int = 5
     min_xic_points: int = 20
     corr_radius: int = 5
     corr_method: int = 0
@@ -213,7 +213,7 @@ def create_parser() -> argparse.ArgumentParser:
     # XIC quantification
     optional_group.add_argument("--min-quan-fr", type=int, help="")
     optional_group.add_argument("--max-quan-fr", type=int, help="")
-    optional_group.add_argument("--n-isotops", type=int, help="")
+    optional_group.add_argument("--max-isotopes", type=int, help="")
     optional_group.add_argument("--min-xic-points", type=int, help="")
     optional_group.add_argument("--corr-radius", type=int, help="")
     optional_group.add_argument("--corr-method", type=int, help="")

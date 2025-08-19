@@ -1,6 +1,4 @@
-
 ## JUMPdiaq
-
 JUMPdiaq is a software designed for the quantification of proteomics data generated using data-independent acquisition mass spectrometry (DIA-MS).
 
 ### Installation
@@ -33,6 +31,19 @@ An HTTP address will appear in the terminal; you can paste it into your browser 
 **Spectral library**: The spectral library should include information about the precursors, such as m/z, charge, and peptide sequence, as well as details of their corresponding product ions, including m/z, charge, ion type (e.g., b/y ions), and more. Supported spectral library formats include comma-separated (.csv), tab-separated (.tsv, .xls, or .txt), and .parquet files.   
 **FASTA file(s)**: The FASTA file(s) used to generate the spectral library. These files are utilized to calculate the protein coverage percentage.  
 **Output directory**: Specify the name or path where the output results will be saved.
+
+### Outputs
+The final protein-level quantification report can be found in the output directory, with a filename such as `Protein.Group_Quan_QTX.X_qualityX.X.csv`.
+
+### Use the GUI
+On the home page, click `Start Analysis` to navigate to the parameter settings page. Enter the paths for the required files, then click `Settings` to configure the parameters. Once all settings are complete, click `Run` to begin the analysis.  
+
+### Use the CLI
+One convenient way to execute the JUMPdiaq CLI is by using a parameter file. Use the following commands to generate a parameter file in the current working directory, then complete the required inputs and run the program.
+```bash
+jumpdiaq --gen-params jumpdiaq.params
+jumpdiaq jumpdiaq.params
+```
 
 ### Parameters
 |Category|Parameter|Command|Description|Values|
@@ -84,21 +95,3 @@ An HTTP address will appear in the terminal; you can paste it into your browser 
 ||weighted_centroid|--weighted-centroid|Use weighted average of m/z and IM for centroid peaks|0 = no, 1 = yes, default: 1|
 ||mass_acc_centroid|--mass-acc-centroid|Max mass tolerance to centroid peaks|default: 5|
 ||im_window_centroid|--im-window-centroid|Max ion mobility difference to centroid peaks|default: 0.005|
-
-### Outputs
-The final protein-level quantification report can be found in the output directory, with a filename such as `Protein.Group_Quan_QTX.X_qualityX.X.csv`.
-
-### Use the GUI
-On the home page, click `Start Analysis` to navigate to the parameter settings page. Enter the paths for the required files, then click `Settings` to configure the parameters. Once all settings are complete, click `Run` to begin the analysis.  
-
-### Use the CLI
-One convenient way to execute the JUMPdiaq CLI is by using a parameter file. Use the following commands to generate a parameter file in the current working directory, then complete the required inputs and run the program.
-```bash
-jumpdiaq --gen-params jumpdiaq.params
-jumpdiaq jumpdiaq.params
-```
-
-
-
-
-

@@ -1,6 +1,7 @@
 # builtin
 import os
 import re
+import math
 # external
 from tqdm import tqdm
 import numpy as np
@@ -28,6 +29,43 @@ fExclude = 1 << 6
 name_of_loss = ["noloss", "H2O", "NH3", "CO", "unknown", "unknown"]
 loss_none, loss_H2O, loss_NH3, loss_CO, loss_N, loss_other = np.arange(6)
 Loss = np.array([0.0, 18.011113035, 17.026548, 27.994915, 0.0, 0.0], dtype=np.float32)
+
+
+def estimate_isotopes(peptide_mass, threshold=0.1):
+    """
+    Estimate number of observable isotopic peaks (>= threshold relative intensity).
+    
+    Parameters
+    ----------
+    peptide_mass : float
+        Peptide mass in Da.
+    threshold : float
+        Relative intensity cutoff (default 0.1 = 10%).
+    
+    Returns
+    -------
+    n_peaks : int
+        Number of observable peaks (M to M+n).
+    """
+    # Mean heavy isotopes using averagine model (C/N contributions)
+    lam = 0.00052 * peptide_mass
+    
+    # Poisson mode (most probable isotope count)
+    mode = int(lam)
+    max_prob = math.exp(-lam) * lam**mode / math.factorial(mode)
+    
+    # Always include mono isotopic peak
+    n_peaks = 1
+    k = 1
+    while True:
+        prob = math.exp(-lam) * lam**k / math.factorial(k)
+        rel_intensity = prob / max_prob
+        if rel_intensity >= threshold:
+            n_peaks = k + 1  # count peaks from M to M+k
+            k += 1
+        else:
+            break
+    return n_peaks
 
 
 def progress_bar(iterable, show=True, intermittent=False):

@@ -20,7 +20,7 @@ from jumpdiaq.utils import (progress_bar, remove_extension, location_to_file_nam
 from jumpdiaq.elution_peaks import identify_optimal_xic, calculate_quantity
 
 args = Arguments()
-nIsotops = args.n_isotops
+MaxIsotopes = args.max_isotopes
 MaxFr = args.max_quan_fr
 CorrRadius = args.corr_radius
 CorrMethod = args.corr_method
@@ -316,6 +316,8 @@ class Library:
                         "RT.Apex": jt[1].RT,
                         "RT.Left": jt[1].RT_left,
                         "RT.Right": jt[1].RT_right,
+                        "n.MS1.XICs": jt[1].n_isotopes,
+                        "n.MS2.XICs": jt[1].n_frs,
                     }
 
                     row_data.update({
@@ -329,7 +331,7 @@ class Library:
                         "MS2.XIC.Corr.Adjusted": ";".join([str(fr.corr[1]) for fr in jt[1].ms2_quant])
                     })
                     
-                    ms1_xic_names = [f'M+{i}' for i in range(10)]
+                    ms1_xic_names = [f'M+{i}' for i in range(9)]
                     row_data.update({
                         "Optimal.XIC": jt[1].optimal_xic,
                         "Optimal.XIC.Type": f"ms{jt[1].optimal_xic_type}",
@@ -381,6 +383,8 @@ class QuantEntry:
     xic_score = None
     optimal_xic: int = 0
     optimal_xic_type: int = 0
+    n_isotopes: int = 0
+    n_frs: int = 0
 
     RT: float = 0.0
     RT_left: float = 0.0
@@ -393,7 +397,7 @@ class QuantEntry:
     ms1_rt = None
     ms2_rt = None
 
-    ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(nIsotops + 1)])
+    ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxIsotopes)])
     ms2_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxFr)])
 
 class Info:
@@ -425,8 +429,6 @@ class Info:
         self.clear()
         
         for run_index, file in enumerate(ms_files):
-            # run_index = 0
-            # file = ms_files[run_index]
             run_name = remove_extension(get_file_name(file))
             xic_file = Path(out_dir) / "xic_files" / f"{run_name}.xic.parquet"
             logging.info(f"Loading XIC data from {xic_file}")
@@ -467,7 +469,10 @@ class Info:
                 
                 qe.xic_score = score_row[ms1_cols+ms2_cols].to_numpy()[0]
                 qe.optimal_xic = int(index_row['ms1_rt'][0])
-                qe.optimal_xic_type = int(mz_row['ms1_rt'][0])
+                qe.optimal_xic_type = int(index_row['ms2_rt'][0])
+                
+                qe.n_isotopes = int(mz_row['ms1_rt'][0])
+                qe.n_frs = int(mz_row['ms2_rt'][0])
                 
                 qe.ms1 = xic_rows.select(ms1_cols).to_numpy()
                 qe.ms2 = xic_rows.select(ms2_cols).to_numpy()
@@ -498,7 +503,7 @@ class Info:
     def quantify(self, ms_files, out_dir):
         logging.info("Quantifying XICs")
         
-        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(nIsotops+1)]
+        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxIsotopes)]
         ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxFr)]
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
         

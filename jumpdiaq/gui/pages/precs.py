@@ -16,8 +16,8 @@ from jumpdiaq.gui.app import app, page_sidebar_style, logger
 
 
 load_figure_template(["vizro", "vizro_dark"])
-ms1_colors = dict(zip([f'M+{i}' for i in range(10)], px.colors.qualitative.T10[0:10]))
-ms2_colors = px.colors.qualitative.T10[3:]
+ms1_colors = dict(zip([f'M+{i}' for i in range(9)], px.colors.qualitative.T10[0:9]))
+ms2_colors = px.colors.qualitative.Bold
 
 sidebar = html.Div(
     [
@@ -69,7 +69,7 @@ layout = html.Div(children=[
     dcc.Store(id='stored-precMS1quality'),
     dcc.Store(id='stored-precMS2quant'),
     dcc.Store(id='stored-precMS2quality'),
-    dcc.Store(id='data-store'),  # Added for storing DataFrame
+    dcc.Store(id='stored-report'),  # Added for storing DataFrame
     dbc.Row([
         dbc.Col(sidebar, width=4),
         dbc.Col([
@@ -439,27 +439,25 @@ def update_summ_plot(sub_row_means_xic,
 
 @app.callback(
     [Output('run-dropdown', 'options'),
-     Output('data-store', 'data')],     
+     Output('stored-report', 'data')],     
     Input('precursor-dropdown', 'value'),
     State('stored-outdir', 'data')
 )
 def update_run_options(selected_precursor: str, file_path: str) -> tuple:
     if selected_precursor is None or not file_path:
-        return [], None#, [], []
+        return [], None
 
     try:
         data_path = Path(file_path) / 'xic_quan_report.parquet'
-        required_cols = ['File.Name', 'Run', 
-                         'Precursor.Id', 'Precursor.Mz', 
-                         'RT.Apex', 'RT.Left', 'RT.Right', 
-                         'Optimal.XIC', 'Optimal.XIC.Type', 
-                         'MS1.XIC.Info', 'MS2.XIC.Info', 
+        required_cols = ['File.Name', 'Run', 'Precursor.Id', 'Precursor.Mz', 
+                         'RT.Apex', 'RT.Left', 'RT.Right', 'Optimal.XIC', 'Optimal.XIC.Type', 
+                         'n.MS1.XICs', 'n.MS2.XICs', 'MS1.XIC.Info', 'MS2.XIC.Info', 
                          'MS2.XIC.Corr.Raw', 'MS2.XIC.Quant.Raw', 'MS2.XIC.Quant.Adjusted',
                          'MS1.XIC.Corr.Raw', 'MS1.XIC.Quant.Raw', 'MS1.XIC.Quant.Adjusted']
         selected_precursor = selected_precursor.split("_")[0]
         df = pd.read_parquet(data_path, 
-                           columns=required_cols,
-                           filters=[('Precursor.Id', '==', selected_precursor)])
+                             columns=required_cols,
+                             filters=[('Precursor.Id', '==', selected_precursor)])
         
         if df.empty:
             return [], None
@@ -468,7 +466,7 @@ def update_run_options(selected_precursor: str, file_path: str) -> tuple:
         df['file_path'] = str(data_path)
         
         run_options = [{'label': run, 'value': run} for run in df['Run'].unique()]
-        return run_options, df.to_dict('records')#, cross_run_corr, cross_run_quan
+        return run_options, df.to_dict('records')
         
     except Exception as e:
         logger.error(f"Error updating run options: {e}")
@@ -485,20 +483,20 @@ def update_run_options(selected_precursor: str, file_path: str) -> tuple:
     [Input('run-dropdown', 'value'),
      Input('precursor-dropdown', 'value'),
      Input('show-ms1-inter', 'value'),],
-    [State('data-store', 'data'),
+    [State('stored-report', 'data'),
      State('stored-outdir', 'data')]
 )
 def update_XIC_plots_table(selected_run: str, 
                             selected_precursor: str, 
                             show_interpolated_ms1: bool,
-                            stored_data: List[Dict[str, Any]], 
+                            stored_report: List[Dict[str, Any]], 
                             file_path: str) -> tuple:
-    if selected_run is None or selected_precursor is None or not stored_data:
+    if selected_run is None or selected_precursor is None or not stored_report:
         return ('Select a run to check precursor XICs', '', go.Figure(), 
                 go.Figure(), go.Figure(), go.Figure(), [])
 
     try:
-        report_df = pd.DataFrame(stored_data)
+        report_df = pd.DataFrame(stored_report)
         report_data = report_df[report_df['Run'] == selected_run].reset_index(drop=True)
 
         if report_data.empty:
@@ -513,8 +511,6 @@ def update_XIC_plots_table(selected_run: str,
         if not xic_path.exists():
             raise FileNotFoundError(f"XIC file not found: {xic_path}")
         
-        # xic_path = r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\test_20250604\xic_files\202206012_K2E50_ZI_500ul60C3cm5min_P1-D5_1_9423.xic.parquet"
-        # selected_precursor = 'GTPEQPQC(UniMod:4)GFSNAVVQILR3'
         selected_precursor = selected_precursor.split("_")[0]
         xic_data = pd.read_parquet(xic_path, filters=[('Precursor.Id', '==', selected_precursor)])
         
@@ -529,10 +525,12 @@ def update_XIC_plots_table(selected_run: str,
         template = "vizro" #if switch_on else "vizro_dark"
         
         # Precursor info table
-        prec_info = report_data[['MS1.XIC.Info', 
+        prec_info = report_data[['n.MS1.XICs',
+                                 'MS1.XIC.Info', 
                                  'MS1.XIC.Corr.Raw', 
                                  'MS1.XIC.Quant.Raw', 
                                  'MS1.XIC.Quant.Adjusted']].iloc[0]
+        n_ms1_xics = int(prec_info['n.MS1.XICs'])
         ms1_xics = prec_info['MS1.XIC.Info'].split(';')
         ms1_xic_names = []
         ms1_xic_mzs = []
@@ -551,10 +549,12 @@ def update_XIC_plots_table(selected_run: str,
         })
 
         # Fragment info table
-        frag_info = report_data[['MS2.XIC.Info', 
+        frag_info = report_data[['n.MS2.XICs',
+                                 'MS2.XIC.Info', 
                                  'MS2.XIC.Corr.Raw', 
                                  'MS2.XIC.Quant.Raw', 
                                  'MS2.XIC.Quant.Adjusted']].iloc[0]
+        n_ms2_xics = int(frag_info['n.MS2.XICs'])
         ms2_xics = frag_info['MS2.XIC.Info'].split(';')
         ms2_xic_names = []
         ms2_xic_mzs = []
@@ -583,13 +583,11 @@ def update_XIC_plots_table(selected_run: str,
             prec_info_df.loc[optimal_xic, 'XIC Name'] = best_prec + " (optimal)"
         
         xic_mask = xic_data['row_type'] == 'xic_row'
-        #mz_mask = xic_data['row_type'] == 'mz_row'
         score_mask = xic_data['row_type'] == 'score_row'
         
         ms1_traces = []
         ms1_rt = xic_data.loc[xic_mask, 'ms1_rt'].values
-        ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns
-        #pr_mzs = xic_data.loc[mz_mask, ms1_intensity_cols].values[0]
+        ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns[0:n_ms1_xics]
         for i, pr in enumerate(ms1_intensity_cols):
             ms1_intensity = xic_data.loc[xic_mask, pr].values
             ms1_traces.append(go.Scatter(
@@ -603,7 +601,7 @@ def update_XIC_plots_table(selected_run: str,
         
         ms2_traces = []
         ms2_rt = xic_data.loc[xic_mask, 'ms2_rt'].values
-        ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns
+        ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns[0:n_ms2_xics]
         #fr_mzs = xic_data.loc[mz_mask, ms2_intensity_cols].values[0]
         for i, fr in enumerate(ms2_intensity_cols):
             ms2_intensity = xic_data.loc[xic_mask, fr].values
@@ -617,7 +615,7 @@ def update_XIC_plots_table(selected_run: str,
             ))
         
         ms1_i_traces = []
-        ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns
+        ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns[0:n_ms1_xics]
         for i, pr in enumerate(ms1_interpol_cols):
             ms1_i_intensity = xic_data.loc[xic_mask, pr].values
             ms1_i_traces.append(go.Scatter(
@@ -770,7 +768,7 @@ def update_XIC_plots_table(selected_run: str,
             fig_ms1.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
             fig_ms2.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top left")
 
-        xic_info_df = pd.concat([prec_info_df, frag_info_df], axis=0)
+        xic_info_df = pd.concat([prec_info_df.iloc[0:n_ms1_xics, :], frag_info_df.iloc[0:n_ms2_xics, :]], axis=0)
         xic_score = xic_data.loc[score_mask, ms1_intensity_cols.union(ms2_intensity_cols)].values
         xic_info_df.insert(3, 'XIC Rank Score', np.round(xic_score[0], 2))          
     except Exception as e:
