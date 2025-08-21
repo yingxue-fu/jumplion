@@ -89,9 +89,6 @@ class Arguments:
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
     
-    # 
-    save_supplements: int = 1
-    
     # Config file
     gen_params: str = ""
     config_file: str = ""
@@ -99,6 +96,9 @@ class Arguments:
     # Progress bar dispaly
     show_progress: int = 1
     inter_progress: int = 0    
+    
+    # 
+    save_supplements: int = 1
     
     # only load files in specific formats
     ms_files: List[str] = field(default_factory=list)
@@ -139,7 +139,7 @@ class Arguments:
                     f.write("# Use existing results\n")
                 if fdef.name == "min_runs_quant":
                     f.write("\n# ID results processing\n")
-                if fdef.name == "mass_calibration":
+                if fdef.name == "n_xic_points":
                     f.write("\n# XIC extraction\n")
                 if fdef.name == "min_quan_fr":
                     f.write("\n# XIC quantification\n")
