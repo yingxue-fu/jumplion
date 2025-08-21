@@ -184,7 +184,6 @@ def quantify_from_xic_report(
         out_dir=""
     ):
     
-    # report_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250617\xic_quan_report.parquet"
     columns = [sample_col, id_col, quant_id_col, quality_col, quant_col] + annotation_cols
     report_df = pl.read_parquet(Path(report_file), columns=columns)
     logging.info(f"ID column: {id_col}, Quantity column: {quant_col}")
@@ -203,12 +202,10 @@ def quantify_from_xic_report(
                                 out_dir=out_dir,
                             )
     
-    # 2
+    # 2. summarize
     quant_mtx, quality_mtx = precursor_summarize(quant_df, quality_df)
-    # quant_mtx_pd=quant_mtx.to_pandas()
-    # quality_mtx_pd=quality_mtx.to_pandas()
 
-    # 3
+    # 3. add annotation
     extra_names = extract_annotation(quant_mtx["Precursor.Id"].to_list(), 
                                      report_df, 
                                      id_col,
@@ -221,14 +218,13 @@ def quantify_from_xic_report(
     
 
 def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.0, quant_source='ms1_ms2', ms2_priority_quality=0.8, out_dir=""):
-    # report_file = Path(OutDir) / 'xic_quan_report.parquet'
-    id_col="Precursor.Id"
+    #id_col="Precursor.Id"
     
     # MS1-level quantification
     logging.info("Quantifying precursors at MS1-level")
     ms1_quant_table, ms1_quality_table = quantify_from_xic_report(
                                              report_file, 
-                                             id_col,
+                                             id_col="Precursor.Id",
                                              sample_col="Run",
                                              quant_id_col="MS1.XIC.Info",
                                              quality_col="MS1.XIC.Corr.Raw",
@@ -250,7 +246,7 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
     logging.info("Quantifying precursors at MS2-level")
     ms2_quant_table, ms2_quality_table = quantify_from_xic_report(
                                              report_file, 
-                                             id_col,
+                                             id_col="Precursor.Id",
                                              sample_col="Run",
                                              quant_id_col="MS2.XIC.Info",
                                              quality_col="MS2.XIC.Corr.Raw",
@@ -268,14 +264,15 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
         (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
     ])
     
-    # 
+    # Combine MS1 and MS2 quantification
     ms1_quality_table = ms1_quality_table.select(ms2_quality_table.columns)
     ms1_quant_table = ms1_quant_table.select(ms2_quant_table.columns)
     ms1_ms2_quality_table = pl.concat([ms1_quality_table, ms2_quality_table], how="vertical")
     ms1_ms2_quant_table = pl.concat([ms1_quant_table, ms2_quant_table], how="vertical")
     
-    ms1_ms2_quant_table.write_parquet(Path(out_dir) / f"{id_col}_quant_ms1_ms2_summ_table.parquet")
-    ms1_ms2_quality_table.write_parquet(Path(out_dir) / f"{id_col}_quality_ms1_ms2_summ_table.parquet")
+    # Save to files
+    ms1_ms2_quant_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
+    ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
     
     if quant_source == 'ms1':
         logging.info("Using only MS1-level precursor quantity for further analysis")
@@ -365,11 +362,11 @@ def protein_summarize(prec_quant_table,
         quality_summed[i, :] = topN(quality_mat)
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
-    quant_table = quant_table.with_columns(pl.Series(name="Average", values=np.nanmean(quant_summed, axis=1)))
+    #quant_table = quant_table.with_columns(pl.Series(name="Average", values=np.nanmean(quant_summed, axis=1)))
     quant_table = quant_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
     
     quality_table = pl.DataFrame(quality_summed, schema=sample_cols)
-    quality_table = quality_table.with_columns(pl.Series(name="Average", values=np.nanmean(quality_summed, axis=1)))
+    #quality_table = quality_table.with_columns(pl.Series(name="Average", values=np.nanmean(quality_summed, axis=1)))
     quality_table = quality_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
 
     return quant_table, quality_table
@@ -403,7 +400,7 @@ def quantify_proteins(prec_quant_table,
     return prot_quant_table, prot_quality_table
     
 
-def quality_hist_plot(quality_table, value_columns, quality_cutoffs, out_dir):
+def quality_hist_plot(quality_table, value_columns, quality_cutoffs, out_dir, save_file_name):
     # Calculate appropriate figure size based on number of columns
     num_cols = quality_table.loc[:, value_columns].shape[1]
     nrows=int(np.ceil(num_cols/4))
@@ -442,7 +439,8 @@ def quality_hist_plot(quality_table, value_columns, quality_cutoffs, out_dir):
     
     # Apply tight layout
     plt.tight_layout()
-    plt.savefig(out_dir / "quan_quality_histplot.pdf")
+    plt.savefig(out_dir / save_file_name)
+    plt.close()
 
 ################################# MaxLFQ algorithm ############################
 # The maxLFQ function is implemented based on R codes from the iq R package with modifications.

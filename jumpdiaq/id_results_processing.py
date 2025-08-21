@@ -18,26 +18,29 @@ from jumpdiaq.calibration import (refine_spline, calc_spline_vectorized,
                                   spline_fitting_plot)
 
 args = Arguments()
-OutDir = args.out_dir
+SaveSupplements = args.save_supplements
 MinRunsQuant = args.min_runs_quant
 MinRunsModel = args.min_runs_model
 MinRunsCal = args.min_runs_cal
 MinQvalueCal = args.min_qvalue_cal
 MaxMassCal = args.max_mass_cal
-MinXICPoints = args.min_xic_points
+MinXICPoints = 21
 
 def process_id_results(id_file, 
                        lib_file, 
                        ms_files,
                        out_dir,
+                       save_supplements=SaveSupplements,
                        min_runs_quant=MinRunsQuant,
                        min_runs_model=MinRunsModel,
                        min_runs_cal=MinRunsCal,
                        min_qvalue_cal=MinQvalueCal,
                        max_mass_cal=MaxMassCal,):
-    # id_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\report.parquet"
-    # lib_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\report-lib.parquet"
-    # out_dir = r"C:\Users\yfu\Downloads\miss_dia_test_data\zuofei_data\test_20250602"
+    out_int_dir = Path(out_dir) / 'intermediate'
+    
+    ################################################
+    # 0. read id report and spectral library files #
+    ################################################
     # read id report file
     logging.info(f"Reading identification report file: {id_file}")
     required_columns = ['Run', 'Precursor.Id', 'RT', 'Q.Value']
@@ -50,7 +53,7 @@ def process_id_results(id_file,
     run_names = [remove_extension(get_file_name(ms_file)) for ms_file in ms_files]
     id_df = id_df[id_df['Run'].isin(run_names)]
     
-    # 
+    # read library file
     logging.info(f"Reading spectral library: {lib_file}")
     lib_df = pd.read_parquet(lib_file)
     # Remove decoys
@@ -67,18 +70,24 @@ def process_id_results(id_file,
         n_unique = lib_df["Precursor.Id"].nunique()
         logging.info(f"Library contains {n_unique} unique precursors")
         
-    ########################################
-    # Choose precursors for quantification #
-    ########################################
+    ###########################################
+    # 1. Choose precursors for quantification #
+    ###########################################
     logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
     # get rt and im matrix
     rt_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='RT')
     rt_mat = rt_mat[(rt_mat.shape[1] - rt_mat.isna().sum(axis=1)) >= min_runs_quant]
-    rt_mat.to_csv(Path(out_dir) / "rt_mat_before_prediction.csv")
+    if save_supplements:
+        out_rt_dir = out_int_dir / 'rt_prediction'
+        out_rt_dir.mkdir(parents=True, exist_ok=True)
+        rt_mat.to_csv(out_rt_dir / "rt_mat_before_prediction.csv")
     if is_tims:
         im_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='IM')
         im_mat = im_mat.loc[rt_mat.index, :]
-        im_mat.to_csv(Path(out_dir) / "im_mat_before_prediction.csv")
+        if save_supplements:
+            out_im_dir = out_int_dir / 'im_prediction'
+            out_im_dir.mkdir(parents=True, exist_ok=True)
+            im_mat.to_csv(out_im_dir / "im_mat_before_prediction.csv")
     else:
         im_mat = None
     logging.info(f"{len(rt_mat)} precursors are included for quantification")
@@ -91,36 +100,45 @@ def process_id_results(id_file,
         lib_df_uniq_prec = lib_df[['Precursor.Id', 'RT', 'Precursor.Mz']].copy()
     lib_df_uniq_prec.drop_duplicates(subset=['Precursor.Id'], inplace=True, ignore_index=True)
     
-    lib_file_filtered = Path(out_dir) / 'splib_quan.parquet'
+    lib_file_filtered = out_int_dir / 'speclib_filtered.parquet'
     lib_df.to_parquet(lib_file_filtered, index=False)
     logging.info(f"Filtered spectral library saved to {lib_file_filtered}\n")
     
-    ###############################
-    # build RT model for each run #
-    ###############################
+    #######################
+    # 2. RT/IM prediction #
+    #######################
     logging.info("Predicting precursor RTs (and IMs)") 
     rt_dict, rt_segments = collect_model_data(rt_mat,  
                                               min_runs_model,
                                               lib_df_uniq_prec,
                                               data_type="rt")
-    rt_mat_pred = modeling_and_prediction(rt_dict, rt_segments, rt_mat, lib_df_uniq_prec, data_type="rt", out_dir=out_dir)
-    rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, n_iter=5, out_dir=out_dir)
-    rt_mat_pred.to_csv(Path(out_dir) / "rt_mat_after_prediction.csv")
+    rt_mat_pred, model_accs = modeling_and_prediction(rt_dict, rt_segments, rt_mat, 
+                                                      lib_df_uniq_prec, 
+                                                      data_type="rt", 
+                                                      out_dir=out_int_dir, 
+                                                      save_model=True,
+                                                      save_plot=save_supplements)
+    rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, n_iter=5, save_plot=False)
+    if save_supplements:
+        rt_mat_pred.to_csv(out_rt_dir / "rt_mat_after_prediction.csv")
     
     if is_tims:
-        ###############################
-        # build IM model for each run #
-        ###############################
         im_dict, im_segments = collect_model_data(im_mat,  
                                                   min_runs_model,
                                                   lib_df_uniq_prec,
                                                   data_type="im")
-        im_mat_pred = modeling_and_prediction(im_dict, im_segments, im_mat, lib_df_uniq_prec, data_type="im", out_dir=out_dir)
-        im_mat_pred.to_csv(Path(out_dir) / "im_mat_after_prediction.csv")
+        im_mat_pred, _ = modeling_and_prediction(im_dict, im_segments, im_mat, 
+                                                 lib_df_uniq_prec, 
+                                                 data_type="im",
+                                                 out_dir=out_int_dir, 
+                                                 save_model=True,
+                                                 save_plot=save_supplements)
+        if save_supplements:
+            im_mat_pred.to_csv(Path(out_im_dir) / "im_mat_after_prediction.csv")
     
-    ##########################################
-    # Choose precursors for mass calibration #
-    ##########################################
+    #############################################
+    # 3. Choose precursors for mass calibration #
+    #############################################
     id_df_cal = id_df[id_df['Q.Value'] < min_qvalue_cal]
     rt_mat_cal = rt_mat[(rt_mat.shape[1] - rt_mat.isna().sum(axis=1)) >= min_runs_cal]
     mass_cal_precs = list(set(rt_mat_cal.index.values).intersection(set(id_df_cal['Precursor.Id'].drop_duplicates())))
@@ -140,27 +158,28 @@ def process_id_results(id_file,
         im_mat_pred = im_mat_pred.add_suffix('_IM')
         prec_locations = pd.concat([prec_locations, im_mat_pred], axis=1)
     
-    prec_locations.to_csv(Path(out_dir) / "precursor_locations.csv")
-        
+    prec_locations.to_csv(out_int_dir / "prec_locations.csv")
+    
+    #########################################
+    # 4. determine the number of XIC points #
+    #########################################
+    if args.n_xic_points == 0:
+        logging.info("Determining the number of data points to extract for an XIC")
+        # 
+        cycle_time = get_cycle_time(ms_files[0])
+        logging.info(f"Cycle time: {cycle_time} ({np.round(cycle_time*60, 3)} seconds)")
+        # 
+        average_model_acc = np.mean(model_accs)
+        average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
+        logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
+        # 
+        args.n_xic_points = max(MinXICPoints, average_model_acc_n_points * 4 + 1)
+    elif args.n_xic_points < MinXICPoints and args.n_xic_points > 0:
+        logging.warning(f"WARNING: the provided number ({args.n_xic_points}) of data points to extract for an XIC may be too small")
+        args.n_xic_points = MinXICPoints
+    logging.info(f"Number of data points to extract for a XIC set to: {args.n_xic_points}\n")
+    
     return prec_locations
-
-
-def determine_n_XIC_points(RT_model_file, ms_files):
-    logging.info("Determining the number of data points to extract for an XIC")
-    with open(RT_model_file, "r") as f:
-        rt_models = json.load(f)
-    
-    cycle_time = get_cycle_time(ms_files[0])
-    logging.info(f"Cycle time: {cycle_time} ({np.round(cycle_time*60, 3)} seconds)")
-    
-    model_accs = rt_models["model_accs"] 
-    average_model_acc = np.mean(model_accs)
-    average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
-    logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
-    n_xic_points = max(MinXICPoints, average_model_acc_n_points * 4 + 1)
-    logging.info(f"Number of data points to extract for a XIC set to: {n_xic_points}\n")
-    
-    return n_xic_points
 
 
 def collect_model_data(mat, 
@@ -246,10 +265,11 @@ def modeling_and_prediction(data_dict,
         logging.info(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {np.round(model_acc, 4)}")
         model_accs.append(model_acc)
         if save_plot:
+            plot_out_dir = out_dir / f'{data_type}_prediction'
             spline_fitting_plot(model_data, model_coeff, 
                                 model_points, model_acc, 
                                 show_window=False, model=data_type.upper(), 
-                                out_dir=out_dir, run_name=run_name,
+                                out_dir=plot_out_dir, run_name=run_name,
                                 save_plot=save_plot)
             
         # predict RT for precursors with no RT        
@@ -268,14 +288,13 @@ def modeling_and_prediction(data_dict,
         # Batch update
         mat_pred.loc[lib_subset.index, run_name] = predicted_rts
     
-    models["model_accs"] = model_accs
     if save_model:
-        json_file = Path(out_dir) / f'{data_type.upper()}_models.json'
+        json_file = out_dir / f'{data_type}_models.json'
         with open(json_file, "w") as f:
             json.dump(models, f, indent=4, default=convert_ndarray)
         logging.info(f"{data_type.upper()} prediction models saved to {json_file}\n")
     
-    return mat_pred
+    return mat_pred, model_accs
 
 # mat = pd.read_csv(r"C:\Users\yfu\Downloads\miss_dia_test_data\ya_data\test_ya_20250521\rt_mtx_before_prediction.csv")
 # mat = mat.set_index("Precursor.Id")
@@ -329,8 +348,6 @@ def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""
     if save_plot:
         plt.savefig(Path(out_dir) / "rt_diff_histogram.pdf")
         plt.close()
-    else:
-        plt.show()
     
     return mat_pred
 
@@ -342,16 +359,16 @@ def convert_ndarray(obj):
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
     
 # 
-def get_protein_info(lib_file, out_dir):
-    prec_prot_info = pd.read_parquet(lib_file, columns=['Precursor.Id', 
+def get_prec_prot_relation(lib_file, out_dir):
+    prec_prot_df = pd.read_parquet(lib_file, columns=['Precursor.Id', 
                                                         'Protein.Ids', 
                                                         'Protein.Group',
                                                         'Protein.Names', 
                                                         'Genes'])
-    prec_prot_info = prec_prot_info.drop_duplicates(ignore_index=True)
-    prec_prot_info.to_csv(Path(out_dir) / "prec_prot_info.csv", index=False)
+    prec_prot_df = prec_prot_df.drop_duplicates(ignore_index=True)
+    prec_prot_df.to_csv(Path(out_dir) / "prec_prot_relation.csv", index=False)
     
-    return prec_prot_info
+    return prec_prot_df
 
 #
 def calculate_protein_coverage(report_file, fasta_files, out_dir):

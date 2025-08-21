@@ -32,12 +32,36 @@ def main():
     if args.gen_params:
         args.generate_file(args.gen_params)
         sys.exit(1)
-        
+    
+    # System information
+    system = platform.system()
+    release = platform.release()
+    architecture = platform.architecture()[0]
+    cores = psutil.cpu_count(logical=False)   # Physical cores
+    threads = psutil.cpu_count(logical=True)  # Logical threads
+    mem_info = psutil.virtual_memory()
+    mem_available = mem_info.available / (1024 ** 3)
+    SaveMemory = True if mem_available < 64 else False
+    
+    OutDir = args.out_dir
+    logger = setup_logger(False, OutDir)
+    logger.info("====================================================")
+    logger.info(f" JUMPdiaq (v{jumpdiaq.__version__}) ")
+    logger.info(" ")
+    logger.info(f" System: {system} {release}, {architecture} ")
+    logger.info(f" CPU: {cores} Cores, {threads} Threads ")
+    logger.info(f" Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total) ")
+    logger.info("====================================================\n")
+    
+    logger.info(f"Command: {cmd}\n")
+    if os.path.isfile(sys.argv[1]):
+        # copy parameter file
+        shutil.copy(sys.argv[1], Path(OutDir) /'jumpdiaq.params')
+    
     from jumpdiaq.library import Library
     from jumpdiaq.run import Run
     from jumpdiaq.id_results_processing import (process_id_results, 
-                                                determine_n_XIC_points,
-                                                get_protein_info, 
+                                                get_prec_prot_relation, 
                                                 calculate_protein_coverage)
     from jumpdiaq.summarization import (quantify_precursors, 
                                         quantify_proteins, 
@@ -45,12 +69,12 @@ def main():
                                         norm_dataframe, 
                                         filter_based_on_quality)
 
-    #
+    # Input files
     MSFiles = args.ms_files
     IdFile = args.id_report
     LibFile = args.spec_lib
     FastaFiles = args.fastas
-    OutDir = args.out_dir
+    
     if not LibFile:
         logging.warning("WARNING: no spectral library provided: nothing to do\n")
     # 
@@ -66,51 +90,25 @@ def main():
     MS2PriorityQuality = args.ms2_priority_quality
     ProtQualityCutoffs = args.prot_quality_cutoffs
     MaxNPrecs = args.max_n_precs
-    
-    # System information
-    system = platform.system()
-    release = platform.release()
-    architecture = platform.architecture()[0]
-    cores = psutil.cpu_count(logical=False)   # Physical cores
-    threads = psutil.cpu_count(logical=True)  # Logical threads
-    mem_info = psutil.virtual_memory()
-    mem_available = mem_info.available / (1024 ** 3)
-    SaveMemory = True if mem_available < 64 else False
-    
-    logger = setup_logger(False, OutDir)
-    logger.info("====================================================")
-    logger.info(f" JUMPdiaq (v{jumpdiaq.__version__}) ")
-    logger.info(" ")
-    logger.info(f" System: {system} {release}, {architecture} ")
-    logger.info(f" CPU: {cores} Cores, {threads} Threads ")
-    logger.info(f" Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total) ")
-    logger.info("====================================================\n")
-    
-    logger.info(f"Command: {cmd}\n")
-    if os.path.isfile(sys.argv[1]):
-        # copy parameter file
-        shutil.copy(sys.argv[1], Path(OutDir) /'jumpdiaq.params')
-    
-    report_file = Path(OutDir) / 'xic_quan_report.parquet'
+    #
+    out_int_dir = Path(OutDir) / 'intermediate'
+    out_pub_dir = Path(OutDir) / 'publication'
+    report_file = out_pub_dir / 'xic_quantification.parquet'
     if UseXICReport:
         logging.info(f"Using existing XIC quantification report: {report_file}") 
     else:
         logging.info(f"{len(MSFiles)} runs will be analyzed")
         if SkipIDprocess:
-            prec_locations_file = Path(OutDir) / "precursor_locations.csv"
+            prec_locations_file = out_int_dir / "prec_locations.csv"
             logging.info(f"ID results processing skipped. Using existing precursor RTs (and IMs): {prec_locations_file}\n") 
             prec_locations = pd.read_csv(prec_locations_file)
             prec_locations.set_index('Precursor.Id', inplace=True)
         else:
             prec_locations = process_id_results(IdFile, LibFile, MSFiles, OutDir)
         
-        # Determine the number of data points to extract for an XIC
-        RT_model_file = Path(OutDir) / 'RT_models.json'
-        args.min_xic_points = determine_n_XIC_points(RT_model_file, MSFiles)
-        
         # load library
         lib = Library()
-        if not lib.load(Path(OutDir) / 'splib_quan.parquet'):
+        if not lib.load(out_int_dir / 'speclib_filtered.parquet'):
             raise Exception("Cannot load spectral library")
         lib.initialize()
         
@@ -119,7 +117,7 @@ def main():
             logging.info(f"Analyzing run {i+1} of {len(MSFiles)}")
             if UseSavedXIC:
                 run_name = remove_extension(get_file_name(file))
-                xic_file = Path(OutDir) / "xic_files" / f"{run_name}.xic.parquet"
+                xic_file = out_int_dir / "xic_files" / f"{run_name}.xic.parquet"
                 if xic_file.exists():
                     logging.info(f"Using existing xic file {xic_file}")
                     logging.info("Skipping analysis\n")
@@ -137,21 +135,22 @@ def main():
                 gc.collect()
 
         # Assambling xic data and genereate xic quant report
-        prec_prot_info = get_protein_info(LibFile, OutDir)
-        lib.info.load(lib, MSFiles, OutDir)
-        lib.info.quantify(MSFiles, OutDir)
-        lib.report(report_file, MSFiles, prec_prot_info)
+        prec_prot_relation = get_prec_prot_relation(LibFile, str(out_int_dir))
+        lib.info.load(lib, MSFiles, str(out_int_dir))
+        lib.info.quantify(MSFiles, str(out_int_dir))
+        lib.report(report_file, MSFiles, prec_prot_relation)
     
     # Precursor quantification
+    out_prec_dir = out_int_dir / 'prec_quant'
     prec_quant_table, prec_quality_table = quantify_precursors(
                                                 report_file, 
                                                 xic_quality_cutoff=0.0, 
                                                 xic_quant_cutoff=0.0, 
                                                 quant_source=PrecQuantLevel,
                                                 ms2_priority_quality=MS2PriorityQuality,
-                                                out_dir=OutDir)
-    prec_quant_table.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table.parquet")
-    prec_quality_table.write_parquet(Path(OutDir) / "Precursor.Id_quality_summ_table.parquet")
+                                                out_dir=str(out_prec_dir))
+    prec_quant_table.write_parquet(out_pub_dir / "precursor_quantity_summ_table.parquet")
+    prec_quality_table.write_parquet(out_pub_dir / "precursor_quality_summ_table.parquet")
     
     # Normalization
     # NormSpecies='HUMAN'
@@ -165,15 +164,15 @@ def main():
                                                   norm_species=NormSpecies, 
                                                   norm_method=NormMethod, 
                                                   trim_percentage=TrimPercentage)
-    prec_quant_table_norm.write_parquet(Path(OutDir) / "Precursor.Id_quant_summ_table_Norm.parquet")
+    prec_quant_table_norm.write_parquet(out_pub_dir / "precursor_quantity_summ_table_norm.parquet")
     
     prot_quant_table, prot_quality_table = quantify_proteins(
                                                prec_quant_table_norm, 
                                                prec_quality_table, 
                                                max_n_precs=MaxNPrecs
                                                )
-    prot_quant_table.write_csv(Path(OutDir) / "Protein.Group_Quan_noFiltering.csv")
-    prot_quality_table.write_csv(Path(OutDir) / "Protein.Group_Quan_Quality.csv")
+    prot_quant_table.write_csv(out_pub_dir / "Protein.Group_Quant_noFiltering.csv")
+    prot_quality_table.write_csv(out_pub_dir / "Protein.Group_Quant_Quality.csv")
                            
     # filter based on quality
     value_columns = prot_quality_table.columns[3:-1]
@@ -184,8 +183,11 @@ def main():
         quantiles = np.round(np.arange(0.0, 1.0, 1 / ProtQualityCutoffs), 2)
         QualityCutoffs = np.nanquantile(prot_quality_table.select(value_columns).to_numpy().flatten(), quantiles)
         QualityCutoffs = np.round(QualityCutoffs, 2)
-        
-    quality_hist_plot(prot_quality_table.to_pandas(), value_columns, QualityCutoffs, Path(OutDir))
+    
+    if args.save_supplements:
+        quality_hist_plot(prot_quality_table.to_pandas(), 
+                          value_columns, QualityCutoffs, out_pub_dir,
+                          "Protein.Group_Quant_Quality_distribution.pdf")
     logging.info(f"Filtering based on protein quality cutoffs: {QualityCutoffs}")
     prot_quant_table_filtered = filter_based_on_quality(prot_quant_table.to_pandas(), 
                                                         prot_quality_table.to_pandas(),
@@ -194,13 +196,13 @@ def main():
                                                         quality_cutoffs=QualityCutoffs)
     for i, (qt, cutoff) in enumerate(zip(quantiles, QualityCutoffs)):
         prot_quant_table_f = prot_quant_table_filtered[i]
-        prot_quant_table_f.to_csv(Path(OutDir) / f"Protein.Group_Quan_QT{qt}_quality{cutoff}.csv", index=False)
+        prot_quant_table_f.to_csv(out_pub_dir / f"Protein.Group_Quant_quantile{qt}_quality{cutoff}.csv", index=False)
     
     if len(FastaFiles):
-        prot_prec_pep_info = calculate_protein_coverage(Path(OutDir) / 'xic_quan_report.parquet', 
+        prot_prec_pep_info = calculate_protein_coverage(out_pub_dir / 'xic_quantification.parquet', 
                                                         FastaFiles, 
-                                                        str(Path(OutDir)))
-        prot_prec_pep_info.to_csv(Path(OutDir) / "prot_prec_pep_info.csv", index=False)
+                                                        str(out_int_dir))
+        prot_prec_pep_info.to_csv(out_int_dir / "prot_prec_pep_info.csv", index=False)
     else:
         logging.warning("WARNING: no Fasta files are provided, protein coverage will not be calculated.")
     

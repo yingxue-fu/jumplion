@@ -1,5 +1,5 @@
 ## JUMPdiaq
-JUMPdiaq is a software designed for the quantification of proteomics data generated using data-independent acquisition mass spectrometry (DIA-MS).
+JUMPdiaq is a software tool designed for the quantification of proteomics data generated using data-independent acquisition mass spectrometry (DIA-MS).
 
 ### Installation
 JUMPdiaq can be installed via pip and is compatible with both Windows and Linux operating systems.
@@ -9,11 +9,19 @@ conda activate jumpdiaq
 conda install mono # required in Linux for reading Thermo .raw file; skip this line for Windows
 pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" # after publishing, the command will be 'pip install jumpdiaq'
 ```
+
+### Getting started
 After installation, the easiest way to begin your analysis is by launching the JUMPdiaq GUI using the following command in the terminal:
 ```bash
 jumpdiaq-gui
 ```
-An HTTP address will appear in the terminal; you can paste it into your browser to open the interface. Alternatively, JUMPdiaq can be used in command-line mode, see the [Use the CLI](#use-the-cli) section for more details.
+An HTTP address will appear in the terminal; you can paste it into your browser to open the interface. On the `Home` page, click `Start Analysis` to navigate to the parameter settings page. Enter the paths for the required files, then click `Settings` to configure the parameters. For most parameters, you can simply leave them at their default values. Once all settings are complete, click `Run` to begin the analysis.  
+  
+Alternatively, JUMPdiaq can be used in command-line mode. See the [Parameters](#parameters) section for a list of all parameters and commands that can be passed to JUMPdiaq. For convenience, you can use a parameter file to set and store all parameters in one place. Use the following commands to generate a parameter file in the current working directory, then complete the required inputs in the file and run the program.
+```bash
+jumpdiaq --gen-params jumpdiaq.params
+jumpdiaq jumpdiaq.params
+```
 
 ### Inputs
 **DIA-MS Files**: Supported mass spectrometry file formats include Bruker `.d` (diaPASEF), Thermo `.raw`, and `.mzML` files converted from `.raw`.  
@@ -35,17 +43,9 @@ An HTTP address will appear in the terminal; you can paste it into your browser 
 ### Outputs
 The final protein-level quantification report can be found in the output directory, with a filename such as `Protein.Group_Quan_QTX.X_qualityX.X.csv`.
 
-### Use the GUI
-On the home page, click `Start Analysis` to navigate to the parameter settings page. Enter the paths for the required files, then click `Settings` to configure the parameters. Once all settings are complete, click `Run` to begin the analysis.  
-
-### Use the CLI
-One convenient way to execute the JUMPdiaq CLI is by using a parameter file. Use the following commands to generate a parameter file in the current working directory, then complete the required inputs and run the program.
-```bash
-jumpdiaq --gen-params jumpdiaq.params
-jumpdiaq jumpdiaq.params
-```
-
 ### Parameters
+The table below lists all parameters and commands that can be passed to JUMPdiaq.  
+  
 |Category|Parameter|Command|Description|Values|
 |---     |---      |---    |---        |---   |
 |**Use existing results**|skip_id_process|--skip-id-process|Skip the ID results processing step. Use previously saved filterd spectral library and precursor RT/IM table.|0 = no, 1 = yes, default: 0|

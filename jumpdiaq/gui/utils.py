@@ -146,7 +146,7 @@ def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, 
         valid_xys = [(prot_tag, B, ratio) for prot_tag, B, ratio in zip(species_prot_tag, species_B, species_R) 
                      if np.isfinite(B) and np.isfinite(ratio)]
         valid_prots[species] = valid_xys
-        print(f"{species}: valid ratios with at least two replicates in each of A and B: {len(valid_xys)}")
+        #print(f"{species}: valid ratios with at least two replicates in each of A and B: {len(valid_xys)}")
     
     return valid_prots
 

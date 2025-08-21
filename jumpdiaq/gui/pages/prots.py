@@ -1,6 +1,6 @@
 # builtin
-import os
 import ast
+from pathlib import Path
 from collections import defaultdict
 # external
 import numpy as np
@@ -258,11 +258,12 @@ layout = html.Div(children=[
     Input('stored-outdir', 'data'),
 )
 def list_quant_files(dir_path):
-    if not dir_path or not os.path.isdir(dir_path):
+    if not dir_path or not Path(dir_path).is_dir():
         return []
-
+    
+    out_pub_dir = Path(dir_path) / 'publication'
     quant_tables = []
-    quant_files = [f for f in os.listdir(dir_path) if f.startswith('Protein.Group_Quan_QT')]
+    quant_files = [f.name for f in out_pub_dir.iterdir() if f.name.startswith('Protein.Group_Quant_quantile')]
     quant_tables.extend(quant_files)
 
     return [{'label': f, 'value': f} for f in quant_tables]
@@ -286,23 +287,24 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
     
     if not selected_table or not outdir_path or not meta_path:
         return None, [], None, None, "", {}
-
-    quant_csv_path = os.path.join(outdir_path, selected_table)
-    quality_csv_path = os.path.join(outdir_path, "Protein.Group_Quan_Quality.csv")
-    prot_pep_info_path = os.path.join(outdir_path, "prot_prec_pep_info.csv")
+    
+    out_int_dir = Path(outdir_path) / 'intermediate'
+    out_pub_dir = Path(outdir_path) / 'publication'
+    quant_csv_path = out_pub_dir / selected_table
+    quality_csv_path = out_pub_dir / "Protein.Group_Quant_Quality.csv"
+    prot_pep_info_path = out_int_dir / "prot_prec_pep_info.csv"
     
     try:
         quant_df = pd.read_csv(quant_csv_path)
         meta = pd.read_csv(meta_path)
         # Make the samples the same order as in the meta file
         sample_names = meta['Sample'].values.tolist()
-        quant_df = quant_df.loc[:, quant_df.columns[0:3].values.tolist() + sample_names + [quant_df.columns[-1]]]
+        quant_df = quant_df.loc[:, quant_df.columns[0:3].values.tolist() + sample_names]
         # Simplify the sample name
         simple_sample_names = extract_unique_parts(sample_names)
         quant_df.columns = (
             quant_df.columns[0:3].values.tolist() + 
-            simple_sample_names + 
-            [quant_df.columns[-1]]
+            simple_sample_names
         )
         # Combine with protein coverage info
         prot_pep_df = pd.read_csv(prot_pep_info_path)
@@ -311,9 +313,9 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
         quant_df['Peptide.Positions'] = quant_df['Peptide.Positions'].apply(ast.literal_eval)
         
         quant_df_to_show = quant_df.drop(columns=['Protein.Group', 'Protein.Description', 'Protein.Names', 'Sequence', 'Precursors', 'Peptides', 'Peptide.Positions'])
-        value_cols = simple_sample_names + ['Average']
-        quant_df_to_show[value_cols] = quant_df_to_show[value_cols].round(2)
-        extracted_cutoffs = selected_table.split("QT")[1].split(".csv")[0].split("_quality")
+        value_cols = simple_sample_names
+        quant_df_to_show[value_cols] = quant_df_to_show[value_cols].round(3)
+        extracted_cutoffs = selected_table.split("quantile")[1].split(".csv")[0].split("_quality")
         quality_tier, quality_cutoff = tuple(extracted_cutoffs)
         
         quality_df = pd.read_csv(quality_csv_path)
@@ -363,7 +365,7 @@ def update_violin_plot(data, species_input):
     # Load data
     df = pd.DataFrame(data)
     species_column = "Protein.Names"
-    value_columns = df.columns[12:-1]
+    value_columns = df.columns[12:]
 
     # Parse and clean user input
     species = [species_input] if species_input else []
@@ -622,13 +624,10 @@ def read_precs_data(selected_prot, outdir_path, meta):
 
     meta = pd.DataFrame(meta)
 
-    # Assuming "file_name" column contains the name of the corresponding HDF file
-    prec_quant_file = "Precursor.Id_quant_summ_table.parquet"
-    prec_quant_norm_file = "Precursor.Id_quant_summ_table_Norm.parquet"
-    prec_quality_file = "Precursor.Id_quality_summ_table.parquet"
-    prec_quant_path = os.path.join(outdir_path, prec_quant_file)
-    prec_quant_norm_path = os.path.join(outdir_path, prec_quant_norm_file)
-    prec_quality_path = os.path.join(outdir_path, prec_quality_file)
+    out_pub_dir = Path(outdir_path) / 'publication'
+    prec_quant_path = out_pub_dir / "precursor_quantity_summ_table.parquet"
+    prec_quant_norm_path = out_pub_dir / "precursor_quantity_summ_table_norm.parquet"
+    prec_quality_path = out_pub_dir / "precursor_quality_summ_table.parquet"
     
     try:
         # read quant data
@@ -748,7 +747,8 @@ def update_summ_plot(selected_prot,
                     name="Precursors" if show_summ_value else tract_id,
                     line=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
                     marker=dict(color='gray' if show_summ_value else trace_colors[tract_id]),
-                    showlegend=not show_summ_value
+                    showlegend=not show_summ_value,
+                    opacity=0.7 if show_summ_value else 1.0
                 ))
         
         for tract_id, group in prec_quality_df.groupby("Precursor.Id_MS_type"):

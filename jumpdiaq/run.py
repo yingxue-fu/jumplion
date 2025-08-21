@@ -23,6 +23,8 @@ from jumpdiaq.elution_peaks import interpolate_ms1, identify_optimal_xic
 
 args = Arguments()
 OutDir = args.out_dir
+out_int_dir = Path(OutDir) / 'intermediate'
+SaveSupplements = args.save_supplements
 # 
 Calibrate = args.mass_calibration
 MassCalAcc = args.mass_cal_acc
@@ -36,7 +38,7 @@ IndividualIMWindow = args.individual_im_window
 MinFr = args.min_quan_fr
 MaxFr = args.max_quan_fr
 MaxIsotopes = args.max_isotopes
-MinXICPoints = args.min_xic_points
+nXICPoints = args.n_xic_points
 CorrRadius = args.corr_radius
 CorrMethod = args.corr_method
 WeightByShape = args.weight_by_shape
@@ -578,7 +580,7 @@ class Run:
         self.calibrate_mass()
         logging.info("Identifying optimal XIC for each precursor")
         for entry in progress_bar(self.entries, args.show_progress, args.inter_progress):   
-            entry.get_optimal_xic(stage=1, n_xic_points=args.min_xic_points)
+            entry.get_optimal_xic(stage=1, n_xic_points=nXICPoints)
         self.export_xics()
 
 
@@ -606,10 +608,10 @@ class Run:
             logging.info(f"Refined mass accuracy used for calibration: {self.MassAccuracyMS1*1e6}, {self.MassAccuracyMS2*1e6} ppm (MS1, MS2)")
             if self.tims and not args.fix_im_window:
                 logging.info(f"Refined ion mobility window: {self.IM_window}")
-            self.do_mass_calibration(save_cal_info=True)
+            self.do_mass_calibration(save_cal_info=SaveSupplements)
             
         if self.tims and not args.fix_im_window:
-            self.check_ion_mobility_error(save_cal_info=True)
+            self.check_ion_mobility_error(save_cal_info=SaveSupplements)
     
         # optimizing mass accuracy for XIC extraction
         if self.acc_ms2_calibrated and not args.fix_mass_acc:
@@ -636,7 +638,7 @@ class Run:
     def do_mass_calibration(self, save_cal_info=True):
         for entry in self.entries:   
             if entry.mass_cal == 1:
-                entry.get_optimal_xic(stage=0, n_xic_points=MinXICPoints)
+                entry.get_optimal_xic(stage=0, n_xic_points=nXICPoints)
         
         mass_cali_data = {'theoretical_mz_ms1': [],
                           'theoretical_mz_ms2': [],
@@ -685,9 +687,11 @@ class Run:
         mass_cali_data = self.mass_calibration(mass_cali_data, level='ms2')
         
         if save_cal_info:
-            mass_cali_data.write_csv(Path(OutDir) / (self.run_name + "_mass_cal.csv"))
-            mass_calibration_plot(mass_cali_data, 'ms1', run_name=self.run_name, out_dir=Path(OutDir))
-            mass_calibration_plot(mass_cali_data, 'ms2', run_name=self.run_name, out_dir=Path(OutDir))
+            out_cal_dir = out_int_dir / 'mass_calibration'
+            out_cal_dir.mkdir(parents=True, exist_ok=True)
+            mass_cali_data.write_csv(out_cal_dir / (self.run_name + "_mass_cal.csv"))
+            mass_calibration_plot(mass_cali_data, 'ms1', run_name=self.run_name, out_dir=out_cal_dir)
+            mass_calibration_plot(mass_cali_data, 'ms2', run_name=self.run_name, out_dir=out_cal_dir)
 
         self.mz_calibrated = True
 
@@ -780,8 +784,10 @@ class Run:
         self.IM_window = np.round(im_boundary, 3)
 
         if save_cal_info:
-            im_cali_data.write_csv(Path(OutDir) / (self.run_name + "_im_error.csv"))
-            im_error_plot(im_cali_data, run_name=self.run_name, out_dir=Path(OutDir))
+            out_cal_dir = out_int_dir / 'mass_calibration'
+            out_cal_dir.mkdir(parents=True, exist_ok=True)
+            im_cali_data.write_csv(out_cal_dir / (self.run_name + "_im_error.csv"))
+            im_error_plot(im_cali_data, run_name=self.run_name, out_dir=out_cal_dir)
         
         
     def export_xics(self):
@@ -826,7 +832,7 @@ class Run:
         df = pl.DataFrame(data_rows, schema=column_names, orient="row")
     
         # Determine output file name
-        out_xic = Path(OutDir) / "xic_files" / f"{self.run_name}.xic.parquet"
+        out_xic = out_int_dir / "xic_files" / f"{self.run_name}.xic.parquet"
     
         # Save DataFrame with error handling
         try:

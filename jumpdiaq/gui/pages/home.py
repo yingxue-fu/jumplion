@@ -57,7 +57,7 @@ layout = dbc.Container([
                         variant="dark",
                         interval=2000,
                         class_name="carousel-fade",
-                        style={"width": "80%"}),
+                        style={"width": "85%"}),
                     ]
                 ),
             ),

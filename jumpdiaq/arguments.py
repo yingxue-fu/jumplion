@@ -38,17 +38,17 @@ class Arguments:
     max_mass_cal: int = 5000
     
     # XIC extraction
+    n_xic_points: int = 20
+    fix_mass_acc: int = 0
+    mass_acc_ms2: float = 15.0
+    mass_acc_ms1: float = 15.0
+    individual_mass_acc: int = 0
     ## Mass calibration
     mass_calibration: int = 1    
     mass_cal_acc: float = 30.0   # calibration mass accuracy
     mass_cal_bins: int = 1
     mass_cal_bins_max: int = 1
     mass_cal_score: float = 0.9
-    fix_mass_acc: int = 0
-    mass_acc_ms2: float = 15.0
-    mass_acc_ms1: float = 15.0
-    individual_mass_acc: int = 0
-    
     ## IM window settings
     im_window_cal: float = 0.03
     fix_im_window: int = 0
@@ -59,7 +59,6 @@ class Arguments:
     min_quan_fr: int = 3
     max_quan_fr: int = 6
     max_isotopes: int = 5
-    min_xic_points: int = 20
     corr_radius: int = 5
     corr_method: int = 0
     weight_by_shape: int = 1
@@ -89,6 +88,9 @@ class Arguments:
     weighted_centroid: int = 1
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
+    
+    # 
+    save_supplements: int = 1
     
     # Config file
     gen_params: str = ""
@@ -193,17 +195,17 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--max-mass-cal", type=int, help="")
     
     # XIC extraction
+    optional_group.add_argument("--n-xic-points", type=int, help="")
+    optional_group.add_argument("--fix-mass-acc", type=int, help="")
+    optional_group.add_argument("--mass-acc-ms2", type=float, help="")
+    optional_group.add_argument("--mass-acc-ms1", type=float, help="")
+    optional_group.add_argument("--individual-mass-acc", type=int, help="")
     ## Mass calibration
     optional_group.add_argument("--mass-calibration", type=int, help="") 
     optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
     optional_group.add_argument("--mass-cal-bins", type=int, help="")
     optional_group.add_argument("--mass-cal-bins-max", type=int, help="")
     optional_group.add_argument("--mass-cal-score", type=float, help="")
-    optional_group.add_argument("--fix-mass-acc", type=int, help="")
-    optional_group.add_argument("--mass-acc-ms2", type=float, help="")
-    optional_group.add_argument("--mass-acc-ms1", type=float, help="")
-    optional_group.add_argument("--individual-mass-acc", type=int, help="")
-    
     ## IM window settings
     optional_group.add_argument("--im-window-cal", type=float, help="")
     optional_group.add_argument("--fix-im-window", type=int, help="")
@@ -214,7 +216,6 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-quan-fr", type=int, help="")
     optional_group.add_argument("--max-quan-fr", type=int, help="")
     optional_group.add_argument("--max-isotopes", type=int, help="")
-    optional_group.add_argument("--min-xic-points", type=int, help="")
     optional_group.add_argument("--corr-radius", type=int, help="")
     optional_group.add_argument("--corr-method", type=int, help="")
     optional_group.add_argument("--weight-by-shape", type=int, help="")
@@ -247,6 +248,9 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Config file
     parser.add_argument("--config-file", type=str, help="Path to a configuration file")
+    
+    #
+    parser.add_argument("--save-supplements", type=int, help="Whether to save additional supplementary files")
     
     # Progress bar dispaly
     parser.add_argument("--show-progress", type=int, help="Show progress bars for some processes")
@@ -318,20 +322,25 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
     if len(arguments.out_dir):
         out_dir = Path(arguments.out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)  # Create directory if missing
-        out_xic_dir = out_dir / 'xic_files'
+        out_pub_dir = out_dir / 'publication'
+        out_pub_dir.mkdir(parents=True, exist_ok=True)
+        out_int_dir = out_dir / 'intermediate'
+        out_int_dir.mkdir(parents=True, exist_ok=True)
+        out_xic_dir = out_int_dir / 'xic_files'
         out_xic_dir.mkdir(parents=True, exist_ok=True)
+        out_prec_dir = out_int_dir / 'prec_quant'
+        out_prec_dir.mkdir(parents=True, exist_ok=True)
     
     if arguments.use_xic_report:
-        report_file = Path(out_dir) / 'xic_quan_report.parquet'
+        report_file = Path(out_pub_dir) / 'xic_quantification.parquet'
         if not report_file.exists():
+            print(f"Cannot find the XIC quantification file {report_file}. use_xic_report reset to 0")
             arguments.use_xic_report = 0
     
     return arguments, command
 
 
 def preprocess_params(param_file):
-    # param_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\trixi_data\jumpdiaq.params"
-    
     # Read the file
     with open(param_file, 'r') as f:
         content = f.read()
@@ -448,7 +457,7 @@ def setup_logger(show_log_level, out_dir):
 
     # Create handlers
     console_handler = logging.StreamHandler()
-    log_file_name = "jumpdia_log_" + time.strftime("%Y%m%d_%H%M%S") + ".txt"
+    log_file_name = "jumpdiaq_log_" + time.strftime("%Y%m%d_%H%M%S") + ".txt"
     file_handler = logging.FileHandler(Path(out_dir) / log_file_name, mode="w", encoding="utf-8")  # Overwrite mode
     
     # Set levels and formats
