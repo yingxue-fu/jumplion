@@ -29,6 +29,8 @@ def main():
     
     # read arguments
     args, cmd = parse_arguments(sys.argv[1:])
+    if args is None:
+        sys.exit(1)
     if args.gen_params:
         args.generate_file(args.gen_params)
         sys.exit(1)

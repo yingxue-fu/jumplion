@@ -38,7 +38,7 @@ class Arguments:
     max_mass_cal: int = 5000
     
     # XIC extraction
-    n_xic_points: int = 20
+    n_xic_points: int = 21
     fix_mass_acc: int = 0
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0
@@ -281,12 +281,15 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
             param_args = params_to_args(potential_param_file)
             # Combine with any other command line arguments (which will override params)
             args = param_args + args[1:]
+        else:
+            print(f"Error: Parameter file {potential_param_file} not found.")
+            return None, None
     
     # Use a config file
     first_pass_args, _ = parser.parse_known_args(args)
     if first_pass_args.config_file:
         if not Path(first_pass_args.config_file).exists():
-            print(f"Warning: Config file {first_pass_args.config_file} not found.")
+            print(f"Error: Config file {first_pass_args.config_file} not found.")
         else:
             config_args = parse_config_file(first_pass_args.config_file)
             args = config_args
@@ -334,7 +337,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
     if arguments.use_xic_report:
         report_file = Path(out_pub_dir) / 'xic_quantification.parquet'
         if not report_file.exists():
-            print(f"Cannot find the XIC quantification file {report_file}. use_xic_report reset to 0")
+            print(f"Cannot find the XIC quantification file {report_file}. Parameter 'use_xic_report' reset to 0.")
             arguments.use_xic_report = 0
     
     return arguments, command

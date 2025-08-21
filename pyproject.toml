@@ -34,7 +34,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["jumpdiaq*"]  # Only include jumpdiaq package
-exclude = ["nbs*"]       # Explicitly exclude nbs
+exclude = ["tests*"]       # Explicitly exclude nbs
 
 [tool.setuptools.dynamic]
 version = {attr = "jumpdiaq.__version__"}

@@ -701,7 +701,7 @@ def update_summ_plot(selected_prot,
         quality_df.columns = extract_unique_parts(quality_df.columns.values.tolist())
         
         # Make sure we're getting numerical values for the plot
-        prot_quant_values = pd.to_numeric(selected_row_data.iloc[12:-1], errors='coerce').values
+        prot_quant_values = pd.to_numeric(selected_row_data.iloc[12:], errors='coerce').values
         prot_quality_values = pd.to_numeric(quality_df.loc[selected_prot,:], errors='coerce').values
         
         # Create figure
@@ -768,7 +768,7 @@ def update_summ_plot(selected_prot,
                 summ_values = prot_quant_values - np.nanmean(prot_quant_values)
             else:
                 summ_values = prot_quant_values
-            summarization_x = quant_df.columns[12:-1].tolist()
+            summarization_x = quant_df.columns[12:].tolist()
             quant_fig.add_trace(go.Scatter(
                 x=summarization_x, 
                 y=summ_values, 
