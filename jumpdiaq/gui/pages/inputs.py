@@ -94,8 +94,8 @@ sidebar = html.Div(
                         ),
                         dbc.Modal(
                             [
-                                dbc.ModalHeader(dbc.ModalTitle("Note"), close_button=True),
-                                dbc.ModalBody("No MS files selected, quantification results will be read directly from the provided output directory."),
+                                dbc.ModalHeader(dbc.ModalTitle("Note"), close_button=True, style={"height": "40px"}),
+                                dbc.ModalBody("No MS files selected. Quantification results will be read directly from the provided output directory."),
                             ],
                             id="no-msfile",
                             is_open=False,

@@ -795,7 +795,7 @@ def update_summ_plot(selected_prot,
             yaxis_title="Log2(Ratio)" if sub_row_means else "Log2(Intensity)",
             template="vizro",
             height=500,
-            xaxis=dict(domain=[0, 0.7]),  # Plot uses only 80% of width
+            xaxis=dict(domain=[0, 0.7]),  # Plot uses only 70% of width
             legend=dict(
                 yanchor="middle",
                 y=0.5,
@@ -814,7 +814,7 @@ def update_summ_plot(selected_prot,
             yaxis_title="Quality",
             template="vizro",
             height=500,
-            xaxis=dict(domain=[0, 0.7]),  # Plot uses only 80% of width
+            xaxis=dict(domain=[0, 0.7]),  # Plot uses only 70% of width
             legend=dict(
                 yanchor="middle",
                 y=0.5,
