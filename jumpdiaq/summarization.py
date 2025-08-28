@@ -129,7 +129,7 @@ def precursor_summarize(quant_df: pl.DataFrame,
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
     
         quant_summed[i, :] = median_summ(quant_mat)
-        quality_summed[i, :] = topN(quality_mat)
+        quality_summed[i, :] = median_simp(quality_mat)
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
     quant_table = quant_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
@@ -359,7 +359,7 @@ def protein_summarize(prec_quant_table,
             quality_mat = quality_mat[top_indices, :]
 
         quant_summed[i, :] = median_summ(quant_mat)
-        quality_summed[i, :] = topN(quality_mat)
+        quality_summed[i, :] = median_simp(quality_mat)
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
     #quant_table = quant_table.with_columns(pl.Series(name="Average", values=np.nanmean(quant_summed, axis=1)))
@@ -522,9 +522,9 @@ def median_summ(mat, log2values=True):
     if not log2values:
         mat = np.log2(mat)
     if mat.shape[0] == 1:
-        return mat[0, :]#, keep_mask
+        return mat[0, :]
     rowMeans = np.nanmean(mat, axis=1)
-    repAbundance = np.mean(sorted(rowMeans, reverse=True)[0:3])
+    repAbundance = np.median(rowMeans)
     mat = mat - rowMeans[:, np.newaxis]
     
     # Check which columns are all-NaN before computing median
@@ -537,7 +537,22 @@ def median_summ(mat, log2values=True):
         medians[valid_cols] = np.nanmedian(mat[:, valid_cols], axis=0)
         
     out = medians + repAbundance
-    return out#, keep_mask
+    return out
+
+def median_simp(mat):
+    if mat.shape[0] == 1:
+        return mat[0, :]
+    
+    # Check which columns are all-NaN before computing median
+    all_nan_cols = np.all(np.isnan(mat), axis=0)
+    medians = np.full(mat.shape[1], np.nan)
+    
+    # Only compute median for columns that aren't all-NaN
+    valid_cols = ~all_nan_cols
+    if np.any(valid_cols):
+        medians[valid_cols] = np.nanmedian(mat[:, valid_cols], axis=0)
+        
+    return medians
 
 ##############################
 def topN(mat, N=3):
