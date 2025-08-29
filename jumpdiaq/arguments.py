@@ -72,7 +72,9 @@ class Arguments:
     intf_removal_corr: float = 0.0
     intf_filter_factor: float = 1.5
     
-    # Precursor normalization
+    # Precursor summarization
+    xic_quality_cutoff: float = 0.0
+    fill_missing_xic: int = 1
     norm_species: str = "HUMAN"
     norm_method: str = "median"       # Other options: 'mean'
     trim_percentage: int = 5
@@ -80,7 +82,6 @@ class Arguments:
     # Protein summarization
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     ms2_priority_quality: float = 0.8
-    max_n_precs: int = 100
     prot_quality_cutoffs: float = 10
     
     # timsTOF data preprocessing
@@ -144,7 +145,7 @@ class Arguments:
                 if fdef.name == "min_quan_fr":
                     f.write("\n# XIC quantification\n")
                 if fdef.name == "norm_species":
-                    f.write("\n# Precursor normalization\n")
+                    f.write("\n# Precursor summarization\n")
                 if fdef.name == "prec_quant_level":
                     f.write("\n# Protein summarization\n")
                 if fdef.name == "tims_centroid":
@@ -229,7 +230,9 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--intf-removal-corr", type=float, help="")
     optional_group.add_argument("--intf-filter-factor", type=float, help="")
     
-    # Precursor normalization
+    # Precursor summarization
+    optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
+    optional_group.add_argument("--fill-missing-xic", type=int, help="")
     optional_group.add_argument("--norm-species", type=str, help="")
     optional_group.add_argument("--norm-method", type=str, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
@@ -237,7 +240,6 @@ def create_parser() -> argparse.ArgumentParser:
     # Protein summarization
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--ms2-priority-quality", type=float, help="")
-    optional_group.add_argument("--max-n-precs", type=int, help="")
     optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")
     
     # timsTOF data preprocessing

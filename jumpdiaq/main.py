@@ -84,6 +84,8 @@ def main():
     UseSavedXIC = args.use_saved_xic
     UseXICReport = args.use_xic_report
     #
+    XicQualityCutoff = args.xic_quality_cutoff
+    FillMissingXic = args.fill_missing_xic
     NormSpecies = args.norm_species
     NormMethod = args.norm_method
     TrimPercentage = args.trim_percentage
@@ -91,7 +93,7 @@ def main():
     PrecQuantLevel = args.prec_quant_level
     MS2PriorityQuality = args.ms2_priority_quality
     ProtQualityCutoffs = args.prot_quality_cutoffs
-    MaxNPrecs = args.max_n_precs
+    #MaxNPrecs = args.max_n_precs
     #
     out_int_dir = Path(OutDir) / 'intermediate'
     out_pub_dir = Path(OutDir) / 'publication'
@@ -146,8 +148,9 @@ def main():
     out_prec_dir = out_int_dir / 'prec_quant'
     prec_quant_table, prec_quality_table = quantify_precursors(
                                                 report_file, 
-                                                xic_quality_cutoff=0.0, 
+                                                xic_quality_cutoff=XicQualityCutoff, 
                                                 xic_quant_cutoff=0.0, 
+                                                fill_missing_xic=FillMissingXic,
                                                 quant_source=PrecQuantLevel,
                                                 ms2_priority_quality=MS2PriorityQuality,
                                                 out_dir=str(out_prec_dir))
@@ -171,7 +174,6 @@ def main():
     prot_quant_table, prot_quality_table = quantify_proteins(
                                                prec_quant_table_norm, 
                                                prec_quality_table, 
-                                               max_n_precs=MaxNPrecs
                                                )
     prot_quant_table.write_csv(out_pub_dir / "Protein.Group_Quant_noFiltering.csv")
     prot_quality_table.write_csv(out_pub_dir / "Protein.Group_Quant_Quality.csv")

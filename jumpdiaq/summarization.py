@@ -79,7 +79,7 @@ def get_quant_quality_dfs(report_df,
 
 def precursor_summarize(quant_df: pl.DataFrame, 
                         quality_df: pl.DataFrame,
-                        fast_calculation=True):
+                        fill_missing=True):
 
     # Pivot input tables
     quant_pivoted = quant_df.pivot(
@@ -114,22 +114,15 @@ def precursor_summarize(quant_df: pl.DataFrame,
         if quality_df_sub is None:
             continue
         
-        if not fast_calculation:
-            source_ids = set(quant_df_sub["source_id"].to_list()).intersection(
-                quality_df_sub["source_id"].to_list()
-            )
-            if not source_ids:
-                continue
-            source_ids = pl.Series("source_id", list(source_ids)).implode()
-            
-            quality_df_sub = quality_df_sub.filter(pl.col("source_id").is_in(source_ids))
-            quant_df_sub = quant_df_sub.filter(pl.col("source_id").is_in(source_ids))
-        
         quant_mat = quant_df_sub.select(sample_cols).to_numpy()
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
-    
+        
+        if fill_missing:
+            quant_mat = np.nan_to_num(quant_mat, nan=np.nanmin(quant_mat))
+            quality_mat = np.nan_to_num(quality_mat, nan=np.nanmin(quality_mat))
+        
         quant_summed[i, :] = median_summ(quant_mat)
-        quality_summed[i, :] = median_simp(quality_mat)
+        quality_summed[i, :] = topN(quality_mat, N=6, method="median")
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
     quant_table = quant_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
@@ -181,7 +174,8 @@ def quantify_from_xic_report(
         annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
         quality_cutoff=0.0,
         quant_cutoff=0.0,
-        out_dir=""
+        out_dir="",
+        fill_missing=True
     ):
     
     columns = [sample_col, id_col, quant_id_col, quality_col, quant_col] + annotation_cols
@@ -203,7 +197,7 @@ def quantify_from_xic_report(
                             )
     
     # 2. summarize
-    quant_mtx, quality_mtx = precursor_summarize(quant_df, quality_df)
+    quant_mtx, quality_mtx = precursor_summarize(quant_df, quality_df, fill_missing)
 
     # 3. add annotation
     extra_names = extract_annotation(quant_mtx["Precursor.Id"].to_list(), 
@@ -217,8 +211,13 @@ def quantify_from_xic_report(
     return final_quant_table, final_quality_table
     
 
-def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.0, quant_source='ms1_ms2', ms2_priority_quality=0.8, out_dir=""):
-    #id_col="Precursor.Id"
+def quantify_precursors(report_file, 
+                        xic_quality_cutoff=0.0, 
+                        xic_quant_cutoff=0.0, 
+                        fill_missing_xic=True,
+                        quant_source='ms1_ms2', 
+                        ms2_priority_quality=0.8, 
+                        out_dir=""):
     
     # MS1-level quantification
     logging.info("Quantifying precursors at MS1-level")
@@ -232,7 +231,8 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
                                              annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
                                              quality_cutoff=xic_quality_cutoff,
                                              quant_cutoff=xic_quant_cutoff,
-                                             out_dir=out_dir)
+                                             out_dir=out_dir,
+                                             fill_missing=fill_missing_xic)
     ms1_quant_table = ms1_quant_table.with_columns(pl.lit('MS1').alias('MS_type'))
     ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
     ms1_quant_table = ms1_quant_table.with_columns([
@@ -254,7 +254,8 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
                                              annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
                                              quality_cutoff=xic_quality_cutoff,
                                              quant_cutoff=xic_quant_cutoff,
-                                             out_dir=out_dir)
+                                             out_dir=out_dir,
+                                             fill_missing=fill_missing_xic)
     ms2_quant_table = ms2_quant_table.with_columns(pl.lit('MS2').alias('MS_type'))
     ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))
     ms2_quant_table = ms2_quant_table.with_columns([
@@ -316,8 +317,7 @@ def quantify_precursors(report_file, xic_quality_cutoff=0.0, xic_quant_cutoff=0.
 
 def protein_summarize(prec_quant_table, 
                       prec_quality_table, 
-                      sample_cols, 
-                      max_n_precs):
+                      sample_cols):
     # Group by protein group for fast lookup
     quant_groups = prec_quant_table.partition_by("Protein.Group", as_dict=True)
     quality_groups = prec_quality_table.partition_by("Protein.Group", as_dict=True)
@@ -340,7 +340,8 @@ def protein_summarize(prec_quant_table,
         )
         if not prec_ids:
             continue
-        prec_ids = pl.Series("Precursor.Id", list(prec_ids)).implode()
+        #prec_ids = pl.Series("Precursor.Id", list(prec_ids)).implode()
+        prec_ids = list(prec_ids)
         
         quality_df_sub = quality_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
         quant_df_sub = quant_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
@@ -349,32 +350,20 @@ def protein_summarize(prec_quant_table,
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
         # Summarization
-        # Limit the number of precursors when there are too many precursors
-        # Choose top-n precursors according to the precursor-wise total intensity
-        if quant_mat.shape[0] > max_n_precs:
-            row_means = np.nanmean(quant_mat, axis=1)
-            sorted_indices = np.argsort(-row_means)
-            top_indices = sorted_indices[:max_n_precs]
-            quant_mat = quant_mat[top_indices, :]
-            quality_mat = quality_mat[top_indices, :]
-
         quant_summed[i, :] = median_summ(quant_mat)
-        quality_summed[i, :] = median_simp(quality_mat)
+        quality_summed[i, :] = topN(quality_mat, N=3, method="mean")
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
-    #quant_table = quant_table.with_columns(pl.Series(name="Average", values=np.nanmean(quant_summed, axis=1)))
     quant_table = quant_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
     
     quality_table = pl.DataFrame(quality_summed, schema=sample_cols)
-    #quality_table = quality_table.with_columns(pl.Series(name="Average", values=np.nanmean(quality_summed, axis=1)))
     quality_table = quality_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
 
     return quant_table, quality_table
 
 
 def quantify_proteins(prec_quant_table, 
-                      prec_quality_table, 
-                      max_n_precs):
+                      prec_quality_table):
     logging.info("Quantifying proteins")
     other_cols = {'Precursor.Id',
                   'Protein.Group',
@@ -388,8 +377,7 @@ def quantify_proteins(prec_quant_table,
     sample_cols = [col for col in prec_quant_table.columns if col not in other_cols]
     prot_quant_table, prot_quality_table = protein_summarize(prec_quant_table, 
                                                              prec_quality_table, 
-                                                             sample_cols,
-                                                             max_n_precs)
+                                                             sample_cols)
     extra_names = extract_annotation(prot_quant_table['Protein.Group'].to_list(), 
                                      prec_quant_table, 
                                      id_col='Protein.Group',
@@ -524,7 +512,7 @@ def median_summ(mat, log2values=True):
     if mat.shape[0] == 1:
         return mat[0, :]
     rowMeans = np.nanmean(mat, axis=1)
-    repAbundance = np.median(rowMeans)
+    repAbundance = np.mean(sorted(rowMeans, reverse=True)[0:3])
     mat = mat - rowMeans[:, np.newaxis]
     
     # Check which columns are all-NaN before computing median
@@ -555,7 +543,7 @@ def median_simp(mat):
     return medians
 
 ##############################
-def topN(mat, N=3):
+def topN(mat, N=3, method="mean"):
     if mat.shape[0] == 1:
         return mat[0, :]
 
@@ -565,7 +553,10 @@ def topN(mat, N=3):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        out = np.nanmean(selected_rows, axis=0)
+        if method == "mean":
+            out = np.nanmean(selected_rows, axis=0)
+        elif method == "median":
+            out = np.nanmedian(selected_rows, axis=0)
     
     out[np.isnan(out)] = np.nan
     return out
