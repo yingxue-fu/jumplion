@@ -80,6 +80,7 @@ class Arguments:
     trim_percentage: int = 5
     
     # Protein summarization
+    min_prec_quality: float = 0.5
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     ms2_priority_quality: float = 0.8
     prot_quality_cutoffs: float = 10
@@ -238,6 +239,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
     # Protein summarization
+    optional_group.add_argument("--min-prec-quality", type=float, help="")
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--ms2-priority-quality", type=float, help="")
     optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")

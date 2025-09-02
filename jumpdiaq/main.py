@@ -91,6 +91,7 @@ def main():
     TrimPercentage = args.trim_percentage
     #
     PrecQuantLevel = args.prec_quant_level
+    MinPrecQuality = args.min_prec_quality
     MS2PriorityQuality = args.ms2_priority_quality
     ProtQualityCutoffs = args.prot_quality_cutoffs
     #MaxNPrecs = args.max_n_precs
@@ -171,10 +172,11 @@ def main():
                                                   trim_percentage=TrimPercentage)
     prec_quant_table_norm.write_parquet(out_pub_dir / "precursor_quantity_summ_table_norm.parquet")
     
+    # 
     prot_quant_table, prot_quality_table = quantify_proteins(
                                                prec_quant_table_norm, 
                                                prec_quality_table, 
-                                               )
+                                               min_prec_quality=MinPrecQuality)
     prot_quant_table.write_csv(out_pub_dir / "Protein.Group_Quant_noFiltering.csv")
     prot_quality_table.write_csv(out_pub_dir / "Protein.Group_Quant_Quality.csv")
                            

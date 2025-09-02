@@ -119,9 +119,9 @@ def precursor_summarize(quant_df: pl.DataFrame,
         
         if fill_missing:
             quant_mat = np.nan_to_num(quant_mat, nan=np.nanmin(quant_mat))
-            quality_mat = np.nan_to_num(quality_mat, nan=np.nanmin(quality_mat))
+            quality_mat = np.nan_to_num(quality_mat, nan=0.01)
         
-        quant_summed[i, :] = median_summ(quant_mat)
+        quant_summed[i, :] = median_summ(quant_mat, topN_rep=3)
         quality_summed[i, :] = topN(quality_mat, N=6, method="median")
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
@@ -340,7 +340,6 @@ def protein_summarize(prec_quant_table,
         )
         if not prec_ids:
             continue
-        #prec_ids = pl.Series("Precursor.Id", list(prec_ids)).implode()
         prec_ids = list(prec_ids)
         
         quality_df_sub = quality_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
@@ -350,7 +349,7 @@ def protein_summarize(prec_quant_table,
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
         # Summarization
-        quant_summed[i, :] = median_summ(quant_mat)
+        quant_summed[i, :] = median_summ(quant_mat, topN_rep=3)
         quality_summed[i, :] = topN(quality_mat, N=3, method="mean")
         
     quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
@@ -363,8 +362,12 @@ def protein_summarize(prec_quant_table,
 
 
 def quantify_proteins(prec_quant_table, 
-                      prec_quality_table):
+                      prec_quality_table,
+                      min_prec_quality):
     logging.info("Quantifying proteins")
+    # filtering based on average quality
+    prec_quality_table = prec_quality_table.filter(pl.col("Average") >= min_prec_quality)
+    # Extract unique sample column names (excluding primary_id and id)
     other_cols = {'Precursor.Id',
                   'Protein.Group',
                   'Protein.Names',
@@ -373,7 +376,6 @@ def quantify_proteins(prec_quant_table,
                   'Additional.Quan.Info',
                   'MS_type',
                   'Precursor.Id_MS_type'}
-    # Extract unique sample column names (excluding primary_id and id)
     sample_cols = [col for col in prec_quant_table.columns if col not in other_cols]
     prot_quant_table, prot_quality_table = protein_summarize(prec_quant_table, 
                                                              prec_quality_table, 
@@ -506,13 +508,13 @@ def maxLFQ(mat):
     return w
 
 ##########################  #########################
-def median_summ(mat, log2values=True):
+def median_summ(mat, log2values=True, topN_rep=3):
     if not log2values:
         mat = np.log2(mat)
     if mat.shape[0] == 1:
         return mat[0, :]
     rowMeans = np.nanmean(mat, axis=1)
-    repAbundance = np.mean(sorted(rowMeans, reverse=True)[0:3])
+    repAbundance = np.mean(sorted(rowMeans, reverse=True)[0:topN_rep])
     mat = mat - rowMeans[:, np.newaxis]
     
     # Check which columns are all-NaN before computing median
