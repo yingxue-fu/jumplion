@@ -272,18 +272,18 @@ def identify_optimal_xic(ms1, ms2,
     region = slice(max(0, apex - radius), 
                    min(ms1.shape[0] - 2, apex + radius + 1))
     
-    if optimal_xic_source == 'ms1':
-        xics = ms1.copy()
-        n_ms1 = ms1.shape[1]
-        n_ms2 = 0
-    elif optimal_xic_source == 'ms2':
-        xics = ms2.copy()
-        n_ms1 = 0
-        n_ms2 = ms2.shape[1]
-    elif optimal_xic_source == 'ms1_ms2':
-        xics = np.concatenate((ms1, ms2), axis = 1)
-        n_ms1 = ms1.shape[1]
-        n_ms2 = ms2.shape[1]
+    # if optimal_xic_source == 'ms1':
+    #     xics = ms1.copy()
+    #     n_ms1 = ms1.shape[1]
+    #     n_ms2 = 0
+    # elif optimal_xic_source == 'ms2':
+    #     xics = ms2.copy()
+    #     n_ms1 = 0
+    #     n_ms2 = ms2.shape[1]
+    # elif optimal_xic_source == 'ms1_ms2':
+    xics = np.concatenate((ms1, ms2), axis = 1)
+    n_ms1 = ms1.shape[1]
+    n_ms2 = ms2.shape[1]
     
     (corr_scores, 
      shape_scores, 
@@ -298,7 +298,16 @@ def identify_optimal_xic(ms1, ms2,
     scores = (0.5*corr_scores) + (0.3*intensity_scores) + (0.2*shape_scores) 
     indices = np.argsort(scores)[::-1]
     
-    for idx in indices:
+    ms1_indices = np.arange(n_ms1)
+    ms2_indices = np.arange(n_ms1, xics.shape[1])
+    if optimal_xic_source == 'ms1':
+        indices_f = np.array([idx for idx in indices if idx not in ms2_indices])
+    elif optimal_xic_source == 'ms2':
+        indices_f = np.array([idx for idx in indices if idx not in ms1_indices]) 
+    elif optimal_xic_source == 'ms1_ms2':
+        indices_f = indices
+        
+    for idx in indices_f:
         ion_xic = xics[region, idx]
         elution = smooth(ion_xic)
         elution_apex = np.argmax(elution)
@@ -345,17 +354,19 @@ def identify_optimal_xic(ms1, ms2,
         elution_apex_global = apex
         fwhm = radius
     else:
-        optimal_xic = idx
         if optimal_xic_source == 'ms1':
             optimal_xic_type = 1
+            optimal_xic = idx
         elif optimal_xic_source == 'ms2':
             optimal_xic_type = 2
+            optimal_xic = idx - n_ms1
         elif optimal_xic_source == 'ms1_ms2':
-            if optimal_xic >= n_ms1:
+            if idx >= n_ms1:
                 optimal_xic_type = 2
-                optimal_xic = optimal_xic - n_ms1
+                optimal_xic = idx - n_ms1
             else:
                 optimal_xic_type = 1
+                optimal_xic = idx
     
     return (corr_scores, 
             shape_scores, 

@@ -80,7 +80,7 @@ class Arguments:
     trim_percentage: int = 5
     
     # Protein summarization
-    min_prec_quality: float = 0.5
+    min_prec_quality: float = 0.0
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     ms2_priority_quality: float = 0.8
     prot_quality_cutoffs: float = 10
@@ -145,9 +145,9 @@ class Arguments:
                     f.write("\n# XIC extraction\n")
                 if fdef.name == "min_quan_fr":
                     f.write("\n# XIC quantification\n")
-                if fdef.name == "norm_species":
+                if fdef.name == "xic_quality_cutoff":
                     f.write("\n# Precursor summarization\n")
-                if fdef.name == "prec_quant_level":
+                if fdef.name == "min_prec_quality":
                     f.write("\n# Protein summarization\n")
                 if fdef.name == "tims_centroid":
                     f.write("\n# timsTOF data preprocessing\n")
