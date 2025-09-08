@@ -31,7 +31,6 @@ MinXicIntensity = args.min_xic_intensity
 MinApexIntensity = args.min_apex_intensity
 MinApexEvidence = args.min_apex_evidence
 IntfRemoval = args.intf_removal
-IntfRemovalCorr = args.intf_removal_corr
 IntfFilterFactor = args.intf_filter_factor
 ShowProgress = args.show_progress
 InterProgress = args.inter_progress
@@ -301,48 +300,48 @@ class Library:
             for index, v in self.info.map.items():
                 entry = self.entries[index]
 
-                for jt in v:
+                for qt in v:
                     
                     # Prepare the row data
                     row_data = {
-                        "File.Name": ms_files[jt[0]],
-                        "Run": runs[jt[0]],
+                        "File.Name": ms_files[qt[0]],
+                        "Run": runs[qt[0]],
                         "Modified.Sequence": pep_name(entry.name),
                         "Stripped.Sequence": get_aas(entry.name),
                         "Precursor.Id": entry.name,
                         "Precursor.Charge": entry.prec.charge,
                         "Precursor.Mz": entry.prec.mz,
-                        "FWHM": jt[1].fwhm,
-                        "RT.Apex": jt[1].RT,
-                        "RT.Left": jt[1].RT_left,
-                        "RT.Right": jt[1].RT_right,
-                        "n.MS1.XICs": jt[1].n_isotopes,
-                        "n.MS2.XICs": jt[1].n_frs,
+                        "FWHM": qt[1].fwhm,
+                        "RT.Apex": qt[1].RT,
+                        "RT.Left": qt[1].RT_left,
+                        "RT.Right": qt[1].RT_right,
+                        "n.MS1.XICs": qt[1].n_isotopes,
+                        "n.MS2.XICs": qt[1].n_frs,
                     }
 
                     row_data.update({
-                        "MS1.XIC.Quant.Raw": ";".join([str(pr.quantity[0]) for pr in jt[1].ms1_quant]),
-                        "MS1.XIC.Quant.Adjusted": ";".join([str(pr.quantity[1]) for pr in jt[1].ms1_quant]),
-                        "MS1.XIC.Corr.Raw": ";".join([str(pr.corr[0]) for pr in jt[1].ms1_quant]),
-                        "MS1.XIC.Corr.Adjusted": ";".join([str(pr.corr[1]) for pr in jt[1].ms1_quant]),
-                        "MS2.XIC.Quant.Raw": ";".join([str(fr.quantity[0]) for fr in jt[1].ms2_quant]),
-                        "MS2.XIC.Quant.Adjusted": ";".join([str(fr.quantity[1]) for fr in jt[1].ms2_quant]),
-                        "MS2.XIC.Corr.Raw": ";".join([str(fr.corr[0]) for fr in jt[1].ms2_quant]),
-                        "MS2.XIC.Corr.Adjusted": ";".join([str(fr.corr[1]) for fr in jt[1].ms2_quant])
+                        "MS1.XIC.Quant.Raw": ";".join([str(pr.quantity[0]) for pr in qt[1].ms1_quant]),
+                        "MS1.XIC.Quant.Adjusted": ";".join([str(pr.quantity[1]) for pr in qt[1].ms1_quant]),
+                        "MS1.XIC.Corr.Raw": ";".join([str(pr.corr[0]) for pr in qt[1].ms1_quant]),
+                        "MS1.XIC.Corr.Adjusted": ";".join([str(pr.corr[1]) for pr in qt[1].ms1_quant]),
+                        "MS2.XIC.Quant.Raw": ";".join([str(fr.quantity[0]) for fr in qt[1].ms2_quant]),
+                        "MS2.XIC.Quant.Adjusted": ";".join([str(fr.quantity[1]) for fr in qt[1].ms2_quant]),
+                        "MS2.XIC.Corr.Raw": ";".join([str(fr.corr[0]) for fr in qt[1].ms2_quant]),
+                        "MS2.XIC.Corr.Adjusted": ";".join([str(fr.corr[1]) for fr in qt[1].ms2_quant])
                     })
                     
                     ms1_xic_names = [f'M+{i}' for i in range(9)]
                     row_data.update({
-                        "Optimal.XIC": jt[1].optimal_xic,
-                        "Optimal.XIC.Type": f"ms{jt[1].optimal_xic_type}",
+                        "Optimal.XIC": qt[1].optimal_xic,
+                        "Optimal.XIC.Type": f"ms{qt[1].optimal_xic_type}",
                         "MS1.XIC.Info": ";".join([f"{ms1_xic_names[i]}/{np.round(pr.mz, 4)}" 
-                                                  for i, pr in enumerate(jt[1].ms1_quant)]),
+                                                  for i, pr in enumerate(qt[1].ms1_quant)]),
                         "MS2.XIC.Info": ";".join([
                                              f"{char_of_fType[(cfr.ion_type & (fTypeB | fTypeY)) >> 0]}"  # Ion type (B or Y)
                                              f"{cfr.index if cfr.ion_type & fTypeB else len(get_aas(entry.name)) - cfr.index}"  # Index
                                              f"{'-' + name_of_loss[cfr.loss] if cfr.loss != loss_none else ''}"  # Loss info (if any)
                                              f"^{cfr.charge}/{np.round(cfr.mz, 4)}"  # Charge and m/z
-                                             for fr in jt[1].ms2_quant 
+                                             for fr in qt[1].ms2_quant 
                                              for cfr in [entry.prec.products[fr.index]]
                                              ])
                     })
@@ -510,7 +509,7 @@ class Info:
         data_rows = []
         for pr_index, v in progress_bar(self.map.items(), ShowProgress, InterProgress):
             # for each precursor, check overall optimal xic type
-            optimal_xic_types = [jt[1].optimal_xic_type for jt in v]
+            optimal_xic_types = [qt[1].optimal_xic_type for qt in v]
             n_ms1 = optimal_xic_types.count(1)
             n_ms2 = optimal_xic_types.count(2)
             if n_ms2 > n_ms1:
@@ -518,24 +517,24 @@ class Info:
             elif n_ms2 < n_ms1:
                 global_optimal_xic_type = 1
             elif n_ms2 == n_ms1:
-                cross_run_scores = [jt[1].xic_score.reshape(-1, 1) for jt in v]
+                cross_run_scores = [qt[1].xic_score.reshape(-1, 1) for qt in v]
                 cross_run_scores = np.hstack(cross_run_scores)
                 scores_sum = np.sum(cross_run_scores, axis=1)
                 global_optimal_xic_type = 2 if np.argmax(scores_sum) >= len(ms1_intensity_cols) else 1
                 
             precursor_id = self.lib.entries[pr_index].name
-            fwhms = [jt[1].fwhm for jt in v]
+            fwhms = [qt[1].fwhm for qt in v]
             global_fwhm = int(np.ceil(np.mean(fwhms)))
             
             # quantify
             for j in range(self.n_runs):
                 run_name = remove_extension(get_file_name(ms_files[j]))
-                jt = v[j]
-                ms1 = jt[1].ms1_i
-                ms2 = jt[1].ms2
-                optimal_xic = int(jt[1].optimal_xic)
-                optimal_xic_type = int(jt[1].optimal_xic_type)
-                elution_apex = jt[1].apex
+                qt = v[j]
+                ms1 = qt[1].ms1_i
+                ms2 = qt[1].ms2
+                optimal_xic = int(qt[1].optimal_xic)
+                optimal_xic_type = int(qt[1].optimal_xic_type)
+                elution_apex = qt[1].apex
 
                 # re-define optimal xic
                 if optimal_xic_type != global_optimal_xic_type:
@@ -554,20 +553,20 @@ class Info:
                                                     min_shape_score=MinShapeScore,
                                                     min_apex_intensity=MinApexIntensity,
                                                     min_apex_evidence=MinApexEvidence)
-                    jt[1].xic_score = scores
-                    jt[1].optimal_xic_type = optimal_xic_type
-                    jt[1].optimal_xic = optimal_xic
-                    jt[1].apex = elution_apex
-                    jt[1].fwhm = fwhm
+                    qt[1].xic_score = scores
+                    qt[1].optimal_xic_type = optimal_xic_type
+                    qt[1].optimal_xic = optimal_xic
+                    qt[1].apex = elution_apex
+                    qt[1].fwhm = fwhm
                 
                 begin = max(0, int(elution_apex - global_fwhm))
                 end = min(ms2.shape[0] - 1, int(elution_apex + global_fwhm))
-                jt[1].begin = begin
-                jt[1].end = end
+                qt[1].begin = begin
+                qt[1].end = end
                 
-                jt[1].RT = jt[1].ms2_rt[elution_apex]
-                jt[1].RT_left = jt[1].ms2_rt[begin]
-                jt[1].RT_right = jt[1].ms2_rt[end]
+                qt[1].RT = qt[1].ms2_rt[elution_apex]
+                qt[1].RT_left = qt[1].ms2_rt[begin]
+                qt[1].RT_right = qt[1].ms2_rt[end]
                 #
                 (ms1_ms2_filtered, 
                  elution, 
@@ -579,20 +578,19 @@ class Info:
                                                       optimal_xic_type, 
                                                       corr_method=CorrMethod, 
                                                       intf_removal=IntfRemoval, 
-                                                      intf_removal_corr=IntfRemovalCorr, 
                                                       intf_filter_factor=IntfFilterFactor)
                 
-                n_ms1 = len(jt[1].ms1_quant)
+                n_ms1 = len(qt[1].ms1_quant)
                 for prec in range(n_ms1):
-                    jt[1].ms1_quant[prec].corr = quant_corr[prec]
-                    jt[1].ms1_quant[prec].quantity = quant_quantity[prec]
+                    qt[1].ms1_quant[prec].corr = quant_corr[prec]
+                    qt[1].ms1_quant[prec].quantity = quant_quantity[prec]
                                                       
-                for fr in range(len(jt[1].ms2_quant)):                   
-                    jt[1].ms2_quant[fr].corr = quant_corr[fr+n_ms1]
-                    jt[1].ms2_quant[fr].quantity = quant_quantity[fr+n_ms1]
+                for fr in range(len(qt[1].ms2_quant)):                   
+                    qt[1].ms2_quant[fr].corr = quant_corr[fr+n_ms1]
+                    qt[1].ms2_quant[fr].quantity = quant_quantity[fr+n_ms1]
                 
-                xics_filtered = np.concat((jt[1].ms1_rt[begin:end+1].reshape(-1, 1), 
-                                     jt[1].ms2_rt[begin:end+1].reshape(-1, 1), 
+                xics_filtered = np.concat((qt[1].ms1_rt[begin:end+1].reshape(-1, 1), 
+                                     qt[1].ms2_rt[begin:end+1].reshape(-1, 1), 
                                      ms1_ms2_filtered, 
                                      elution[begin:end+1].reshape(-1, 1)), axis=1)
           

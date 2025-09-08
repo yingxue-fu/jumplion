@@ -1,14 +1,14 @@
 # builtin
-import sys
 import os
-import time
 import re
+import sys
+import time
+import logging
 import argparse
 import configparser
-from typing import List, Optional
 from pathlib import Path
+from typing import List, Optional
 from dataclasses import dataclass, field, fields
-import logging
 # local
 import jumpdiaq
 from jumpdiaq.utils import get_extension, MSFormatsExt
@@ -18,11 +18,10 @@ class Arguments:
     # Singleton pattern: ensure it has only one instance throughout the program
     _instance = None
     
-    # Input/Output
+    # Inputs
     input_runs: List[str] = field(default_factory=list)
     id_report: str = ""
     spec_lib: str = ""
-    fastas: List[str] = field(default_factory=list)
     out_dir: str = ""
     
     # Use existing results
@@ -59,22 +58,25 @@ class Arguments:
     min_quan_fr: int = 3
     max_quan_fr: int = 6
     max_isotopes: int = 5
+    ## identify optimal xic
     corr_radius: int = 5
     corr_method: int = 0
     weight_by_shape: int = 1
     weight_by_intensity: int = 1
+    optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_shape_score: float = 0.3
     min_xic_intensity: float = 10.0
     min_apex_intensity: float = 30.0
     min_apex_evidence: float = 0.99
-    optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
+    ## interference removal
     intf_removal: int = 1
-    intf_removal_corr: float = 0.0
-    intf_filter_factor: float = 1.5
+    intf_filter_factor: float = 1.2
     
     # Precursor summarization
-    xic_quality_cutoff: float = 0.0
+    xic_quality_cutoff: float = -0.2
     fill_missing_xic: int = 1
+    use_raw_ms1: int = 1
+    use_raw_ms2: int = 1
     norm_species: str = "HUMAN"
     norm_method: str = "median"       # Other options: 'mean'
     trim_percentage: int = 5
@@ -82,24 +84,21 @@ class Arguments:
     # Protein summarization
     min_prec_quality: float = 0.0
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
-    ms2_priority_quality: float = 0.8
+    ms2_priority_quality: float = 1.0
     prot_quality_cutoffs: float = 10
+    fastas: List[str] = field(default_factory=list)
     
-    # timsTOF data preprocessing
+    # timsTOF data preprocessing (hidden from users)
     tims_centroid: int = 0
     weighted_centroid: int = 1
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
     
-    # Config file
+    # Other hidden parameters
     gen_params: str = ""
     config_file: str = ""
-    
-    # Progress bar dispaly
     show_progress: int = 1
-    inter_progress: int = 0    
-    
-    # 
+    inter_progress: int = 0     
     save_supplements: int = 1
     
     # only load files in specific formats
@@ -126,18 +125,16 @@ class Arguments:
             f.write("# Input runs: .raw/.mzML files for Thermo instruments or diaPASEF .d files for timsTOF instruments\n")
             f.write("# Leave the 'input_runs = ' row empty when there are multiple files. The same applies to the 'fastas = ' parameter.\n")
             for fdef in fields(self):
-                if fdef.name == "gen_params":
+                if fdef.name == "tims_centroid":
                     break
                 if fdef.name == "id_report":
                     f.write("\n# Precursor-level idetification report\n")
                 if fdef.name == "spec_lib":
                     f.write("\n# Spectral library (support .tsv/.csv/.parquet format)\n") 
-                if fdef.name == "fastas":
-                    f.write("\n# Fasta files\n") 
                 if fdef.name == "out_dir":
                     f.write("\n# Output directory name\n")
                 if fdef.name == "skip_id_process":
-                    f.write("\n[optional]\n")
+                    f.write("\n\n[optional]\n")
                     f.write("# Use existing results\n")
                 if fdef.name == "min_runs_quant":
                     f.write("\n# ID results processing\n")
@@ -149,8 +146,6 @@ class Arguments:
                     f.write("\n# Precursor summarization\n")
                 if fdef.name == "min_prec_quality":
                     f.write("\n# Protein summarization\n")
-                if fdef.name == "tims_centroid":
-                    f.write("\n# timsTOF data preprocessing\n")
                 value = getattr(self, fdef.name)
                 if isinstance(value, list):
                     f.write(f"{fdef.name} = \n")
@@ -169,25 +164,25 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     
     # Add positional argument for params file
-    parser.add_argument("params_file", type=str, nargs='?', help="Use a parameter file")
-    parser.add_argument("--gen-params", type=str, nargs='?', const="jumpdiaq.params", metavar="PARAMS_FILE",
-                        help="Generate a parameter file with default values (default: %(const)s)")
+    parser.add_argument("param_file", type=str, nargs='?', help="use a parameter file (.params)")
+    parser.add_argument("--gen-params", type=str, nargs='?', const="jumpdiaq.params", metavar="PARAM_FILE",
+                        help="generate a parameter file with default values (default: %(const)s)")
     
     # Create argument groups   
     required_group = parser.add_argument_group('required arguments')
     optional_group = parser.add_argument_group('optional arguments')
     
-    # Input/Output 
-    required_group.add_argument("--input-runs", help="Paths of MS files", nargs='*', default=[])
-    required_group.add_argument("--id-report", type=str, help="Path to identification report")
-    required_group.add_argument("--spec-lib", type=str, help="Path to spectral library")
-    required_group.add_argument("--fastas", help="Paths of Fasta files", nargs='*', default=[])
-    required_group.add_argument("--out-dir", type=str, help="Output directory name")
+    # Inputs 
+    required_group.add_argument("--input-runs", help="paths of raw files", nargs='*', default=[])
+    #required_group.add_argument("--sample-meta", type=str, help="group information of runs/samples")
+    required_group.add_argument("--id-report", type=str, help="path to identification report")
+    required_group.add_argument("--spec-lib", type=str, help="path to spectral library")
+    required_group.add_argument("--out-dir", type=str, help="output directory name")
     
     # Use existing results
-    optional_group.add_argument("--skip-id-process", type=int, help="Use existing filterd library and precursor RT/IM")
-    optional_group.add_argument("--use-saved-xic", type=int, help="Use existing XIC files")
-    optional_group.add_argument("--use-xic-report", type=int, help="Use existing XIC quant report file")
+    optional_group.add_argument("--skip-id-process", type=int, help="")
+    optional_group.add_argument("--use-saved-xic", type=int, help="")
+    optional_group.add_argument("--use-xic-report", type=int, help="")
     
     # ID results processing
     optional_group.add_argument("--min-runs-quant", type=int, help="")
@@ -228,7 +223,6 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-apex-evidence", type=float, help="")   
     optional_group.add_argument("--optimal-xic-source", type=str, help="")
     optional_group.add_argument("--intf-removal", type=int, help="")
-    optional_group.add_argument("--intf-removal-corr", type=float, help="")
     optional_group.add_argument("--intf-filter-factor", type=float, help="")
     
     # Precursor summarization
@@ -243,22 +237,22 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--ms2-priority-quality", type=float, help="")
     optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")
+    optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
     # timsTOF data preprocessing
-    optional_group.add_argument("--tims-centroid", type=int, help="")
-    optional_group.add_argument("--weighted-centroid", type=int, help="")
-    optional_group.add_argument("--mass-acc-centroid", type=int, help="")
-    optional_group.add_argument("--im-window-centroid", type=float, help="")
+    parser.add_argument("--tims-centroid", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--weighted-centroid", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--mass-acc-centroid", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--im-window-centroid", type=float, help=argparse.SUPPRESS)
     
+    # Other hidden parameters
     # Config file
-    parser.add_argument("--config-file", type=str, help="Path to a configuration file")
-    
-    #
-    parser.add_argument("--save-supplements", type=int, help="Whether to save additional supplementary files")
-    
+    parser.add_argument("--config-file", type=str, help=argparse.SUPPRESS)
+    # Whether to save additional supplementary files
+    parser.add_argument("--save-supplements", type=int, help=argparse.SUPPRESS)
     # Progress bar dispaly
-    parser.add_argument("--show-progress", type=int, help="Show progress bars for some processes")
-    parser.add_argument("--inter-progress", type=int, help="Show intermittent progress bars")
+    parser.add_argument("--show-progress", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--inter-progress", type=int, help=argparse.SUPPRESS)
     
     return parser
 

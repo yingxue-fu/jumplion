@@ -380,9 +380,11 @@ def identify_optimal_xic(ms1, ms2,
 
 def calculate_quantity(ms1, ms2, 
                        begin, end, apex, 
-                       optimal_xic, optimal_xic_type, 
-                       corr_method=0, intf_removal=True, 
-                       intf_removal_corr=0.5, intf_filter_factor=1.5):
+                       optimal_xic, 
+                       optimal_xic_type, 
+                       corr_method=0, 
+                       intf_removal=True, 
+                       intf_filter_factor=1.5):
     
     ms1_ms2 = np.concatenate((ms1, ms2), axis=1)
     len_ = end - begin + 1
@@ -418,42 +420,39 @@ def calculate_quantity(ms1, ms2,
         for ion in range(p):
             if ion == optimal_xic:
                 continue
-            
-            if quant_corr[ion, 0] > intf_removal_corr:
-                if intf_removal:
-                    w = max(E, np.sum(elution[apex - 1:apex + 2] ** 2))
-                    scaled = np.sum(ms1_ms2[apex - 1:apex + 2, :] * elution[apex - 1:apex + 2, None] ** 2, axis=0) / w
-                    if scaled[optimal_xic]:
-                        # Compute ratio r
-                        r = scaled[ion] / scaled[optimal_xic]
-            
-                        # Adjust ratio if correlation is below 0.8
-                        if quant_corr[ion, 0] < 0.8:
-                            # initial r
-                            r = min(r, ms1_ms2[apex, ion] / max(E, ms1_ms2[apex, optimal_xic]))
-                            # adjust r
-                            radj = r
-                            e = elution[apex] * 0.5
-                            for pos in range(apex - 1, -1, -1): # for the left side of apex point
-                                if elution[pos] < e:
-                                    break
-                                radj = min(radj, ms1_ms2[pos, ion] / max(E, ms1_ms2[pos, optimal_xic]))
-                            for pos in range(apex + 1, ms1_ms2.shape[0]): # for the right side of apex point
-                                if elution[pos] < e:
-                                    break
-                                radj = min(radj, ms1_ms2[pos, ion] / max(E, ms1_ms2[pos, optimal_xic]))
-                            # final r
-                            r = max(r * 0.5, min(r, radj))
-            
-                        # Apply interference filtering
-                        ms1_ms2_filtered[begin:end+1, ion] = np.minimum(ms1_ms2[begin:end+1, ion], intf_filter_factor * r * elution[begin:end+1])
-                        quant_quantity[ion, 1] = np.sum(ms1_ms2_filtered[begin:end+1, ion])
-            else:
-                ms1_ms2_filtered[begin:end+1, ion] = 0.0
-                quant_quantity[ion, 1] = 0.0
-    
+            if intf_removal:
+                w = max(E, np.sum(elution[apex - 1:apex + 2] ** 2))
+                scaled = np.sum(ms1_ms2[apex - 1:apex + 2, :] * elution[apex - 1:apex + 2, None] ** 2, axis=0) / w
+                if scaled[optimal_xic]:
+                    # Compute ratio r
+                    r = scaled[ion] / scaled[optimal_xic]
+        
+                    # Adjust ratio if correlation is below 0.8
+                    if quant_corr[ion, 0] < 0.8:
+                        # initial r
+                        r = min(r, ms1_ms2[apex, ion] / max(E, ms1_ms2[apex, optimal_xic]))
+                        # adjust r
+                        radj = r
+                        e = elution[apex] * 0.5
+                        for pos in range(apex - 1, -1, -1): # for the left side of apex point
+                            if elution[pos] < e:
+                                break
+                            radj = min(radj, ms1_ms2[pos, ion] / max(E, ms1_ms2[pos, optimal_xic]))
+                        for pos in range(apex + 1, ms1_ms2.shape[0]): # for the right side of apex point
+                            if elution[pos] < e:
+                                break
+                            radj = min(radj, ms1_ms2[pos, ion] / max(E, ms1_ms2[pos, optimal_xic]))
+                        # final r
+                        r = max(r * 0.5, min(r, radj))
+        
+                    # Apply interference filtering
+                    ms1_ms2_filtered[begin:end+1, ion] = np.minimum(ms1_ms2[begin:end+1, ion], intf_filter_factor * r * elution[begin:end+1])
+                    quant_quantity[ion, 1] = np.sum(ms1_ms2_filtered[begin:end+1, ion])
+        
+        # calculate correlation after correction
         quant_corr[:, 1] = np.array([corr(elution[begin:end+1], ms1_ms2_filtered[begin:end+1, ion], corr_method) for ion in range(p)])
     
+    # corrected XIC region
     ms1_ms2_filtered = ms1_ms2_filtered[begin:end+1, :]
     
     return ms1_ms2_filtered, elution, quant_corr, quant_quantity

@@ -17,46 +17,39 @@ args = Arguments()
 ShowProgress = args.show_progress
 InterProgress = args.inter_progress
 
-def get_quant_quality_dfs(report_df, 
-                          id_col,
-                          sample_col,
-                          quant_id_col, 
-                          quality_col, 
-                          quant_col, 
-                          quality_cutoff=0.0, 
-                          quant_cutoff=0.0,
-                          save_data=True,
-                          out_dir="",
-                          ):
+def get_quantity_quality_dfs(report_df, 
+                             id_col,
+                             sample_col,
+                             secondary_id_col, 
+                             quantity_col, 
+                             quality_col, 
+                             save_data=True,
+                             out_dir="",
+                             ):
     
-    # Split and explode quant and quality columns
+    # Split and explode quantity and quality columns
     report_df_long = (
         report_df
         .with_columns([
-            pl.col(quant_id_col).str.split(";"),
-            pl.col(quality_col).str.split(";"),
-            pl.col(quant_col).str.split(";")
+            pl.col(secondary_id_col).str.split(";"),
+            pl.col(quantity_col).str.split(";"),
+            pl.col(quality_col).str.split(";")
         ])
-        .explode([quant_id_col, quality_col, quant_col])
+        .explode([secondary_id_col, quantity_col, quality_col])
         .with_columns([
-            pl.col(quality_col).cast(pl.Float64),
-            pl.col(quant_col).cast(pl.Float64)
-        ])
-        .with_columns([
-            pl.when(pl.col(quality_col) <= quality_cutoff).then(None).otherwise(pl.col(quality_col)).alias(quality_col),
-            pl.when(pl.col(quant_col) <= quant_cutoff).then(None).otherwise(pl.col(quant_col)).alias(quant_col)
+            pl.col(quantity_col).cast(pl.Float64),
+            pl.col(quality_col).cast(pl.Float64)
         ])
     )
     
-    # quantity: log2 transform
-    quant_df = (
+    # quantity
+    quantity_df = (
         report_df_long.select([
             pl.col(id_col).cast(pl.Utf8).alias("target_id"),
             pl.col(sample_col).cast(pl.Utf8).alias("samples"),
-            pl.col(quant_id_col).cast(pl.Utf8).alias("source_id"),
-            pl.col(quant_col).log(base=2).alias("source_quant")
+            pl.col(secondary_id_col).cast(pl.Utf8).alias("source_id"),
+            pl.col(quantity_col).alias("source_quantity")
         ])
-        .drop_nulls()
     )
 
     # quality
@@ -64,26 +57,27 @@ def get_quant_quality_dfs(report_df,
         report_df_long.select([
             pl.col(id_col).cast(pl.Utf8).alias("target_id"),
             pl.col(sample_col).cast(pl.Utf8).alias("samples"),
-            pl.col(quant_id_col).cast(pl.Utf8).alias("source_id"),
+            pl.col(secondary_id_col).cast(pl.Utf8).alias("source_id"),
             pl.col(quality_col).alias("source_quality")
         ])
-        .drop_nulls()
     )
             
     if save_data:
-        quant_df.write_parquet(Path(out_dir) / f"{id_col}_{quant_col}_mapping.parquet")
+        quantity_df.write_parquet(Path(out_dir) / f"{id_col}_{quantity_col}_mapping.parquet")
         quality_df.write_parquet(Path(out_dir) / f"{id_col}_{quality_col}_mapping.parquet")
         
-    return quant_df, quality_df
+    return quantity_df, quality_df
 
 
-def precursor_summarize(quant_df: pl.DataFrame, 
+def precursor_summarize(quantity_df: pl.DataFrame, 
                         quality_df: pl.DataFrame,
-                        fill_missing=True):
+                        xic_quality_cutoff=0.0,
+                        fill_missing_xic=True,
+                        ):
 
     # Pivot input tables
-    quant_pivoted = quant_df.pivot(
-        values="source_quant",
+    quantity_pivoted = quantity_df.pivot(
+        values="source_quantity",
         index=["target_id", "source_id"],
         on="samples",
         aggregate_function="first"
@@ -95,44 +89,59 @@ def precursor_summarize(quant_df: pl.DataFrame,
         aggregate_function="first"
     )
 
-    sample_cols = [col for col in quant_pivoted.columns if col not in {"target_id", "source_id"}]
-    prec_ids = quant_pivoted["target_id"].unique().to_list()
+    sample_cols = [col for col in quantity_pivoted.columns if col not in {"target_id", "source_id"}]
+    prec_ids = quantity_pivoted["target_id"].unique().to_list()
 
     # Group by precursor for fast lookup
-    quant_groups = quant_pivoted.partition_by("target_id", as_dict=True)
+    quantity_groups = quantity_pivoted.partition_by("target_id", as_dict=True)
     quality_groups = quality_pivoted.partition_by("target_id", as_dict=True)
 
-    quant_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
+    quantity_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
     quality_summed = np.full((len(prec_ids), len(sample_cols)), np.nan)
 
     for i, prec_id in enumerate(progress_bar(prec_ids, ShowProgress, InterProgress)):
-        quant_df_sub = quant_groups.get((prec_id,))
-        if quant_df_sub is None:
+        quantity_df_sub = quantity_groups.get((prec_id,))
+        if quantity_df_sub is None:
             continue
     
         quality_df_sub = quality_groups.get((prec_id,))
         if quality_df_sub is None:
             continue
         
-        quant_mat = quant_df_sub.select(sample_cols).to_numpy()
+        quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
-        if fill_missing:
-            quant_mat = np.nan_to_num(quant_mat, nan=np.nanmin(quant_mat))
-            quality_mat = np.nan_to_num(quality_mat, nan=0.01)
+        quantity_mat_new = quantity_mat.copy()
+        if fill_missing_xic:
+            if xic_quality_cutoff <= 0.0:
+                missing_mask = (quality_mat < xic_quality_cutoff) | (quality_mat == 0.0)
+            else:
+                missing_mask = quality_mat < xic_quality_cutoff
+            quantity_mat_new[missing_mask] = np.nan
+            # remove rows that contain all NaNs
+            quantity_mat_new = quantity_mat_new[~np.all(np.isnan(quantity_mat_new), axis=1)]
+            # fill missing value
+            if quantity_mat_new.shape[0] == 0:
+                continue
+            else:
+                quantity_mat_new = np.nan_to_num(quantity_mat_new, nan=np.nanmin(quantity_mat_new))
+        #
+        quantity_mat_new = np.log2(quantity_mat_new)
+        quantity_summed[i, :] = median_summ(quantity_mat_new, topN_rep=3)
+        #
+        quality_mat_new = quality_mat.copy()
+        quality_mat_new[quality_mat_new <= 0.0] = 0.01
+        quality_summed[i, :] = topN(quality_mat_new, N=6, method="median")
         
-        quant_summed[i, :] = median_summ(quant_mat, topN_rep=3)
-        quality_summed[i, :] = topN(quality_mat, N=6, method="median")
-        
-    quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
-    quant_table = quant_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
-    quant_table = quant_table.with_columns(pl.Series(name="Precursor.Id", values=prec_ids))
+    quantity_table = pl.DataFrame(quantity_summed, schema=sample_cols)
+    quantity_table = quantity_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
+    quantity_table = quantity_table.with_columns(pl.Series(name="Precursor.Id", values=prec_ids))
     
     quality_table = pl.DataFrame(quality_summed, schema=sample_cols)
     quality_table = quality_table.with_columns(pl.mean_horizontal(pl.all()).alias("Average"))
     quality_table = quality_table.with_columns(pl.Series(name="Precursor.Id", values=prec_ids))
 
-    return quant_table, quality_table
+    return quantity_table, quality_table
 
 
 def extract_annotation(id_list, 
@@ -168,74 +177,73 @@ def quantify_from_xic_report(
         report_file, 
         id_col="Precursor.Id",
         sample_col="Run",
-        quant_id_col="MS2.XIC.Info",
+        secondary_id_col="MS2.XIC.Info",
         quality_col="MS2.XIC.Corr.Raw",
-        quant_col="MS2.XIC.Quant.Adjusted",
+        quantity_col="MS2.XIC.Quant.Adjusted",
         annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
-        quality_cutoff=0.0,
-        quant_cutoff=0.0,
         out_dir="",
-        fill_missing=True
+        fill_missing=True, 
+        xic_quality_cutoff=0.0
     ):
     
-    columns = [sample_col, id_col, quant_id_col, quality_col, quant_col] + annotation_cols
+    columns = [sample_col, id_col, secondary_id_col, quality_col, quantity_col] + annotation_cols
     report_df = pl.read_parquet(Path(report_file), columns=columns)
-    logging.info(f"ID column: {id_col}, Quantity column: {quant_col}")
+    logging.info(f"ID column: {id_col}, Quantity column: {quantity_col}")
     
-    # 1. extract quant and quality
-    quant_df, quality_df = get_quant_quality_dfs(
+    # 1. extract quantity and quality
+    quantity_df, quality_df = get_quantity_quality_dfs(
                                 report_df, 
                                 id_col,
                                 sample_col,
-                                quant_id_col,
+                                secondary_id_col,
                                 quality_col,
-                                quant_col,
-                                quality_cutoff,
-                                quant_cutoff,
+                                quantity_col,
                                 save_data=True,
                                 out_dir=out_dir,
                             )
     
     # 2. summarize
-    quant_mtx, quality_mtx = precursor_summarize(quant_df, quality_df, fill_missing)
+    quantity_mtx, quality_mtx = precursor_summarize(quantity_df, 
+                                                 quality_df, 
+                                                 fill_missing, 
+                                                 xic_quality_cutoff)
 
     # 3. add annotation
-    extra_names = extract_annotation(quant_mtx["Precursor.Id"].to_list(), 
+    extra_names = extract_annotation(quantity_mtx["Precursor.Id"].to_list(), 
                                      report_df, 
                                      id_col,
                                      annotation_cols)
     
-    final_quant_table = extra_names.join(quant_mtx, on=id_col, how="inner")
+    final_quantity_table = extra_names.join(quantity_mtx, on=id_col, how="inner")
     final_quality_table = extra_names.join(quality_mtx, on=id_col, how="inner")  
     
-    return final_quant_table, final_quality_table
+    return final_quantity_table, final_quality_table
     
 
 def quantify_precursors(report_file, 
                         xic_quality_cutoff=0.0, 
-                        xic_quant_cutoff=0.0, 
                         fill_missing_xic=True,
-                        quant_source='ms1_ms2', 
-                        ms2_priority_quality=0.8, 
+                        quantity_source='ms1_ms2', 
+                        ms2_priority_quality=1.0, 
                         out_dir=""):
     
     # MS1-level quantification
     logging.info("Quantifying precursors at MS1-level")
-    ms1_quant_table, ms1_quality_table = quantify_from_xic_report(
+    ms1_quantity_table, ms1_quality_table = quantify_from_xic_report(
                                              report_file, 
+                                             #sample_meta_file,
                                              id_col="Precursor.Id",
                                              sample_col="Run",
-                                             quant_id_col="MS1.XIC.Info",
+                                             secondary_id_col="MS1.XIC.Info",
                                              quality_col="MS1.XIC.Corr.Raw",
-                                             quant_col="MS1.XIC.Quant.Adjusted",
+                                             quantity_col="MS1.XIC.Quant.Adjusted",
                                              annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
-                                             quality_cutoff=xic_quality_cutoff,
-                                             quant_cutoff=xic_quant_cutoff,
                                              out_dir=out_dir,
-                                             fill_missing=fill_missing_xic)
-    ms1_quant_table = ms1_quant_table.with_columns(pl.lit('MS1').alias('MS_type'))
+                                             fill_missing=fill_missing_xic,
+                                             xic_quality_cutoff=xic_quality_cutoff)
+    ms1_quantity_table = ms1_quantity_table.with_columns(pl.lit('MS1').alias('MS_type'))
     ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
-    ms1_quant_table = ms1_quant_table.with_columns([
+    ms1_quantity_table = ms1_quantity_table.with_columns([
         (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
     ])
     ms1_quality_table = ms1_quality_table.with_columns([
@@ -244,21 +252,21 @@ def quantify_precursors(report_file,
 
     # MS2-level quantification
     logging.info("Quantifying precursors at MS2-level")
-    ms2_quant_table, ms2_quality_table = quantify_from_xic_report(
+    ms2_quantity_table, ms2_quality_table = quantify_from_xic_report(
                                              report_file, 
+                                             #sample_meta_file,
                                              id_col="Precursor.Id",
                                              sample_col="Run",
-                                             quant_id_col="MS2.XIC.Info",
+                                             secondary_id_col="MS2.XIC.Info",
                                              quality_col="MS2.XIC.Corr.Raw",
-                                             quant_col="MS2.XIC.Quant.Adjusted",
+                                             quantity_col="MS2.XIC.Quant.Adjusted",
                                              annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
-                                             quality_cutoff=xic_quality_cutoff,
-                                             quant_cutoff=xic_quant_cutoff,
                                              out_dir=out_dir,
-                                             fill_missing=fill_missing_xic)
-    ms2_quant_table = ms2_quant_table.with_columns(pl.lit('MS2').alias('MS_type'))
+                                             fill_missing=fill_missing_xic,
+                                             xic_quality_cutoff=xic_quality_cutoff)
+    ms2_quantity_table = ms2_quantity_table.with_columns(pl.lit('MS2').alias('MS_type'))
     ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))
-    ms2_quant_table = ms2_quant_table.with_columns([
+    ms2_quantity_table = ms2_quantity_table.with_columns([
         (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
     ])
     ms2_quality_table = ms2_quality_table.with_columns([
@@ -267,21 +275,21 @@ def quantify_precursors(report_file,
     
     # Combine MS1 and MS2 quantification
     ms1_quality_table = ms1_quality_table.select(ms2_quality_table.columns)
-    ms1_quant_table = ms1_quant_table.select(ms2_quant_table.columns)
+    ms1_quantity_table = ms1_quantity_table.select(ms2_quantity_table.columns)
     ms1_ms2_quality_table = pl.concat([ms1_quality_table, ms2_quality_table], how="vertical")
-    ms1_ms2_quant_table = pl.concat([ms1_quant_table, ms2_quant_table], how="vertical")
+    ms1_ms2_quantity_table = pl.concat([ms1_quantity_table, ms2_quantity_table], how="vertical")
     
     # Save to files
-    ms1_ms2_quant_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
+    ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
     ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
     
-    if quant_source == 'ms1':
+    if quantity_source == 'ms1':
         logging.info("Using only MS1-level precursor quantity for further analysis")
-        return ms1_quant_table, ms1_quality_table
-    elif quant_source == 'ms2':
+        return ms1_quantity_table, ms1_quality_table
+    elif quantity_source == 'ms2':
         logging.info("Using only MS2-level precursor quantity for further analysis")
-        return ms2_quant_table, ms2_quality_table
-    elif quant_source == 'ms1_ms2':
+        return ms2_quantity_table, ms2_quality_table
+    elif quantity_source == 'ms1_ms2':
         logging.info("Dynamically select MS1- or MS2-level quantity for each precursor based on quality scores")
         # Keep only the row with the highest Average per Precursor.Id, but prioritize MS2 when both > 0.8
         ms1_ms2_quality_table = (
@@ -306,36 +314,36 @@ def quantify_precursors(report_file,
             .drop(["ms1_avg", "ms2_avg", "ms1_good", "ms2_good"])
         )
         
-        # Filter quant table to keep only rows matching filtered quality table
-        ms1_ms2_quant_table = ms1_ms2_quant_table.filter(
+        # Filter quantity table to keep only rows matching filtered quality table
+        ms1_ms2_quantity_table = ms1_ms2_quantity_table.filter(
             pl.col("Precursor.Id_MS_type").is_in(
                 ms1_ms2_quality_table.get_column("Precursor.Id_MS_type").implode()
             )
         )
-        return ms1_ms2_quant_table, ms1_ms2_quality_table
+        return ms1_ms2_quantity_table, ms1_ms2_quality_table
 
 
-def protein_summarize(prec_quant_table, 
+def protein_summarize(prec_quantity_table, 
                       prec_quality_table, 
                       sample_cols):
     # Group by protein group for fast lookup
-    quant_groups = prec_quant_table.partition_by("Protein.Group", as_dict=True)
+    quantity_groups = prec_quantity_table.partition_by("Protein.Group", as_dict=True)
     quality_groups = prec_quality_table.partition_by("Protein.Group", as_dict=True)
     
-    prot_ids = [prot_key[0] for prot_key in quant_groups.keys()]
-    quant_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
+    prot_ids = [prot_key[0] for prot_key in quantity_groups.keys()]
+    quantity_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
     quality_summed = np.full((len(prot_ids), len(sample_cols)), np.nan)
 
     for i, prot_id in enumerate(progress_bar(prot_ids, ShowProgress, InterProgress)):
-        quant_df_sub = quant_groups.get((prot_id,))
-        if quant_df_sub is None:
+        quantity_df_sub = quantity_groups.get((prot_id,))
+        if quantity_df_sub is None:
             continue
     
         quality_df_sub = quality_groups.get((prot_id,))
         if quality_df_sub is None:
             continue
         
-        prec_ids = set(quant_df_sub["Precursor.Id"].to_list()).intersection(
+        prec_ids = set(quantity_df_sub["Precursor.Id"].to_list()).intersection(
             quality_df_sub["Precursor.Id"].to_list()
         )
         if not prec_ids:
@@ -343,25 +351,27 @@ def protein_summarize(prec_quant_table,
         prec_ids = list(prec_ids)
         
         quality_df_sub = quality_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
-        quant_df_sub = quant_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
+        quantity_df_sub = quantity_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
         
-        quant_mat = quant_df_sub.select(sample_cols).to_numpy()
+        quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
         # Summarization
-        quant_summed[i, :] = median_summ(quant_mat, topN_rep=3)
+        quantity_mat = quantity_mat[~np.all(np.isnan(quantity_mat), axis=1)]
+        quantity_summed[i, :] = median_summ(quantity_mat, topN_rep=3)
+        quality_mat = quality_mat[~np.all(np.isnan(quality_mat), axis=1)]
         quality_summed[i, :] = topN(quality_mat, N=3, method="mean")
         
-    quant_table = pl.DataFrame(quant_summed, schema=sample_cols)
-    quant_table = quant_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
+    quantity_table = pl.DataFrame(quantity_summed, schema=sample_cols)
+    quantity_table = quantity_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
     
     quality_table = pl.DataFrame(quality_summed, schema=sample_cols)
     quality_table = quality_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
 
-    return quant_table, quality_table
+    return quantity_table, quality_table
 
 
-def quantify_proteins(prec_quant_table, 
+def quantify_proteins(prec_quantity_table, 
                       prec_quality_table,
                       min_prec_quality):
     logging.info("Quantifying proteins")
@@ -376,18 +386,18 @@ def quantify_proteins(prec_quant_table,
                   'Additional.Quan.Info',
                   'MS_type',
                   'Precursor.Id_MS_type'}
-    sample_cols = [col for col in prec_quant_table.columns if col not in other_cols]
-    prot_quant_table, prot_quality_table = protein_summarize(prec_quant_table, 
+    sample_cols = [col for col in prec_quantity_table.columns if col not in other_cols]
+    prot_quantity_table, prot_quality_table = protein_summarize(prec_quantity_table, 
                                                              prec_quality_table, 
                                                              sample_cols)
-    extra_names = extract_annotation(prot_quant_table['Protein.Group'].to_list(), 
-                                     prec_quant_table, 
+    extra_names = extract_annotation(prot_quantity_table['Protein.Group'].to_list(), 
+                                     prec_quantity_table, 
                                      id_col='Protein.Group',
                                      annotation_cols=['Protein.Names', 'Genes'])
-    prot_quant_table = extra_names.join(prot_quant_table, on='Protein.Group', how="inner")   
+    prot_quantity_table = extra_names.join(prot_quantity_table, on='Protein.Group', how="inner")   
     prot_quality_table = extra_names.join(prot_quality_table, on='Protein.Group', how="inner")  
     
-    return prot_quant_table, prot_quality_table
+    return prot_quantity_table, prot_quality_table
     
 
 def quality_hist_plot(quality_table, value_columns, quality_cutoffs, out_dir, save_file_name):
@@ -677,11 +687,11 @@ def normalization(mat, trim_pct_upper, trim_pct_lower, norm_method):
     return res, dict(zip(mat.columns, normFactors))
 
 ####
-def filter_based_on_quality(quant_df, quality_df, tag_column, value_columns, quality_cutoffs=[0.5, 0.75]):
-    # Align quality matrix to quant_df using tag_column
-    quality_mat = quality_df.set_index(tag_column).loc[quant_df[tag_column], value_columns].reset_index(drop=True)
+def filter_based_on_quality(quantity_df, quality_df, tag_column, value_columns, quality_cutoffs=[0.5, 0.75]):
+    # Align quality matrix to quantity_df using tag_column
+    quality_mat = quality_df.set_index(tag_column).loc[quantity_df[tag_column], value_columns].reset_index(drop=True)
 
-    quant_dfs_filtered = []
+    quantity_dfs_filtered = []
     for cutoff in quality_cutoffs:
         # Create a mask: True where quality > cutoff
         mask = quality_mat > cutoff
@@ -689,10 +699,10 @@ def filter_based_on_quality(quant_df, quality_df, tag_column, value_columns, qua
         # Keep rows with at least one value passing the cutoff
         valid_rows = mask.any(axis=1)
         
-        # Filter quant_df and apply mask
-        quant_df_f = quant_df.loc[valid_rows].copy()
-        quant_df_f[value_columns] = quant_df_f[value_columns].where(mask.loc[valid_rows])
+        # Filter quantity_df and apply mask
+        quantity_df_f = quantity_df.loc[valid_rows].copy()
+        quantity_df_f[value_columns] = quantity_df_f[value_columns].where(mask.loc[valid_rows])
         
-        quant_dfs_filtered.append(quant_df_f)
+        quantity_dfs_filtered.append(quantity_df_f)
 
-    return quant_dfs_filtered
+    return quantity_dfs_filtered

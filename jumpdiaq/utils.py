@@ -2,9 +2,11 @@
 import os
 import re
 import math
+from typing import List
 # external
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 
 #
 MSFormatsExt = {"mzml", "raw", "d"}  
@@ -66,6 +68,121 @@ def estimate_isotopes(peptide_mass, threshold=0.1):
         else:
             break
     return n_peaks
+
+
+def generate_group_indices(column_names: List[str], group_df: pd.DataFrame, 
+                          col_name_column: str = 'Sample', 
+                          group_column: str = 'Group') -> List[List[int]]:
+    """
+    Generate group indices from column names and grouping DataFrame.
+    
+    Parameters:
+    -----------
+    column_names : List[str]
+        List of column names in the order they appear in your matrix
+    group_df : pd.DataFrame
+        DataFrame with column names and their corresponding groups
+    col_name_column : str
+        Name of the column in group_df that contains column names
+    group_column : str
+        Name of the column in group_df that contains group assignments
+        
+    Returns:
+    --------
+    List[List[int]]
+        List of lists, where each inner list contains column indices for a group
+    """
+    # Create a mapping from column name to its index in the matrix
+    col_name_to_index = {name: idx for idx, name in enumerate(column_names)}
+    
+    # Create a dictionary to store groups
+    group_dict = {}
+    
+    # Process each row in the group DataFrame
+    for _, row in group_df.iterrows():
+        col_name = row[col_name_column]
+        group = row[group_column]
+        
+        # Check if column name exists in our matrix
+        if col_name in col_name_to_index:
+            if group not in group_dict:
+                group_dict[group] = []
+            group_dict[group].append(col_name_to_index[col_name])
+        else:
+            print(f"Warning: Column '{col_name}' not found in matrix columns")
+    
+    # Convert to list of lists (sorted by group keys for consistency)
+    group_indices = [group_dict[group] for group in sorted(group_dict.keys())]
+    
+    return group_indices
+
+
+def group_wise_imputation(data: np.ndarray, group_indices: List[List[int]]) -> np.ndarray:
+    """
+    Perform group-wise imputation on a numpy array.
+    
+    For each row and each group:
+    - If group has ≥2 non-missing values: impute missing values with group mean
+    - If group has 0 or 1 non-missing value: impute missing values with group minimum (across all rows)
+    - If group has 0 non-missing values: keep as NaN
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        2D numpy array with missing values (NaN)
+    group_indices : List[List[int]]
+        List of lists, where each inner list contains column indices for a group
+        
+    Returns:
+    --------
+    np.ndarray
+        Imputed array
+    """
+    # Create a copy to avoid modifying original data
+    imputed_data = data.copy()
+    
+    # Calculate group minimums across all rows for fallback imputation
+    group_mins = {}
+    for group_idx, col_indices in enumerate(group_indices):
+        group_data = data[:, col_indices]
+        # Get minimum value across all rows and columns in this group
+        # Handle case where all values in group are NaN
+        if np.all(np.isnan(group_data)):
+            group_mins[group_idx] = np.nan  # or any default value you prefer
+            #print(f"Warning: All values in group {group_idx} are NaN. Using 0.0 as fallback.")
+        else:
+            group_mins[group_idx] = np.nanmin(group_data)
+    
+    # Process each row
+    for row_idx in range(data.shape[0]):
+        # Process each group
+        for group_idx, col_indices in enumerate(group_indices):
+            # Get values for this group in current row
+            group_values = data[row_idx, col_indices]
+            
+            # Find non-missing values
+            non_missing_mask = ~np.isnan(group_values)
+            non_missing_values = group_values[non_missing_mask]
+            non_missing_count = len(non_missing_values)
+            
+            # Find missing value positions
+            missing_mask = np.isnan(group_values)
+            
+            if np.any(missing_mask):  # Only impute if there are missing values
+                if non_missing_count >= 2:
+                    # Use mean of non-missing values in this row's group
+                    #fill_value = np.mean(non_missing_values)
+                    fill_value = group_mins[group_idx]
+                else:
+                    # Use minimum value of this group across all rows
+                    fill_value = group_mins[group_idx]
+                
+                # Fill missing values
+                for i, col_idx in enumerate(col_indices):
+                    if missing_mask[i]:
+                        imputed_data[row_idx, col_idx] = fill_value
+    
+    return imputed_data
 
 
 def progress_bar(iterable, show=True, intermittent=False):
