@@ -8,10 +8,11 @@ import numpy as np
 import polars as pl
 # local
 from jumpdiaq.arguments import Arguments, get_extension
-from jumpdiaq.utils import (C13delta, fExclude, E, INF, estimate_isotopes,
-                            remove_extension, 
-                            get_file_name, 
-                            progress_bar)
+from jumpdiaq.utils import (CorrRadius, CorrMethod, WeightByShape, WeightByIntensity, 
+                            CorrWeight, ShapeWeight, IntensityWeight, MinShapeScore,
+                            MinXicIntensity, MinApexIntensity, MinApexEvidence,
+                            C13delta, fExclude, E, INF, estimate_isotopes,
+                            remove_extension, get_file_name, progress_bar)
 from jumpdiaq.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
 from jumpdiaq.calibration import (split_into_rt_bins, 
                                   predicted_mz, 
@@ -25,28 +26,19 @@ args = Arguments()
 OutDir = args.out_dir
 out_int_dir = Path(OutDir) / 'intermediate'
 SaveSupplements = args.save_supplements
-# 
+# XIC extraction
+nXICPoints = args.n_xic_points
 Calibrate = args.mass_calibration
 MassCalAcc = args.mass_cal_acc
 MassCalBinsMax = args.mass_cal_bins_max
 MassCalScore = args.mass_cal_score
 IndividualMassAcc = args.individual_mass_acc
-#
 IMWindowCal = args.im_window_cal
 IndividualIMWindow = args.individual_im_window
-#
-MinFr = args.min_quan_fr
-MaxFr = args.max_quan_fr
-MaxIsotopes = args.max_isotopes
-nXICPoints = args.n_xic_points
-CorrRadius = args.corr_radius
-CorrMethod = args.corr_method
-WeightByShape = args.weight_by_shape
-WeightByIntensity = args.weight_by_intensity
-MinShapeScore = args.min_shape_score
-MinXicIntensity = args.min_xic_intensity
-MinApexIntensity = args.min_apex_intensity
-MinApexEvidence = args.min_apex_evidence
+# XIC quantification
+MinFr = args.min_fr_quant
+MaxFr = args.max_fr_quant
+MaxPrIsotopes = args.max_pr_isotopes
 OptimalXicSource = args.optimal_xic_source
 
 
@@ -167,13 +159,13 @@ class RunEntry:
         self.ms2_rts = np.zeros(l)
         
         # extracted intensities
-        self.ms1 = np.zeros((l, MaxIsotopes))   # of isotopic peaks
+        self.ms1 = np.zeros((l, MaxPrIsotopes))   # of isotopic peaks
         self.ms2 = np.zeros((l, MaxFr))
         
         # extracted mzs
-        exp_ms1_mzs = np.zeros((l, MaxIsotopes))
+        exp_ms1_mzs = np.zeros((l, MaxPrIsotopes))
         exp_ms2_mzs = np.zeros((l, MaxFr))
-        exp_ims = np.zeros((l, MaxIsotopes))
+        exp_ims = np.zeros((l, MaxPrIsotopes))
                 
         for k in range(from_idx, to_idx):
             
@@ -184,7 +176,7 @@ class RunEntry:
             ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1 # search MS2 rt of the apex point      
             self.ms1_rts[ind] = self.run.ms1_RT[ms1_left]
             
-            n_isotopes = min(MaxIsotopes, self.info.n_isotopic_peaks)
+            n_isotopes = min(MaxPrIsotopes, self.info.n_isotopic_peaks)
             for j in range(n_isotopes):
                 query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], self.ms1_rts[ind], 
                                         self.run.MassCalCenter, args.mass_cal_bins)
@@ -237,7 +229,7 @@ class RunEntry:
         # for stage = 1, perform quantification and export XIC
         if not self.fInit:
             # theoritical MS1 m/zs
-            self.info.ms1_mzs = self.prec.mz + (C13delta * np.arange(0, MaxIsotopes) / self.prec.charge)
+            self.info.ms1_mzs = self.prec.mz + (C13delta * np.arange(0, MaxPrIsotopes) / self.prec.charge)
             self.info.n_isotopic_peaks = estimate_isotopes(self.prec.mz * self.prec.charge)
             # get products info and build ms2 scan index
             self.prepare_products(MinFr, MaxFr)
@@ -277,6 +269,9 @@ class RunEntry:
                                          corr_method=CorrMethod, 
                                          shape_weighted=WeightByShape,
                                          intensity_weighted=WeightByIntensity,
+                                         corr_weight=CorrWeight,
+                                         shape_weight=ShapeWeight,
+                                         intensity_weight=IntensityWeight,
                                          optimal_xic_source=OptimalXicSource,
                                          min_shape_score=MinShapeScore,
                                          min_apex_intensity=MinApexIntensity,
@@ -490,7 +485,7 @@ class Run:
             if self.ms2x[i].window_high > self.max_ms1_isolation_mz:
                 self.max_ms1_isolation_mz = self.ms2x[i].window_high
         
-        logging.info(f"Detected MS1 isolation m/z range: {np.round(self.min_ms1_isolation_mz)} - {np.round(self.max_ms1_isolation_mz)}")
+        logging.info(f"Detected MS1 isolation m/z range: {self.min_ms1_isolation_mz:.1f} - {self.max_ms1_isolation_mz:.1f}")
         
         # number of total cycles
         self.n_cycle = cycle + 1
@@ -709,7 +704,7 @@ class Run:
         b_r = mass_cali_data[delta_col].to_numpy() / theo
         mean = np.mean(b_r)
         sd = np.std(b_r)
-        logging.info(f"Mean and SD of {level.upper()} mass error before calibration: {np.round(mean * 1e6, 2)} and {np.round(sd * 1e6, 2)} ppm")
+        logging.info(f"Mean and SD of {level.upper()} mass error before calibration: {(mean * 1e6):2f} and {(sd * 1e6):2f} ppm")
         acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 5) / 1e6
         
         # Step 2: Build calibration model
@@ -739,7 +734,7 @@ class Run:
         b_r = (observed - query_mz) / theo
         mean = np.mean(b_r)
         sd = np.std(b_r)
-        logging.info(f"Mean and SD of {level.upper()} mass error after calibration: {np.round(mean * 1e6, 2)} and {np.round(sd * 1e6, 2)} ppm")
+        logging.info(f"Mean and SD of {level.upper()} mass error after calibration: {(mean * 1e6):2f} and {(sd * 1e6):2f} ppm")
         acc = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 5) / 1e6
         setattr(self, f'MassAccuracy{level.upper()}', acc)
         setattr(self, f'acc_{level}_calibrated', True)
@@ -779,7 +774,7 @@ class Run:
         logging.info(f"{len(im_cali_data)} IM values are used for IM window determination") 
         mean = im_cali_data['im_delta'].mean()
         sd = im_cali_data['im_delta'].std()
-        logging.info(f"Mean and SD of ion mobility error: {np.round(mean, 4)} and {np.round(sd, 5)}")
+        logging.info(f"Mean and SD of ion mobility error: {mean:4g} and {sd:5g}")
         im_boundary = max(abs(mean+3*sd), abs(mean-3*sd)) * 1.25
         self.IM_window = np.round(im_boundary, 3)
 
@@ -791,9 +786,9 @@ class Run:
         
         
     def export_xics(self):
-        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxIsotopes)]
+        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrIsotopes)]
         ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxFr)]
-        ms1_interpol_cols = [f'ms1_interpol_M{i}' for i in range(MaxIsotopes)]
+        ms1_interpol_cols = [f'ms1_interpol_M{i}' for i in range(MaxPrIsotopes)]
         column_names = ['Precursor.Id', 'row_type', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ms1_interpol_cols
         
         data_rows = []

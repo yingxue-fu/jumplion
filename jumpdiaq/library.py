@@ -16,20 +16,15 @@ from jumpdiaq.precursor import (Precursor, to_eg, to_canonical_with_charge,
 from jumpdiaq.utils import (progress_bar, remove_extension, location_to_file_name, 
                             get_file_name, MaxLibFrNum, fTypeB, fTypeY, fExclude, 
                             char_of_fType, name_of_loss, loss_none, loss_H2O, 
-                            loss_NH3, loss_CO, loss_other)
+                            loss_NH3, loss_CO, loss_other, CorrRadius, CorrMethod, 
+                            WeightByShape, WeightByIntensity, CorrWeight, 
+                            ShapeWeight, IntensityWeight, MinShapeScore,
+                            MinApexIntensity, MinApexEvidence)
 from jumpdiaq.elution_peaks import identify_optimal_xic, calculate_quantity
 
 args = Arguments()
-MaxIsotopes = args.max_isotopes
-MaxFr = args.max_quan_fr
-CorrRadius = args.corr_radius
-CorrMethod = args.corr_method
-WeightByShape = args.weight_by_shape
-WeightByIntensity = args.weight_by_intensity
-MinShapeScore = args.min_shape_score
-MinXicIntensity = args.min_xic_intensity
-MinApexIntensity = args.min_apex_intensity
-MinApexEvidence = args.min_apex_evidence
+MaxPrIsotopes = args.max_pr_isotopes
+MaxFr = args.max_fr_quant
 IntfRemoval = args.intf_removal
 IntfFilterFactor = args.intf_filter_factor
 ShowProgress = args.show_progress
@@ -396,7 +391,7 @@ class QuantEntry:
     ms1_rt = None
     ms2_rt = None
 
-    ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxIsotopes)])
+    ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxPrIsotopes)])
     ms2_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxFr)])
 
 class Info:
@@ -502,7 +497,7 @@ class Info:
     def quantify(self, ms_files, out_dir):
         logging.info("Quantifying XICs")
         
-        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxIsotopes)]
+        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrIsotopes)]
         ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxFr)]
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
         
@@ -543,16 +538,20 @@ class Info:
                      scores, 
                      optimal_xic, 
                      optimal_xic_type, 
-                     elution_apex, fwhm) = identify_optimal_xic(ms1, ms2, 
-                                                    apex, 
-                                                    radius=CorrRadius, 
-                                                    corr_method=CorrMethod, 
-                                                    shape_weighted=WeightByShape,
-                                                    intensity_weighted=WeightByIntensity,
-                                                    optimal_xic_source=f'ms{global_optimal_xic_type}',
-                                                    min_shape_score=MinShapeScore,
-                                                    min_apex_intensity=MinApexIntensity,
-                                                    min_apex_evidence=MinApexEvidence)
+                     elution_apex, fwhm) = identify_optimal_xic(
+                                               ms1, ms2, apex, 
+                                               radius=CorrRadius, 
+                                               corr_method=CorrMethod, 
+                                               shape_weighted=WeightByShape,
+                                               intensity_weighted=WeightByIntensity,
+                                               corr_weight=CorrWeight,
+                                               shape_weight=ShapeWeight,
+                                               intensity_weight=IntensityWeight,
+                                               optimal_xic_source=f'ms{global_optimal_xic_type}',
+                                               min_shape_score=MinShapeScore,
+                                               min_apex_intensity=MinApexIntensity,
+                                               min_apex_evidence=MinApexEvidence
+                                           )
                     qt[1].xic_score = scores
                     qt[1].optimal_xic_type = optimal_xic_type
                     qt[1].optimal_xic = optimal_xic
@@ -598,6 +597,6 @@ class Info:
 
         # Create Polars DataFrame
         df = pl.DataFrame(data_rows, schema=column_names, orient="row")
-        out_xic = Path(out_dir) / "xic_files" / "xics.corrected.parquet"
+        out_xic = Path(out_dir) / "xic_files" / "xics.adjusted.parquet"
         df.write_parquet(out_xic)
-        logging.info(f"Corrected XIC data saved to {out_xic}")
+        logging.info(f"Adjusted XIC data saved to {out_xic}")

@@ -55,37 +55,26 @@ class Arguments:
     individual_im_window: int = 0
     
     # XIC quantification
-    min_quan_fr: int = 3
-    max_quan_fr: int = 6
-    max_isotopes: int = 5
-    ## identify optimal xic
-    corr_radius: int = 5
-    corr_method: int = 0
-    weight_by_shape: int = 1
-    weight_by_intensity: int = 1
+    min_fr_quant: int = 3
+    max_fr_quant: int = 6
+    max_pr_isotopes: int = 5
     optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
-    min_shape_score: float = 0.3
-    min_xic_intensity: float = 10.0
-    min_apex_intensity: float = 30.0
-    min_apex_evidence: float = 0.99
-    ## interference removal
     intf_removal: int = 1
     intf_filter_factor: float = 1.2
     
     # Precursor summarization
-    xic_quality_cutoff: float = -0.2
+    xic_quality_cutoff: float = 0.0
     fill_missing_xic: int = 1
-    use_raw_ms1: int = 1
-    use_raw_ms2: int = 1
+    use_raw_ms1xic: int = 0
+    use_raw_ms2xic: int = 1
+    
+    # Precursor normalization
     norm_species: str = "HUMAN"
     norm_method: str = "median"       # Other options: 'mean'
     trim_percentage: int = 5
     
     # Protein summarization
-    min_prec_quality: float = 0.0
-    prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
-    ms2_priority_quality: float = 1.0
-    prot_quality_cutoffs: float = 10
+    prec_quant_level: str = "ms2" # Other options: 'ms1', 'ms2'
     fastas: List[str] = field(default_factory=list)
     
     # timsTOF data preprocessing (hidden from users)
@@ -140,11 +129,13 @@ class Arguments:
                     f.write("\n# ID results processing\n")
                 if fdef.name == "n_xic_points":
                     f.write("\n# XIC extraction\n")
-                if fdef.name == "min_quan_fr":
+                if fdef.name == "min_fr_quant":
                     f.write("\n# XIC quantification\n")
                 if fdef.name == "xic_quality_cutoff":
                     f.write("\n# Precursor summarization\n")
-                if fdef.name == "min_prec_quality":
+                if fdef.name == "norm_species":
+                    f.write("\n# Precursor normalization\n")
+                if fdef.name == "prec_quant_level":
                     f.write("\n# Protein summarization\n")
                 value = getattr(self, fdef.name)
                 if isinstance(value, list):
@@ -153,7 +144,7 @@ class Arguments:
                         f.write(f"{item}\n")
                 else:
                     f.write(f"{fdef.name} = {value}\n")
-        print(f"Parameter file generated to: {output_path}")
+        print(f"Parameter file generated to: {Path(output_path).resolve()}")
         
 def create_parser() -> argparse.ArgumentParser:
     VERSION = jumpdiaq.__version__
@@ -174,7 +165,6 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Inputs 
     required_group.add_argument("--input-runs", help="paths of raw files", nargs='*', default=[])
-    #required_group.add_argument("--sample-meta", type=str, help="group information of runs/samples")
     required_group.add_argument("--id-report", type=str, help="path to identification report")
     required_group.add_argument("--spec-lib", type=str, help="path to spectral library")
     required_group.add_argument("--out-dir", type=str, help="output directory name")
@@ -210,33 +200,26 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--individual-im-window", type=int, help="")
     
     # XIC quantification
-    optional_group.add_argument("--min-quan-fr", type=int, help="")
-    optional_group.add_argument("--max-quan-fr", type=int, help="")
-    optional_group.add_argument("--max-isotopes", type=int, help="")
-    optional_group.add_argument("--corr-radius", type=int, help="")
-    optional_group.add_argument("--corr-method", type=int, help="")
-    optional_group.add_argument("--weight-by-shape", type=int, help="")
-    optional_group.add_argument("--weight-by-intensity", type=int, help="")
-    optional_group.add_argument("--min-shape-score", type=float, help="")
-    optional_group.add_argument("--min-xic-intensity", type=float, help="")
-    optional_group.add_argument("--min-apex-intensity", type=float, help="")
-    optional_group.add_argument("--min-apex-evidence", type=float, help="")   
+    optional_group.add_argument("--min-fr-quant", type=int, help="")
+    optional_group.add_argument("--max-fr-quant", type=int, help="")
+    optional_group.add_argument("--max-pr-isotopes", type=int, help="")  
     optional_group.add_argument("--optimal-xic-source", type=str, help="")
     optional_group.add_argument("--intf-removal", type=int, help="")
     optional_group.add_argument("--intf-filter-factor", type=float, help="")
     
     # Precursor summarization
+    optional_group.add_argument("--use-raw-ms1xic", type=float, help="")
+    optional_group.add_argument("--use-raw-ms2xic", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
     optional_group.add_argument("--fill-missing-xic", type=int, help="")
+    
+    # Precursor normalization
     optional_group.add_argument("--norm-species", type=str, help="")
     optional_group.add_argument("--norm-method", type=str, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
     
     # Protein summarization
-    optional_group.add_argument("--min-prec-quality", type=float, help="")
     optional_group.add_argument("--prec-quant-level", type=str, help="")
-    optional_group.add_argument("--ms2-priority-quality", type=float, help="")
-    optional_group.add_argument("--prot-quality-cutoffs", type=float, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
     # timsTOF data preprocessing

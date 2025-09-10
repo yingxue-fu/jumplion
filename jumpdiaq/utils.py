@@ -12,6 +12,19 @@ import pandas as pd
 MSFormatsExt = {"mzml", "raw", "d"}  
 MaxLibFrNum = 20
 
+# Optimal XIC
+CorrRadius = 5
+CorrMethod = 0
+WeightByShape = 1
+WeightByIntensity = 1
+CorrWeight = 0.5
+ShapeWeight = 0.2
+IntensityWeight = 0.3
+MinShapeScore = 0.3
+MinXicIntensity = 10
+MinApexIntensity = 30
+MinApexEvidence = 0.99
+
 #
 E = np.float64(0.000000001)
 INF = np.float64(10000000.0)

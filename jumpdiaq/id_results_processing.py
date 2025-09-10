@@ -167,7 +167,7 @@ def process_id_results(id_file,
         logging.info("Determining the number of data points to extract for an XIC")
         # 
         cycle_time = get_cycle_time(ms_files[0])
-        logging.info(f"Cycle time: {cycle_time} ({np.round(cycle_time*60, 3)} seconds)")
+        logging.info(f"Cycle time: {cycle_time} ({(cycle_time*60):3g} seconds)")
         # 
         average_model_acc = np.mean(model_accs)
         average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
@@ -262,7 +262,7 @@ def modeling_and_prediction(data_dict,
         models[run_name] = {"coeff": model_coeff, "points": model_points}
         delta_percentile=0.8
         model_acc = check_model_accuracy(model_data, model_coeff, model_points, delta_percentile)
-        logging.info(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {np.round(model_acc, 4)}")
+        logging.info(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {model_acc:.4g}")
         model_accs.append(model_acc)
         if save_plot:
             plot_out_dir = out_dir / f'{data_type}_prediction'
@@ -308,9 +308,9 @@ def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""
     mat_median_diff = mat.sub(mat_stat['median'].values, axis=0)
     ## min and max of diffs
     median_diff = mat_median_diff.values.flatten()
-    diff_max = np.round(np.nanmax(median_diff), 4)
-    diff_min = np.round(np.nanmin(median_diff), 4)
-    logging.info(f"Min and max RT differences across runs before RT prediction: {diff_min}, {diff_max}")
+    diff_max = np.nanmax(median_diff)
+    diff_min = np.nanmin(median_diff)
+    logging.info(f"Min and max RT differences across runs before RT prediction: {diff_min:.4g}, {diff_max:.4g}")
     
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
     ax1.hist(mat_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')

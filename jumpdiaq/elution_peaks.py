@@ -251,6 +251,9 @@ def identify_optimal_xic(ms1, ms2,
                         corr_method, 
                         shape_weighted,
                         intensity_weighted,
+                        corr_weight,
+                        shape_weight,
+                        intensity_weight,
                         optimal_xic_source, 
                         min_shape_score,
                         min_apex_intensity, 
@@ -272,15 +275,6 @@ def identify_optimal_xic(ms1, ms2,
     region = slice(max(0, apex - radius), 
                    min(ms1.shape[0] - 2, apex + radius + 1))
     
-    # if optimal_xic_source == 'ms1':
-    #     xics = ms1.copy()
-    #     n_ms1 = ms1.shape[1]
-    #     n_ms2 = 0
-    # elif optimal_xic_source == 'ms2':
-    #     xics = ms2.copy()
-    #     n_ms1 = 0
-    #     n_ms2 = ms2.shape[1]
-    # elif optimal_xic_source == 'ms1_ms2':
     xics = np.concatenate((ms1, ms2), axis = 1)
     n_ms1 = ms1.shape[1]
     n_ms2 = ms2.shape[1]
@@ -294,8 +288,9 @@ def identify_optimal_xic(ms1, ms2,
                                              shape_weighted, 
                                              intensity_weighted)
     # Sort descending by combined score
-    #scores = corr_scores * shape_scores * intensity_scores
-    scores = (0.5*corr_scores) + (0.3*intensity_scores) + (0.2*shape_scores) 
+    scores = ((corr_weight*corr_scores) + 
+              (intensity_weight*intensity_scores) + 
+              (shape_weight*shape_scores))
     indices = np.argsort(scores)[::-1]
     
     ms1_indices = np.arange(n_ms1)
