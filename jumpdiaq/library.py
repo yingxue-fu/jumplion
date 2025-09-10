@@ -26,7 +26,8 @@ args = Arguments()
 MaxPrIsotopes = args.max_pr_isotopes
 MaxFr = args.max_fr_quant
 IntfRemoval = args.intf_removal
-IntfFilterFactor = args.intf_filter_factor
+IntfFactorMS1 = args.intf_factor_ms1
+IntfFactorMS2 = args.intf_factor_ms2
 ShowProgress = args.show_progress
 InterProgress = args.inter_progress
 
@@ -577,7 +578,8 @@ class Info:
                                                       optimal_xic_type, 
                                                       corr_method=CorrMethod, 
                                                       intf_removal=IntfRemoval, 
-                                                      intf_filter_factor=IntfFilterFactor)
+                                                      intf_factor_ms1=IntfFactorMS1,
+                                                      intf_factor_ms2=IntfFactorMS2)
                 
                 n_ms1 = len(qt[1].ms1_quant)
                 for prec in range(n_ms1):

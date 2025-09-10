@@ -60,7 +60,8 @@ class Arguments:
     max_pr_isotopes: int = 5
     optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     intf_removal: int = 1
-    intf_filter_factor: float = 1.2
+    intf_factor_ms1: float = 1.2
+    intf_factor_ms2: float = 1.5
     
     # Precursor summarization
     xic_quality_cutoff: float = 0.0
@@ -205,7 +206,8 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--max-pr-isotopes", type=int, help="")  
     optional_group.add_argument("--optimal-xic-source", type=str, help="")
     optional_group.add_argument("--intf-removal", type=int, help="")
-    optional_group.add_argument("--intf-filter-factor", type=float, help="")
+    optional_group.add_argument("--intf-factor-ms1", type=float, help="")
+    optional_group.add_argument("--intf-factor-ms2", type=float, help="")
     
     # Precursor summarization
     optional_group.add_argument("--use-raw-ms1xic", type=float, help="")

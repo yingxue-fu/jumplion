@@ -379,9 +379,11 @@ def calculate_quantity(ms1, ms2,
                        optimal_xic_type, 
                        corr_method=0, 
                        intf_removal=True, 
-                       intf_filter_factor=1.5):
+                       intf_factor_ms1=1.2,
+                       intf_factor_ms2=1.5):
     
     ms1_ms2 = np.concatenate((ms1, ms2), axis=1)
+    n_ms1 = ms1.shape[1]
     len_ = end - begin + 1
     p = ms1_ms2.shape[1]
     
@@ -441,7 +443,10 @@ def calculate_quantity(ms1, ms2,
                         r = max(r * 0.5, min(r, radj))
         
                     # Apply interference filtering
-                    ms1_ms2_filtered[begin:end+1, ion] = np.minimum(ms1_ms2[begin:end+1, ion], intf_filter_factor * r * elution[begin:end+1])
+                    if ion < n_ms1: # for MS1 XICs
+                        ms1_ms2_filtered[begin:end+1, ion] = np.minimum(ms1_ms2[begin:end+1, ion], intf_factor_ms1 * r * elution[begin:end+1])
+                    else:           # for MS2 XICs
+                        ms1_ms2_filtered[begin:end+1, ion] = np.minimum(ms1_ms2[begin:end+1, ion], intf_factor_ms2 * r * elution[begin:end+1])
                     quant_quantity[ion, 1] = np.sum(ms1_ms2_filtered[begin:end+1, ion])
         
         # calculate correlation after correction
