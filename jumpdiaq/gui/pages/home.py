@@ -10,7 +10,7 @@ layout = dbc.Container([
             dbc.Card(
                 dbc.CardBody(
                     [
-                        html.H4("JUMPdiaq: A Hybrid MS1-MS2 Approach for Complete and Accurate Quantification in DIA Proteomics", 
+                        html.H4("JUMPdiaq: Integrating MS1 and MS2 Signals for Complete and Accurate Quantification in DIA Proteomics", 
                                 className="card-title"),
                         html.Div([
                             html.Span(f"Version: {jumpdiaq.__version__}", style={"marginRight": "20px"}),

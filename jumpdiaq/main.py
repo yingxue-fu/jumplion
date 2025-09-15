@@ -8,6 +8,7 @@ import platform  # os info
 import logging
 from pathlib import Path
 # external
+import polars as pl
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg') 
@@ -68,6 +69,7 @@ def main():
     from jumpdiaq.run import Run
     from jumpdiaq.id_results_processing import (process_id_results, 
                                                 get_prec_prot_relation, 
+                                                get_prot_prec_pep_info,
                                                 calculate_protein_coverage)
     from jumpdiaq.summarization import (quantify_precursors, 
                                         quantify_proteins, 
@@ -93,6 +95,8 @@ def main():
     TrimPercentage = args.trim_percentage
     ## Protein quantification
     PrecQuantLevel = args.prec_quant_level
+    MinPrecQuality = args.min_prec_quality
+    MinPepNum = args.min_pep_num
     
     # XIC quantification
     report_file = out_pub_dir / 'xic_quantification.parquet'
@@ -103,12 +107,12 @@ def main():
         
         ## Skip ID results processing
         if SkipIDprocess:
-            prec_locations_file = out_int_dir / "prec_locations.csv"
-            logging.info(f"ID results processing skipped. Using existing precursor RTs (and IMs): {prec_locations_file}\n") 
-            prec_locations = pd.read_csv(prec_locations_file)
-            prec_locations.set_index('Precursor.Id', inplace=True)
+            prec_rt_file = out_int_dir / "prec_rt_info.csv"
+            logging.info(f"ID results processing skipped. Using existing precursor RTs (and IMs): {prec_rt_file}\n") 
+            prec_rts = pd.read_csv(prec_rt_file)
+            prec_rts.set_index('Precursor.Id', inplace=True)
         else:
-            prec_locations = process_id_results(IdFile, LibFile, MSFiles, OutDir)
+            prec_rts = process_id_results(IdFile, LibFile, MSFiles, OutDir)
         
         ## Load library
         lib = Library()
@@ -131,7 +135,7 @@ def main():
             if not run.load(file):
                 logging.info(f"ERROR: cannot load the file {file}, skipping")
             run.load_library(lib)
-            run.load_prec_locations(prec_locations)
+            run.load_prec_rts(prec_rts)
             run.process()
             run.free()
             del run
@@ -146,28 +150,13 @@ def main():
     
     # Precursor quantification
     out_prec_dir = out_int_dir / 'prec_quant'
-    (prec_ms1_quantity_table, 
-     prec_ms1_quality_table,
-     prec_ms2_quantity_table, 
-     prec_ms2_quality_table) = quantify_precursors(report_file, 
-                                                   use_raw_ms1xic=UseRawMS1XIC,
-                                                   use_raw_ms2xic=UseRawMS2XIC,
-                                                   xic_quality_cutoff=XicQualityCutoff,
-                                                   fill_missing_xic=FillMissingXic,
-                                                   out_dir=str(out_prec_dir))
-                                                   
-    # Choose between MS1 and MS2 precursor quantification
-    if PrecQuantLevel == 'ms1':
-        logging.info("Using only MS1-level precursor quantity for further analysis")
-        prec_quantity_table = prec_ms1_quantity_table
-        prec_quality_table = prec_ms1_quality_table
-    elif PrecQuantLevel == 'ms2':
-        logging.info("Using only MS2-level precursor quantity for further analysis")
-        prec_quantity_table = prec_ms2_quantity_table
-        prec_quality_table = prec_ms2_quality_table
-    elif PrecQuantLevel == 'ms1_ms2':
-        logging.info("Using a hybrid of MS1- and MS2-level quantity for further analysis")
-        pass
+    prec_quantity_table, prec_quality_table = quantify_precursors(report_file, 
+                                                  use_raw_ms1xic=UseRawMS1XIC,
+                                                  use_raw_ms2xic=UseRawMS2XIC,
+                                                  xic_quality_cutoff=XicQualityCutoff,
+                                                  fill_missing_xic=FillMissingXic,
+                                                  prec_quant_level=PrecQuantLevel,
+                                                  out_dir=str(out_prec_dir))
     prec_quantity_table.write_parquet(out_pub_dir / "precursor_quantity_summ_table.parquet")
     prec_quality_table.write_parquet(out_pub_dir / "precursor_quality_summ_table.parquet")
     
@@ -186,19 +175,30 @@ def main():
     prec_quantity_table_norm.write_parquet(out_pub_dir / "precursor_quantity_summ_table_norm.parquet")
     
     # Protein quantification
-    prot_quantity_table, prot_quality_table = quantify_proteins(prec_quantity_table_norm, prec_quality_table)
-    prot_quantity_table.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
+    # prec_quantity_table_norm = pl.read_parquet(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250908_xicHybrid_precMS2raw_cmd\publication\precursor_quantity_summ_table_norm.parquet")
+    # prec_quality_table = pl.read_parquet(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250908_xicHybrid_precMS2raw_cmd\publication\precursor_quality_summ_table.parquet")
+    prot_quantity_table, prot_quality_table = quantify_proteins(prec_quantity_table_norm, 
+                                                                prec_quality_table,
+                                                                min_prec_quality=MinPrecQuality)
+    # out_pub_dir = Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250908_xicHybrid_precMS2raw_cmd\publication")
+    prot_quantity_table.write_csv(out_pub_dir / "protein.group_quantity_matrix_all.csv")
     prot_quality_table.write_csv(out_pub_dir / "protein.group_quality_matrix.csv")
     
-    # Protein coverage calculation
+    # Calculate the number of peptides of a protein
+    prot_prec_pep_info = get_prot_prec_pep_info(out_pub_dir / 'xic_quantification.parquet')
+    # Calculate protein coverage
     FastaFiles = args.fastas
     if len(FastaFiles):
         logging.info("Calculating protein coverage based on provided fasta files")
-        prot_prec_pep_info = calculate_protein_coverage(out_pub_dir / 'xic_quantification.parquet', 
-                                                        FastaFiles, str(out_int_dir))
-        prot_prec_pep_info.to_csv(out_int_dir / "prot_prec_pep_info.csv", index=False)
+        prot_prec_pep_info = calculate_protein_coverage(prot_prec_pep_info, FastaFiles)
     else:
         logging.warning("WARNING: no Fasta files are provided, protein coverage will not be calculated.")
+    prot_prec_pep_info.to_csv(out_int_dir / "prot_prec_pep_info.csv", index=False)
+    
+    # Filter based on the number of peptides
+    accepted_pgs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Peptides'] >= MinPepNum]
+    prot_quantity_table_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(accepted_pgs))
+    prot_quantity_table_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
     
     logging.info("Finished!")
     close_logger(logger)

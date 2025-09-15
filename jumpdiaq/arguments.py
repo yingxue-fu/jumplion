@@ -33,7 +33,7 @@ class Arguments:
     min_runs_quant: int = 3
     min_runs_model: int = 3
     min_runs_cal: int = 6
-    min_qvalue_cal: float = 0.0001
+    max_qvalue_cal: float = 0.0001
     max_mass_cal: int = 5000
     
     # XIC extraction
@@ -45,9 +45,9 @@ class Arguments:
     ## Mass calibration
     mass_calibration: int = 1    
     mass_cal_acc: float = 30.0   # calibration mass accuracy
-    mass_cal_bins: int = 1
-    mass_cal_bins_max: int = 1
-    mass_cal_score: float = 0.9
+    #mass_cal_bins: int = 1
+    #mass_cal_bins_max: int = 1
+    #mass_cal_score: float = 0.9
     ## IM window settings
     im_window_cal: float = 0.03
     fix_im_window: int = 0
@@ -61,7 +61,7 @@ class Arguments:
     optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     intf_removal: int = 1
     intf_factor_ms1: float = 1.2
-    intf_factor_ms2: float = 1.5
+    intf_factor_ms2: float = 1.6
     
     # Precursor summarization
     xic_quality_cutoff: float = 0.0
@@ -76,6 +76,8 @@ class Arguments:
     
     # Protein summarization
     prec_quant_level: str = "ms2" # Other options: 'ms1', 'ms2'
+    min_prec_quality: float = 0.0
+    min_pep_num: int = 2
     fastas: List[str] = field(default_factory=list)
     
     # timsTOF data preprocessing (hidden from users)
@@ -179,7 +181,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-runs-quant", type=int, help="")
     optional_group.add_argument("--min-runs-model", type=int, help="")
     optional_group.add_argument("--min-runs-cal", type=int, help="")
-    optional_group.add_argument("--min-qvalue-cal", type=float, help="")
+    optional_group.add_argument("--max-qvalue-cal", type=float, help="")
     optional_group.add_argument("--max-mass-cal", type=int, help="")
     
     # XIC extraction
@@ -191,9 +193,9 @@ def create_parser() -> argparse.ArgumentParser:
     ## Mass calibration
     optional_group.add_argument("--mass-calibration", type=int, help="") 
     optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
-    optional_group.add_argument("--mass-cal-bins", type=int, help="")
-    optional_group.add_argument("--mass-cal-bins-max", type=int, help="")
-    optional_group.add_argument("--mass-cal-score", type=float, help="")
+    #optional_group.add_argument("--mass-cal-bins", type=int, help="")
+    #optional_group.add_argument("--mass-cal-bins-max", type=int, help="")
+    #optional_group.add_argument("--mass-cal-score", type=float, help="")
     ## IM window settings
     optional_group.add_argument("--im-window-cal", type=float, help="")
     optional_group.add_argument("--fix-im-window", type=int, help="")
@@ -222,6 +224,8 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Protein summarization
     optional_group.add_argument("--prec-quant-level", type=str, help="")
+    optional_group.add_argument("--min-prec-quality", type=float, help="")
+    optional_group.add_argument("--min-pep-num", type=int, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
     # timsTOF data preprocessing

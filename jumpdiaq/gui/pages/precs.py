@@ -26,7 +26,7 @@ sidebar = html.Div(
             [   
                 html.Label(id='protein-label', style={"font-weight": "bold"}),
                 dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor"),
-                html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
+                #html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
                 html.Br(),
                 html.Label("For cross-run", style={"font-weight": "bold"}),
                 dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means-xic', value=False),
@@ -161,14 +161,14 @@ def update_protein_label(protein_name):
 def load_options(stored_options):
     if stored_options is None:
         return []
-    # Note: label and value are different
-    precursor_options = [{'label': precursor.split("_")[0], 'value': precursor} 
+    
+    precursor_options = [{'label': precursor, 'value': precursor} 
                          for precursor in stored_options]
     return precursor_options
 
 @app.callback(
     [Output('show-precid-c', 'children'),
-     Output('show-ms-level', 'children'), 
+     #Output('show-ms-level', 'children'), 
      Output('stored-precquant', 'data'),
      Output('stored-precquality', 'data'),
      Output('stored-precMS1quant', 'data'),
@@ -181,37 +181,42 @@ def load_options(stored_options):
 )
 def read_precs_data(selected_precursor, outdir_path):
     if not selected_precursor or outdir_path is None:
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None
     
     out_prec_dir = Path(outdir_path) / 'intermediate' / 'prec_quant'
+    #
     prec_quant_file = out_prec_dir / "precursor_quantity_ms1_ms2_summ_table.parquet"
     prec_quality_file = out_prec_dir / "precursor_quality_ms1_ms2_summ_table.parquet"
+    #
     ms1_quant_file = out_prec_dir / "Precursor.Id_MS1.XIC.Quant.Adjusted_mapping.parquet"
     ms1_quality_file = out_prec_dir / "Precursor.Id_MS1.XIC.Corr.Raw_mapping.parquet"
-    ms2_quant_file = out_prec_dir / "Precursor.Id_MS2.XIC.Quant.Adjusted_mapping.parquet"
+    #
+    ms2_quant_file = out_prec_dir / "Precursor.Id_MS2.XIC.Quant.Raw_mapping.parquet"
     ms2_quality_file = out_prec_dir / "Precursor.Id_MS2.XIC.Corr.Raw_mapping.parquet"
     
-    precursor_id = selected_precursor.split("_")[0]
-    ms_level = selected_precursor.split("_")[1]
+    precursor_id = selected_precursor
+    #ms_level = selected_precursor.split("_")[1]
     title = html.Div([f"     {precursor_id}"])
-    ms_level_info = f"{ms_level}-level quantification of this precursor is used when summarizing to protein."
+    #ms_level_info = f"{ms_level}-level quantification of this precursor is used when summarizing to protein."
     try:
         prec_quant_df = pd.read_parquet(prec_quant_file, filters=[('Precursor.Id', '==', precursor_id)])
         prec_quality_df = pd.read_parquet(prec_quality_file, filters=[('Precursor.Id', '==', precursor_id)])
         
         ms1_quant_df = pd.read_parquet(ms1_quant_file, filters=[('target_id', '==', precursor_id)])
+        ms1_quant_df['source_quantity'] = np.log2(ms1_quant_df['source_quantity'])
         ms1_quant_df['samples'] = extract_unique_parts(ms1_quant_df['samples'].values.tolist())
         
         ms1_quality_df = pd.read_parquet(ms1_quality_file, filters=[('target_id', '==', precursor_id)])
         ms1_quality_df['samples'] = extract_unique_parts(ms1_quality_df['samples'].values.tolist())
         
         ms2_quant_df = pd.read_parquet(ms2_quant_file, filters=[('target_id', '==', precursor_id)])
+        ms2_quant_df['source_quantity'] = np.log2(ms2_quant_df['source_quantity'])
         ms2_quant_df['samples'] = extract_unique_parts(ms2_quant_df['samples'].values.tolist())
         
         ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', precursor_id)])
         ms2_quality_df['samples'] = extract_unique_parts(ms2_quality_df['samples'].values.tolist())
         
-        return (title, ms_level_info,
+        return (title, #ms_level_info,
                 prec_quant_df.to_dict("records"), 
                 prec_quality_df.to_dict("records"), 
                 ms1_quant_df.to_dict("records"), 
@@ -221,7 +226,7 @@ def read_precs_data(selected_precursor, outdir_path):
                 )
     except Exception as e:
         logger.error(f"Error loading parquet file: {str(e)}")
-        return None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 @app.callback(
     Output('prec-quant-plot', 'figure'),
@@ -295,7 +300,7 @@ def update_summ_plot(sub_row_means_xic,
         # Plot each tract as a connected scatter plot
         meta_samples = extract_unique_parts(meta_samples)
         
-        ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quant', meta_samples)
+        ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quantity', meta_samples)
         for tract_id, group in ms1_quant_df.groupby("source_id"):
             x=group["X"]
             if sub_row_means_xic:
@@ -316,7 +321,7 @@ def update_summ_plot(sub_row_means_xic,
                 opacity=opacity
             ))
 
-        ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quant', meta_samples)
+        ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quantity', meta_samples)
         for i, (tract_id, group) in enumerate(ms2_quant_df.groupby("source_id")):
             x=group["X"]
             if sub_row_means_xic:
@@ -457,7 +462,7 @@ def update_run_options(selected_precursor: str, outdir_path: str) -> tuple:
                          'n.MS1.XICs', 'n.MS2.XICs', 'MS1.XIC.Info', 'MS2.XIC.Info', 
                          'MS2.XIC.Corr.Raw', 'MS2.XIC.Quant.Raw', 'MS2.XIC.Quant.Adjusted',
                          'MS1.XIC.Corr.Raw', 'MS1.XIC.Quant.Raw', 'MS1.XIC.Quant.Adjusted']
-        selected_precursor = selected_precursor.split("_")[0]
+        #selected_precursor = selected_precursor.split("_")[0]
         df = pd.read_parquet(data_path, 
                              columns=required_cols,
                              filters=[('Precursor.Id', '==', selected_precursor)])
@@ -508,7 +513,7 @@ def update_XIC_plots_table(selected_precursor: str,
         if not xic_file_path.exists():
             raise FileNotFoundError(f"XIC file not found: {xic_file_path}")
         
-        selected_precursor = selected_precursor.split("_")[0]
+        #selected_precursor = selected_precursor.split("_")[0]
         xic_data = pd.read_parquet(xic_file_path, filters=[('Precursor.Id', '==', selected_precursor)])
         
         if xic_data.empty:
@@ -623,7 +628,7 @@ def update_XIC_plots_table(selected_precursor: str,
                 marker=dict(color=ms1_colors[ms1_xics[i].split("/")[0]])
             ))
             
-        xic_c_path = out_int_dir / "xic_files" / "xics.corrected.parquet"
+        xic_c_path = out_int_dir / "xic_files" / "xics.adjusted.parquet"
         xic_data_c = pd.read_parquet(xic_c_path, 
                                      filters=[('Run', '==', selected_run),
                                               ('Precursor.Id', '==', selected_precursor)])

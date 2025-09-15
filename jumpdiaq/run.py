@@ -11,6 +11,7 @@ from jumpdiaq.arguments import Arguments, get_extension
 from jumpdiaq.utils import (CorrRadius, CorrMethod, WeightByShape, WeightByIntensity, 
                             CorrWeight, ShapeWeight, IntensityWeight, MinShapeScore,
                             MinXicIntensity, MinApexIntensity, MinApexEvidence,
+                            MassCalBins, MassCalBinsMax, MassCalScore,
                             C13delta, fExclude, E, INF, estimate_isotopes,
                             remove_extension, get_file_name, progress_bar)
 from jumpdiaq.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
@@ -30,8 +31,6 @@ SaveSupplements = args.save_supplements
 nXICPoints = args.n_xic_points
 Calibrate = args.mass_calibration
 MassCalAcc = args.mass_cal_acc
-MassCalBinsMax = args.mass_cal_bins_max
-MassCalScore = args.mass_cal_score
 IndividualMassAcc = args.individual_mass_acc
 IMWindowCal = args.im_window_cal
 IndividualIMWindow = args.individual_im_window
@@ -179,7 +178,7 @@ class RunEntry:
             n_isotopes = min(MaxPrIsotopes, self.info.n_isotopic_peaks)
             for j in range(n_isotopes):
                 query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], self.ms1_rts[ind], 
-                                        self.run.MassCalCenter, args.mass_cal_bins)
+                                        self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
                     self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1x[ms1_left].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
                 else:             
@@ -188,7 +187,7 @@ class RunEntry:
             for fr in range(self.info.n_frs):
                 self.ms2_rts[ind] = self.run.ms2_RT[i]
                 query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz, self.ms2_rts[ind], 
-                                        self.run.MassCalCenter, args.mass_cal_bins)
+                                        self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
                     self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2x[i].level(report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
                 else:             
@@ -558,7 +557,7 @@ class Run:
         logging.info(f"{cnt} precursors in the library are within the MS1 isolation m/z range")
     
     
-    def load_prec_locations(self, df):
+    def load_prec_rts(self, df):
         if self.tims:         
             logging.info("Loading precursor RT and IM")
         else:
@@ -671,7 +670,7 @@ class Run:
         mass_cali_data = mass_cali_data.sort("experimental_rt")
         
         # setup for mass calibration bins
-        (args.mass_cal_bins, 
+        (MassCalBins, 
          self.MassCalSplit, 
          self.MassCalCenter) = split_into_rt_bins(mass_cali_data['experimental_rt'].to_numpy(), 
                                                   max_num_bins=MassCalBinsMax) 
@@ -713,7 +712,7 @@ class Run:
             delta_mzs = mass_cali_data[delta_col].to_numpy(),
             rts = mass_cali_data['experimental_rt'].to_numpy(),
             RTBinCenter = self.MassCalCenter,
-            nRTBins = args.mass_cal_bins
+            nRTBins = MassCalBins
         )
         setattr(self, f'MassCorrection{level.upper()}', correction)
     
@@ -723,7 +722,7 @@ class Run:
             mass_cali_data[theo_col].to_numpy().reshape(-1, 1),
             mass_cali_data['experimental_rt'].to_numpy(),
             self.MassCalCenter,
-            args.mass_cal_bins
+            MassCalBins
         ).reshape(-1)
         mass_cali_data = mass_cali_data.with_columns(
             pl.Series(name=query_col, values=query_mz)

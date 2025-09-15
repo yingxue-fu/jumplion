@@ -1,5 +1,4 @@
 # builtin
-import ast
 from pathlib import Path
 from collections import defaultdict
 # external
@@ -32,11 +31,44 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(
             [
-                html.Label("Select a quantification table", style={"font-weight": "bold"}),
-                dbc.Select(id='quant-table-selector', placeholder='Select a file'),
-                html.Label("Input meta file path", style={"font-weight": "bold", 'marginTop': '10px'}),
+                html.Label("Input meta file path", style={"font-weight": "bold"}),
                 dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
                           style={'width': '100%'}, persistence=True),
+                html.Label("Protein filtering", style={"font-weight": "bold", 'marginTop': '10px'}),
+                dbc.Row([
+                    dbc.Col(html.Label("Missing value # <="), width=8),  
+                    dbc.Col(html.Div([
+                        dbc.Input(id="n-missing", 
+                                  type="number", 
+                                  value=2, 
+                                  style={"width": "32px", "height": "25px", 
+                                         "padding": "0px",
+                                         "paddingLeft": "3px",
+                                         "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
+                                         "backgroundSize": "10px"}), 
+                        html.P("/", style={"margin": "0 5px", "height": "25px"}),
+                        dbc.Input(id="n-total", 
+                                  type="number", 
+                                  value=4, 
+                                  style={"width": "32px", "height": "25px", 
+                                         "padding": "0px",
+                                         "paddingLeft": "3px",
+                                         "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
+                                         "backgroundSize": "10px"})
+                    ], style={"display": "flex", "align-items": "center"}),
+                    width=4),  
+                ], className="mt-1 mb-0 p-0"),
+                dbc.Row([
+                    dbc.Col(html.Label("Coefficient of variation <="), width=8),  
+                    dbc.Col(html.Div([
+                        dbc.Input(id="max-cv", 
+                                  type="number", 
+                                  value=20, 
+                                  style={"width": "80px", "height": "25px"}), 
+                        html.P("%", style={"margin": "0 5px", "height": "25px"}),
+                    ], style={"display": "flex", "align-items": "center"}),
+                    width=4),  
+                ], className="mb-1 p-0", style={"margin-top": "5px"}),
                 dbc.Button('Load Quantification Table', 
                            id='load-prot-quant', n_clicks=0, color='info',
                            style={'margin-top': '10px', "textTransform": "none"}),
@@ -58,6 +90,7 @@ sidebar = html.Div(
                 html.Label("Select groups for comparison", style={'marginTop': '5px'}),
                 dbc.Select(id='group-A', placeholder="Group A"),
                 dbc.Select(id='group-B', placeholder="Group B", style={'marginTop': '5px'}),
+                dbc.Switch(label='Show expected ratios', id='show-exp-ratios', value=False),
                 html.Label("Input expected ratios:", style={'marginTop': '5px'}),
                 dbc.Row([
                     dbc.Col(dbc.Input(id="ratio-1", type="number", value=1.0), width=4), 
@@ -251,23 +284,7 @@ layout = html.Div(children=[
         ], width=8)
     ])
 ])
-   
-
-@app.callback(
-    Output('quant-table-selector', 'options'),
-    Input('stored-outdir', 'data'),
-)
-def list_quant_files(dir_path):
-    if not dir_path or not Path(dir_path).is_dir():
-        return []
-    
-    out_pub_dir = Path(dir_path) / 'publication'
-    quant_tables = []
-    quant_files = [f.name for f in out_pub_dir.iterdir() if f.name.startswith('Protein.Group_Quant_quantile')]
-    quant_tables.extend(quant_files)
-
-    return [{'label': f, 'value': f} for f in quant_tables]
-    
+       
 
 # Callback to read the selected CSV file
 @app.callback(
@@ -275,49 +292,48 @@ def list_quant_files(dir_path):
      Output('prot-quant-table', 'columns'),
      Output('stored-prot-quant', 'data'),
      Output('stored-prot-quality', 'data'),
-     Output('show-cutoff', 'children'),
+     #Output('show-cutoff', 'children'),
      Output('stored-meta', 'data')],
     Input('load-prot-quant', 'n_clicks'),
-    State('quant-table-selector', 'value'),
+    #State('quant-table-selector', 'value'),
     State('stored-outdir', 'data'),
     State('meta-path', 'value'),
     prevent_initial_call=True
 )
-def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
+def load_quant_table(n_clicks, outdir_path, meta_path):
     
-    if not selected_table or not outdir_path or not meta_path:
-        return None, [], None, None, "", {}
+    if not outdir_path or not meta_path:
+        return None, [], None, None, {}
     
     out_int_dir = Path(outdir_path) / 'intermediate'
     out_pub_dir = Path(outdir_path) / 'publication'
-    quant_csv_path = out_pub_dir / selected_table
-    quality_csv_path = out_pub_dir / "Protein.Group_Quant_Quality.csv"
+    quant_csv_path = out_pub_dir / 'protein.group_quantity_matrix.csv'
+    quality_csv_path = out_pub_dir / "protein.group_quality_matrix.csv"
     prot_pep_info_path = out_int_dir / "prot_prec_pep_info.csv"
     
     try:
         quant_df = pd.read_csv(quant_csv_path)
         meta = pd.read_csv(meta_path)
+        
         # Make the samples the same order as in the meta file
         sample_names = meta['Sample'].values.tolist()
         quant_df = quant_df.loc[:, quant_df.columns[0:3].values.tolist() + sample_names]
+        
         # Simplify the sample name
         simple_sample_names = extract_unique_parts(sample_names)
         quant_df.columns = (
             quant_df.columns[0:3].values.tolist() + 
             simple_sample_names
         )
+        meta['Sample_simp'] = simple_sample_names
+        
         # Combine with protein coverage info
         prot_pep_df = pd.read_csv(prot_pep_info_path)
         quant_df = prot_pep_df.merge(quant_df, how='right')
-        # Convert the string to an actual list of tuples
-        quant_df['Peptide.Positions'] = quant_df['Peptide.Positions'].apply(ast.literal_eval)
-        
-        quant_df_to_show = quant_df.drop(columns=['Protein.Group', 'Protein.Description', 'Protein.Names', 'Sequence', 'Precursors', 'Peptides', 'Peptide.Positions'])
-        value_cols = simple_sample_names
-        quant_df_to_show[value_cols] = quant_df_to_show[value_cols].round(3)
-        extracted_cutoffs = selected_table.split("quantile")[1].split(".csv")[0].split("_quality")
-        quality_tier, quality_cutoff = tuple(extracted_cutoffs)
-        
+        cols_to_show = ["Protein.Group", "Protein.Names", "Genes", "n.Precursors", "n.Peptides"]
+        quant_df_to_show = quant_df[cols_to_show+simple_sample_names]
+        quant_df_to_show[simple_sample_names] = quant_df_to_show[simple_sample_names].round(3)
+        #
         quality_df = pd.read_csv(quality_csv_path)
         quality_df = quality_df.loc[:, ['Protein.Group'] + meta['Sample'].values.tolist()]
         
@@ -325,12 +341,11 @@ def load_quant_table(n_clicks, selected_table, outdir_path, meta_path):
                 [{'name': col, 'id': col} for col in quant_df_to_show.columns], 
                 quant_df.to_dict('records'), 
                 quality_df.to_dict('records'),
-                f"Using quality cutoff: {quality_cutoff}",
                 meta.to_dict('records'))
 
     except Exception as e:
         logger.error(f"Error loading quantification table: {str(e)}")
-        return None, [], None, None, "", {}
+        return None, [], None, None, {}
 
 
 @app.callback(
@@ -357,15 +372,17 @@ def limit_selection(current_value, previous_value):
     Output('prot-violin-plot', 'figure'),
     Input('stored-prot-quant', 'data'),
     Input('species-input-violin', 'value'),
+    Input('stored-meta', 'data'),
 )
-def update_violin_plot(data, species_input):
+def update_violin_plot(data, species_input, meta_data):
     if data is None:
         return dash.no_update
 
     # Load data
     df = pd.DataFrame(data)
+    meta = pd.DataFrame(meta_data)
     species_column = "Protein.Names"
-    value_columns = df.columns[12:]
+    value_columns = meta['Sample_simp']
 
     # Parse and clean user input
     species = [species_input] if species_input else []
@@ -468,6 +485,7 @@ def generate_group_options(meta):
      Output('ratio-violin-plot', 'figure'),
      Output('stored-valid-prots', 'data')],
     [Input('species-input-bench', 'value'),
+     Input('show-exp-ratios', 'value'),
      Input('ratio-1', 'value'),
      Input('ratio-2', 'value'),
      Input('ratio-3', 'value'),
@@ -480,7 +498,7 @@ def generate_group_options(meta):
      State('stored-meta', 'data')],
     prevent_initial_call=True
 )
-def update_benchmark_plot(species_input, ratio_1, ratio_2, ratio_3, group_A, group_B, point_size, point_opacity, y_span, data, meta):
+def update_benchmark_plot(species_input, show_exp_ratios, ratio_1, ratio_2, ratio_3, group_A, group_B, point_size, point_opacity, y_span, data, meta):
     if data is None:
         return dash.no_update, dash.no_update, {}
     
@@ -530,7 +548,7 @@ def update_benchmark_plot(species_input, ratio_1, ratio_2, ratio_3, group_A, gro
                                  sample_groups=[group_A, group_B], 
                                  cols_A=cols_A, cols_B=cols_B)
     scatter_fig, violin_fig = lfqbench_plot(
-        valid_prots, species_list, exp_ratios, 
+        valid_prots, species_list, show_exp_ratios, exp_ratios, 
         colors=colors, span=y_span, point_cex=point_size, 
         sample_groups=[group_A, group_B], title="",
         opacity=point_opacity
@@ -632,8 +650,8 @@ def read_precs_data(selected_prot, outdir_path, meta):
     try:
         # read quant data
         quant_df = pd.read_parquet(prec_quant_path, filters=[('Protein.Group', '==', selected_prot)])
-        precursors = np.array(quant_df['Precursor.Id_MS_type'].tolist())
-        precursors = np.unique(precursors)
+        precursors = [precursor.split("_")[0] for precursor in quant_df['Precursor.Id_MS_type'].tolist()]
+        precursors = np.unique(np.array(precursors))
         quant_df.set_index('Precursor.Id_MS_type', drop=True, inplace=True)
         quant_df = quant_df.loc[:, meta['Sample'].values.tolist()]
         quant_df.columns = extract_unique_parts(quant_df.columns.values.tolist())
@@ -855,8 +873,14 @@ def update_sequence_viewer(selected_prot, data):
     
     # Retrieve selected row data
     df = pd.DataFrame(data)
+    if 'Peptide.Positions' not in df.columns:
+        return (html.Div("No coverage information is found for the selected protein.", 
+                        style={'height': '500px',
+                               'fontSize': '20px', 
+                               'marginTop': '15px',
+                               'marginLeft': '20px'}), 
+                None)
     row = df[df["Protein.Group"] == selected_prot].iloc[0,:]
-    
     selected_protein = row["Accession.Number"]
     sequence = row['Sequence']
     peptides = row['Peptides'].split(',')

@@ -128,7 +128,10 @@ def precursor_summarize(quantity_df: pl.DataFrame,
         quantity_summed[i, :] = median_summ(quantity_mat_new, topN_rep=3)
         #
         quality_mat_new = quality_mat.copy()
-        quality_mat_new[quality_mat_new <= 0.0] = 0.01
+        quality_mat_new[quality_mat == 0.0] = np.nan
+        quality_mat_new = quality_mat_new[~np.all(np.isnan(quality_mat_new), axis=1)]
+        quality_mat_new[quality_mat_new < 0.0] = 0.01
+        quality_mat_new = np.nan_to_num(quality_mat_new, nan=0.01)
         quality_summed[i, :] = topN(quality_mat_new, N=6, method="median")
         
     quantity_table = pl.DataFrame(quantity_summed, schema=sample_cols)
@@ -216,6 +219,7 @@ def quantify_precursors(report_file,
                         use_raw_ms2xic=True,
                         xic_quality_cutoff=0.0, 
                         fill_missing_xic=True,
+                        prec_quant_level='ms2',
                         out_dir=""):
     
     # MS1-level quantification
@@ -281,11 +285,26 @@ def quantify_precursors(report_file,
     ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
     ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
     
-    return ms1_quantity_table, ms1_quality_table, ms2_quantity_table, ms2_quality_table
-    
+    # Choose between MS1 and MS2 precursor quantification
+    if prec_quant_level == 'ms1':
+        logging.info("Using only MS1-level precursor quantity for further analysis")
+        return ms1_quantity_table, ms1_quality_table
+    elif prec_quant_level == 'ms2':
+        logging.info("Using only MS2-level precursor quantity for further analysis")
+        return ms2_quantity_table, ms2_quality_table
+    elif prec_quant_level == 'ms1_ms2':
+        logging.info("Using a hybrid of MS1- and MS2-level quantity for further analysis")
+        return ms1_ms2_quantity_table, ms1_ms2_quality_table
+
+
 def protein_summarize(prec_quantity_table, 
                       prec_quality_table, 
-                      sample_cols):
+                      sample_cols, 
+                      min_prec_quality):
+    # filtering based on average quality
+    prec_quality_table = prec_quality_table.with_columns(pl.mean_horizontal(sample_cols).alias("Average"))
+    prec_quality_table = prec_quality_table.filter(pl.col("Average") >= min_prec_quality)
+    
     # Group by protein group for fast lookup
     quantity_groups = prec_quantity_table.partition_by("Protein.Group", as_dict=True)
     quality_groups = prec_quality_table.partition_by("Protein.Group", as_dict=True)
@@ -303,24 +322,32 @@ def protein_summarize(prec_quantity_table,
         if quality_df_sub is None:
             continue
         
-        prec_ids = set(quantity_df_sub["Precursor.Id"].to_list()).intersection(
-            quality_df_sub["Precursor.Id"].to_list()
+        prec_id_col = "Precursor.Id_MS_type"
+        prec_ids = set(quantity_df_sub[prec_id_col].to_list()).intersection(
+            quality_df_sub[prec_id_col].to_list()
         )
         if not prec_ids:
             continue
         prec_ids = list(prec_ids)
         
-        quality_df_sub = quality_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
-        quantity_df_sub = quantity_df_sub.filter(pl.col("Precursor.Id").is_in(prec_ids)).sort("Precursor.Id")
-        
-        quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
-        quality_mat = quality_df_sub.select(sample_cols).to_numpy()
+        quantity_df_sub = quantity_df_sub.filter(pl.col(prec_id_col).is_in(prec_ids)).sort(prec_id_col)
+        quality_df_sub = quality_df_sub.filter(pl.col(prec_id_col).is_in(prec_ids)).sort(prec_id_col)
         
         # Summarization
-        quantity_mat = quantity_mat[~np.all(np.isnan(quantity_mat), axis=1)]
-        quantity_summed[i, :] = median_summ(quantity_mat, topN_rep=3)
-        quality_mat = quality_mat[~np.all(np.isnan(quality_mat), axis=1)]
-        quality_summed[i, :] = topN(quality_mat, N=3, method="mean")
+        if len(prec_ids) >= 1:
+            quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
+            quality_mat = quality_df_sub.select(sample_cols).to_numpy()
+            
+            quantity_mat = quantity_mat[~np.all(np.isnan(quantity_mat), axis=1)]
+            quality_mat = quality_mat[~np.all(np.isnan(quality_mat), axis=1)]
+            
+            quantity_summed[i, :] = median_summ(quantity_mat, topN_rep=3)
+            quality_summed[i, :] = topN(quality_mat, N=3, method="mean")
+        else:
+            max_quality_prec = (quality_df_sub.filter(pl.col("Average") == pl.col("Average").max())
+                                .select(["Precursor.Id_MS_type"])).item()
+            quantity_summed[i, :] = quantity_df_sub.filter(pl.col("Precursor.Id_MS_type") == max_quality_prec).select(sample_cols).to_numpy()[0]
+            quality_summed[i, :] = quality_df_sub.filter(pl.col("Precursor.Id_MS_type") == max_quality_prec).select(sample_cols).to_numpy()[0]
         
     quantity_table = pl.DataFrame(quantity_summed, schema=sample_cols)
     quantity_table = quantity_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
@@ -331,7 +358,8 @@ def protein_summarize(prec_quantity_table,
     return quantity_table, quality_table
 
 def quantify_proteins(prec_quantity_table, 
-                      prec_quality_table):
+                      prec_quality_table,
+                      min_prec_quality):
     logging.info("Quantifying proteins")
     # Extract unique sample column names (excluding primary_id and id)
     other_cols = {'Precursor.Id',
@@ -343,7 +371,8 @@ def quantify_proteins(prec_quantity_table,
     sample_cols = [col for col in prec_quantity_table.columns if col not in other_cols]
     prot_quantity_table, prot_quality_table = protein_summarize(prec_quantity_table, 
                                                                 prec_quality_table, 
-                                                                sample_cols)
+                                                                sample_cols,
+                                                                min_prec_quality)
     extra_names = extract_annotation(prot_quantity_table['Protein.Group'].to_list(), 
                                      prec_quantity_table, 
                                      id_col='Protein.Group',

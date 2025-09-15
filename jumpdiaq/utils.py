@@ -12,6 +12,11 @@ import pandas as pd
 MSFormatsExt = {"mzml", "raw", "d"}  
 MaxLibFrNum = 20
 
+#
+MassCalBins = 1
+MassCalBinsMax = 1
+MassCalScore = 0.9
+
 # Optimal XIC
 CorrRadius = 5
 CorrMethod = 0

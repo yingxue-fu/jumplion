@@ -20,7 +20,7 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(
             [   
-                html.Label("Input MS files", style={"font-weight": "bold"}),
+                html.Label("MS files", style={"font-weight": "bold"}),
                 dbc.Input(id='msfile-path', type='text', 
                           placeholder='Path of MS files (.raw, .mzML, .d)', 
                           style={'width': '100%'}, persistence=True),  

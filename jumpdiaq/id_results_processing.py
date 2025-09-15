@@ -22,7 +22,7 @@ SaveSupplements = args.save_supplements
 MinRunsQuant = args.min_runs_quant
 MinRunsModel = args.min_runs_model
 MinRunsCal = args.min_runs_cal
-MinQvalueCal = args.min_qvalue_cal
+MaxQvalueCal = args.max_qvalue_cal
 MaxMassCal = args.max_mass_cal
 MinXICPoints = 21
 
@@ -34,7 +34,7 @@ def process_id_results(id_file,
                        min_runs_quant=MinRunsQuant,
                        min_runs_model=MinRunsModel,
                        min_runs_cal=MinRunsCal,
-                       min_qvalue_cal=MinQvalueCal,
+                       max_qvalue_cal=MaxQvalueCal,
                        max_mass_cal=MaxMassCal,):
     out_int_dir = Path(out_dir) / 'intermediate'
     
@@ -139,10 +139,10 @@ def process_id_results(id_file,
     #############################################
     # 3. Choose precursors for mass calibration #
     #############################################
-    id_df_cal = id_df[id_df['Q.Value'] < min_qvalue_cal]
+    id_df_cal = id_df[id_df['Q.Value'] < max_qvalue_cal]
     rt_mat_cal = rt_mat[(rt_mat.shape[1] - rt_mat.isna().sum(axis=1)) >= min_runs_cal]
     mass_cal_precs = list(set(rt_mat_cal.index.values).intersection(set(id_df_cal['Precursor.Id'].drop_duplicates())))
-    logging.info(f"{len(mass_cal_precs)} precursors with Q-values < {min_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
+    logging.info(f"{len(mass_cal_precs)} precursors with Q-values < {max_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
     random.seed(42)
     mass_cal_precs = random.sample(mass_cal_precs, min(len(mass_cal_precs), max_mass_cal))
     logging.info(f"{len(mass_cal_precs)} of them are randomly selected for mass calibration\n")
@@ -153,12 +153,11 @@ def process_id_results(id_file,
     lib_df_uniq_prec = lib_df_uniq_prec.set_index('Precursor.Id').reindex(rt_mat_pred.index)
     
     rt_mat_pred = rt_mat_pred.add_suffix('_RT')
-    prec_locations = pd.concat([rt_mat_pred, lib_df_uniq_prec['mass_cal']], axis=1)    
+    prec_rt_info = pd.concat([rt_mat_pred, lib_df_uniq_prec['mass_cal']], axis=1)    
     if is_tims:
         im_mat_pred = im_mat_pred.add_suffix('_IM')
-        prec_locations = pd.concat([prec_locations, im_mat_pred], axis=1)
-    
-    prec_locations.to_csv(out_int_dir / "prec_locations.csv")
+        prec_rt_info = pd.concat([prec_rt_info, im_mat_pred], axis=1) 
+    prec_rt_info.to_csv(out_int_dir / "prec_rt_info.csv")
     
     #########################################
     # 4. determine the number of XIC points #
@@ -179,7 +178,7 @@ def process_id_results(id_file,
         args.n_xic_points = MinXICPoints
     logging.info(f"Number of data points to extract for a XIC set to: {args.n_xic_points}\n")
     
-    return prec_locations
+    return prec_rt_info
 
 
 def collect_model_data(mat, 
@@ -370,8 +369,8 @@ def get_prec_prot_relation(lib_file, out_dir):
     
     return prec_prot_df
 
-#
-def calculate_protein_coverage(report_file, fasta_files, out_dir):
+# 
+def get_prot_prec_pep_info(report_file):
     
     # report_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\jumpdia_gui\jump_dia_report.parquet"
     df = pd.read_parquet(report_file, columns=['Protein.Group', 'Precursor.Id', 'Stripped.Sequence'])
@@ -387,6 +386,11 @@ def calculate_protein_coverage(report_file, fasta_files, out_dir):
     prot_prec_info_grouped["n.Precursors"] = prot_prec_info_grouped["Precursors"].apply(lambda x: len(x.split(', ')))
     #
     prot_prec_pep_info = prot_prec_info_grouped.merge(prot_pep_info_grouped)
+    
+    return prot_prec_pep_info
+    
+    
+def calculate_protein_coverage(prot_prec_pep_info, fasta_files): 
     prot_prec_pep_info.insert(1, 'Protein.Group.Rep', prot_prec_pep_info['Protein.Group'].str.split(pat=';', n=1, expand=True)[0])
     #
     prot_fas_info = extract_prot_info_from_FASTAs(fasta_files, prot_prec_pep_info['Protein.Group.Rep'].values.tolist())
@@ -399,7 +403,7 @@ def calculate_protein_coverage(report_file, fasta_files, out_dir):
     #
     (prot_prec_pep_info['Peptide.Positions'], 
      prot_prec_pep_info['Coverage.Percentage']) = map_peptides(prot_prec_pep_info['Sequence'].tolist(), 
-                                                                    prot_prec_pep_info['Peptides'].tolist())
+                                                               prot_prec_pep_info['Peptides'].tolist())
     
     return prot_prec_pep_info
 

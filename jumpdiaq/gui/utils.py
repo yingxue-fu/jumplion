@@ -42,7 +42,8 @@ def ratio_violin_plot(ratios, labels, colors, ylim=None, text_cex=1):
     
     fig.update_traces(
         box=dict(visible=False),
-        meanline=dict(visible=False),
+        meanline=dict(visible=True),
+        side="negative",
         scalemode='width',
         spanmode='hard',
     )
@@ -151,8 +152,8 @@ def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, 
     return valid_prots
 
 
-def lfqbench_plot(valid_prots, species_list, exp_ratios, colors, 
-                  span=4, point_cex=0.3, text_cex=1, opacity=0.8, 
+def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios, 
+                  colors, span=4, point_cex=0.3, text_cex=1, opacity=0.8, 
                   sample_groups=None, title=None):
     """
     Main function to create the LFQBench plot with Plotly
@@ -187,16 +188,17 @@ def lfqbench_plot(valid_prots, species_list, exp_ratios, colors,
                 text=prot_tag_valid,
             ))
     
-    for ratio in exp_ratios:
-        # Add horizontal lines at expected ratios
-        ratio_intensity_fig.add_shape(
-            type="line",
-            x0=min(all_valid_B, default=0),
-            y0=np.log2(ratio),
-            x1=max(all_valid_B, default=1),
-            y1=np.log2(ratio),
-            line=dict(color='rgba(0,0,0,0.5)', width=2, dash='dash')
-        )
+    if show_exp_ratios:
+        for ratio in exp_ratios:
+            # Add horizontal lines at expected ratios
+            ratio_intensity_fig.add_shape(
+                type="line",
+                x0=min(all_valid_B, default=0),
+                y0=np.log2(ratio),
+                x1=max(all_valid_B, default=1),
+                y1=np.log2(ratio),
+                line=dict(color='rgba(128,128,128,0.5)', width=2, dash='dash')
+            )
     
     # Update scatter plot layout
     if sample_groups is None:
@@ -225,16 +227,16 @@ def lfqbench_plot(valid_prots, species_list, exp_ratios, colors,
         ylim=[-span, span]
     )
     
-    # Add horizontal lines at expected ratios
-    for ratio in exp_ratios:
-        ratio_dist_fig.add_shape(
-            type="line",
-            x0=-1,
-            y0=np.log2(ratio),
-            x1=3,
-            y1=np.log2(ratio),
-            line=dict(color='rgba(0,0,0,0.5)', width=2, dash='dash')
-        )
+    # # Add horizontal lines at expected ratios
+    # for ratio in exp_ratios:
+    #     ratio_dist_fig.add_shape(
+    #         type="line",
+    #         x0=-1,
+    #         y0=np.log2(ratio),
+    #         x1=3,
+    #         y1=np.log2(ratio),
+    #         line=dict(color='rgba(0,0,0,0.5)', width=2, dash='dash')
+    #     )
     
     return ratio_intensity_fig, ratio_dist_fig
 
