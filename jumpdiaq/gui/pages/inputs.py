@@ -65,7 +65,7 @@ sidebar = html.Div(
                 html.Label("Spectral library", style={"font-weight": "bold", "margin-top": "10px"}),
                 dbc.Input(id='speclib-path', type='text', placeholder='Path of a spectral library file', 
                           style={'width': '100%'}, persistence=True),
-                html.Label("Fasta files", style={"font-weight": "bold", "margin-top": "10px"}),
+                html.Label("FASTA files", style={"font-weight": "bold", "margin-top": "10px"}),
                 dbc.Input(id='fasta-path', type='text', 
                           placeholder='Path of fasta files (.fasta, .fas)', 
                           style={'width': '100%'}, persistence=True),

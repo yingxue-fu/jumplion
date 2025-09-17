@@ -29,7 +29,7 @@ def main():
     
     # os info
     system = platform.system()
-    release = platform.release()
+    release = platform.release().split(sep='-')[0]
     architecture = platform.architecture()[0]
     # cpu and memory info
     cores = psutil.cpu_count(logical=False)   # Physical cores
@@ -52,13 +52,13 @@ def main():
     out_pub_dir = Path(OutDir) / 'publication'
     
     logger = setup_logger(False, OutDir)
-    logger.info("====================================================")
-    logger.info(f" JUMPdiaq (v{jumpdiaq.__version__}) ")
+    logger.info("=======================================")
+    logger.info(f"  JUMPdiaq (v{jumpdiaq.__version__})")
     logger.info(" ")
-    logger.info(f" System: {system} {release}, {architecture} ")
+    logger.info(f"  OS: {system} {release}, {architecture} ")
     logger.info(f" CPU: {cores} Cores, {threads} Threads")
-    logger.info(f" Memory: {mem_available:.2f} GB/{mem_info.total / (1024 ** 3):.2f} GB  (Available/Total) ")
-    logger.info("====================================================\n")
+    logger.info(f" RAM: {mem_available:.0f} GB/{mem_info.total / (1024 ** 3):.0f} GB  (Avail/Total) ")
+    logger.info("=======================================\n")
     logger.info(f"Command: {cmd}\n")
     
     # Copy the parameter file
@@ -86,10 +86,11 @@ def main():
     UseSavedXIC = args.use_saved_xic
     UseXICReport = args.use_xic_report
     ## Precursor quantification
-    UseRawMS1XIC = args.use_raw_ms1xic
-    UseRawMS2XIC = args.use_raw_ms2xic
+    UseRawMS1 = args.use_raw_ms1
+    UseRawMS2 = args.use_raw_ms2
     XicQualityCutoff = args.xic_quality_cutoff
     FillMissingXic = args.fill_missing_xic
+    ## Precursor normalization
     NormSpecies = args.norm_species
     NormMethod = args.norm_method
     TrimPercentage = args.trim_percentage
@@ -99,9 +100,9 @@ def main():
     MinPepNum = args.min_pep_num
     
     # XIC quantification
-    report_file = out_pub_dir / 'xic_quantification.parquet'
+    xic_quant_file = out_pub_dir / 'xic_quantification.parquet'
     if UseXICReport:
-        logging.info(f"Using existing XIC quantification report: {report_file}") 
+        logging.info(f"Using existing XIC quantification report: {xic_quant_file}") 
     else:
         logging.info(f"{len(MSFiles)} runs will be analyzed")
         
@@ -146,13 +147,13 @@ def main():
         prec_prot_relation = get_prec_prot_relation(LibFile, str(out_int_dir))
         lib.info.load(lib, MSFiles, str(out_int_dir))
         lib.info.quantify(MSFiles, str(out_int_dir))
-        lib.report(report_file, MSFiles, prec_prot_relation)
+        lib.report(xic_quant_file, MSFiles, prec_prot_relation)
     
     # Precursor quantification
     out_prec_dir = out_int_dir / 'prec_quant'
-    prec_quantity_table, prec_quality_table = quantify_precursors(report_file, 
-                                                  use_raw_ms1xic=UseRawMS1XIC,
-                                                  use_raw_ms2xic=UseRawMS2XIC,
+    prec_quantity_table, prec_quality_table = quantify_precursors(xic_quant_file, 
+                                                  use_raw_ms1=UseRawMS1,
+                                                  use_raw_ms2=UseRawMS2,
                                                   xic_quality_cutoff=XicQualityCutoff,
                                                   fill_missing_xic=FillMissingXic,
                                                   prec_quant_level=PrecQuantLevel,
@@ -175,27 +176,29 @@ def main():
     prec_quantity_table_norm.write_parquet(out_pub_dir / "precursor_quantity_summ_table_norm.parquet")
     
     # Protein quantification
-    # prec_quantity_table_norm = pl.read_parquet(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250908_xicHybrid_precMS2raw_cmd\publication\precursor_quantity_summ_table_norm.parquet")
-    # prec_quality_table = pl.read_parquet(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250908_xicHybrid_precMS2raw_cmd\publication\precursor_quality_summ_table.parquet")
     prot_quantity_table, prot_quality_table = quantify_proteins(prec_quantity_table_norm, 
                                                                 prec_quality_table,
                                                                 min_prec_quality=MinPrecQuality)
-    # out_pub_dir = Path(r"C:\Users\yfu\Downloads\miss_dia_test_data\timstof_pro2\test_20250908_xicHybrid_precMS2raw_cmd\publication")
     prot_quantity_table.write_csv(out_pub_dir / "protein.group_quantity_matrix_all.csv")
     prot_quality_table.write_csv(out_pub_dir / "protein.group_quality_matrix.csv")
     
     # Calculate the number of peptides of a protein
-    prot_prec_pep_info = get_prot_prec_pep_info(out_pub_dir / 'xic_quantification.parquet')
+    prot_prec_pep_info = get_prot_prec_pep_info(xic_quant_file)
+    
     # Calculate protein coverage
     FastaFiles = args.fastas
     if len(FastaFiles):
-        logging.info("Calculating protein coverage based on provided fasta files")
-        prot_prec_pep_info = calculate_protein_coverage(prot_prec_pep_info, FastaFiles)
+        try:
+            logging.info("Calculating protein coverage based on provided FASTA file(s)")
+            prot_prec_pep_info = calculate_protein_coverage(prot_prec_pep_info, FastaFiles)
+        except FileNotFoundError as e:
+            logging.warning(f"WARNING: cannot read the FASTA file. {e}")
     else:
-        logging.warning("WARNING: no Fasta files are provided, protein coverage will not be calculated.")
+        logging.warning("WARNING: no FASTA files are provided, protein coverage will not be calculated.")
     prot_prec_pep_info.to_csv(out_int_dir / "prot_prec_pep_info.csv", index=False)
     
     # Filter based on the number of peptides
+    logging.info(f"Filtering proteins based on the number of peptides (>= {MinPepNum})")
     accepted_pgs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Peptides'] >= MinPepNum]
     prot_quantity_table_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(accepted_pgs))
     prot_quantity_table_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")

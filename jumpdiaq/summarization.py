@@ -215,8 +215,8 @@ def quantify_from_xic_report(
     return final_quantity_table, final_quality_table
     
 def quantify_precursors(report_file, 
-                        use_raw_ms1xic=False,
-                        use_raw_ms2xic=True,
+                        use_raw_ms1=False,
+                        use_raw_ms2=True,
                         xic_quality_cutoff=0.0, 
                         fill_missing_xic=True,
                         prec_quant_level='ms2',
@@ -224,7 +224,7 @@ def quantify_precursors(report_file,
     
     # MS1-level quantification
     logging.info("Quantifying precursors at MS1-level")
-    if use_raw_ms1xic:
+    if use_raw_ms1:
         ms1_quantity_col = "MS1.XIC.Quant.Raw"
     else:
         ms1_quantity_col = "MS1.XIC.Quant.Adjusted"
@@ -250,7 +250,7 @@ def quantify_precursors(report_file,
 
     # MS2-level quantification
     logging.info("Quantifying precursors at MS2-level")
-    if use_raw_ms2xic:
+    if use_raw_ms2:
         ms2_quantity_col = "MS2.XIC.Quant.Raw"
     else:
         ms2_quantity_col = "MS2.XIC.Quant.Adjusted"

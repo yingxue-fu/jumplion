@@ -38,16 +38,13 @@ class Arguments:
     
     # XIC extraction
     n_xic_points: int = 21
+    ## Mass calibration
+    mass_calibration: int = 1    
+    mass_cal_acc: float = 30.0   # calibration mass accuracy
     fix_mass_acc: int = 0
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0
     individual_mass_acc: int = 0
-    ## Mass calibration
-    mass_calibration: int = 1    
-    mass_cal_acc: float = 30.0   # calibration mass accuracy
-    #mass_cal_bins: int = 1
-    #mass_cal_bins_max: int = 1
-    #mass_cal_score: float = 0.9
     ## IM window settings
     im_window_cal: float = 0.03
     fix_im_window: int = 0
@@ -61,13 +58,13 @@ class Arguments:
     optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     intf_removal: int = 1
     intf_factor_ms1: float = 1.2
-    intf_factor_ms2: float = 1.6
+    intf_factor_ms2: float = 1.5
     
     # Precursor summarization
+    use_raw_ms1: int = 0
+    use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
     fill_missing_xic: int = 1
-    use_raw_ms1xic: int = 0
-    use_raw_ms2xic: int = 1
     
     # Precursor normalization
     norm_species: str = "HUMAN"
@@ -134,7 +131,7 @@ class Arguments:
                     f.write("\n# XIC extraction\n")
                 if fdef.name == "min_fr_quant":
                     f.write("\n# XIC quantification\n")
-                if fdef.name == "xic_quality_cutoff":
+                if fdef.name == "use_raw_ms1":
                     f.write("\n# Precursor summarization\n")
                 if fdef.name == "norm_species":
                     f.write("\n# Precursor normalization\n")
@@ -186,16 +183,13 @@ def create_parser() -> argparse.ArgumentParser:
     
     # XIC extraction
     optional_group.add_argument("--n-xic-points", type=int, help="")
+    ## Mass calibration
+    optional_group.add_argument("--mass-calibration", type=int, help="") 
+    optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
     optional_group.add_argument("--fix-mass-acc", type=int, help="")
     optional_group.add_argument("--mass-acc-ms2", type=float, help="")
     optional_group.add_argument("--mass-acc-ms1", type=float, help="")
     optional_group.add_argument("--individual-mass-acc", type=int, help="")
-    ## Mass calibration
-    optional_group.add_argument("--mass-calibration", type=int, help="") 
-    optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
-    #optional_group.add_argument("--mass-cal-bins", type=int, help="")
-    #optional_group.add_argument("--mass-cal-bins-max", type=int, help="")
-    #optional_group.add_argument("--mass-cal-score", type=float, help="")
     ## IM window settings
     optional_group.add_argument("--im-window-cal", type=float, help="")
     optional_group.add_argument("--fix-im-window", type=int, help="")
@@ -212,8 +206,8 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--intf-factor-ms2", type=float, help="")
     
     # Precursor summarization
-    optional_group.add_argument("--use-raw-ms1xic", type=float, help="")
-    optional_group.add_argument("--use-raw-ms2xic", type=int, help="")
+    optional_group.add_argument("--use-raw-ms1", type=float, help="")
+    optional_group.add_argument("--use-raw-ms2", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
     optional_group.add_argument("--fill-missing-xic", type=int, help="")
     
@@ -392,7 +386,6 @@ def preprocess_params(param_file):
 
 
 def params_to_args(param_file):
-    
     parser = create_parser()
     default_args = parser.parse_args([])
     
@@ -432,7 +425,6 @@ def params_to_args(param_file):
 
 def setup_logger(show_log_level, out_dir):
     """Sets up the main logger with console, file, and queue handlers."""
-    
     level = logging.INFO  # Default level
 
     # Create a named logger

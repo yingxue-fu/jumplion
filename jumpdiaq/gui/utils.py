@@ -34,18 +34,21 @@ def ratio_violin_plot(ratios, labels, colors, ylim=None, text_cex=1):
         font=dict(size=14 * text_cex),
         xaxis_title='Species',
         yaxis_title=None,  # Explicitly remove the y-axis title
-        margin=dict(l=10),  # Reduce left margin (l = left)
+        margin=dict(l=5),  # Reduce left margin (l = left)
         showlegend=False,
         violingap=0,
         violingroupgap=0,
+        bargap=0.0,
+        bargroupgap=0.0
     )
     
     fig.update_traces(
         box=dict(visible=False),
         meanline=dict(visible=True),
         side="negative",
-        scalemode='width',
+        scalemode='count',
         spanmode='hard',
+        width=1.5       # Make violins wider
     )
     
     if ylim is not None:
@@ -197,10 +200,11 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
                 y0=np.log2(ratio),
                 x1=max(all_valid_B, default=1),
                 y1=np.log2(ratio),
-                line=dict(color='rgba(128,128,128,0.5)', width=2, dash='dash')
+                line=dict(color='rgba(64,64,64,0.5)', width=2, dash='dash')
             )
     
     # Update scatter plot layout
+    span = span + 0.2
     if sample_groups is None:
         sample_groups = ['A', 'B']
     ratio_intensity_fig.update_layout(
@@ -209,7 +213,7 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
         yaxis=dict(range=[-span, span]),
         xaxis=dict(
             range=[
-                np.quantile(all_valid_B, 0.01) if len(all_valid_B) else 0,
+                np.quantile(all_valid_B, 0.001) if len(all_valid_B) else 0,
                 np.quantile(all_valid_B, 0.999) if len(all_valid_B) else 1
             ]
         ),
@@ -227,16 +231,17 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
         ylim=[-span, span]
     )
     
-    # # Add horizontal lines at expected ratios
-    # for ratio in exp_ratios:
-    #     ratio_dist_fig.add_shape(
-    #         type="line",
-    #         x0=-1,
-    #         y0=np.log2(ratio),
-    #         x1=3,
-    #         y1=np.log2(ratio),
-    #         line=dict(color='rgba(0,0,0,0.5)', width=2, dash='dash')
-    #     )
+    if show_exp_ratios:
+        # Add horizontal lines at expected ratios
+        for ratio in exp_ratios:
+            ratio_dist_fig.add_shape(
+                type="line",
+                x0=-1,
+                y0=np.log2(ratio),
+                x1=3,
+                y1=np.log2(ratio),
+                line=dict(color='rgba(64,64,64,0.5)', width=2, dash='dash')
+            )
     
     return ratio_intensity_fig, ratio_dist_fig
 

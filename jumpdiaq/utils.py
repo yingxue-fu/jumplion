@@ -8,11 +8,11 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-#
+# 
 MSFormatsExt = {"mzml", "raw", "d"}  
 MaxLibFrNum = 20
 
-#
+# Mass calibration
 MassCalBins = 1
 MassCalBinsMax = 1
 MassCalScore = 0.9

@@ -295,10 +295,7 @@ def modeling_and_prediction(data_dict,
     
     return mat_pred, model_accs
 
-# mat = pd.read_csv(r"C:\Users\yfu\Downloads\miss_dia_test_data\ya_data\test_ya_20250521\rt_mtx_before_prediction.csv")
-# mat = mat.set_index("Precursor.Id")
-# mat_pred = pd.read_csv(r"C:\Users\yfu\Downloads\miss_dia_test_data\ya_data\test_ya_20250521\rt_mtx_after_prediction.csv")
-# mat_pred = mat_pred.set_index("Precursor.Id")
+
 def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""):
     # calculate reference RT deviation range from actual matrix
     ## medians of each row

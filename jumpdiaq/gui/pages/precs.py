@@ -26,7 +26,6 @@ sidebar = html.Div(
             [   
                 html.Label(id='protein-label', style={"font-weight": "bold"}),
                 dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor"),
-                #html.Div(id='show-ms-level', style={'marginTop': '10px', 'color': 'green'}),
                 html.Br(),
                 html.Label("For cross-run", style={"font-weight": "bold"}),
                 dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means-xic', value=False),
@@ -168,7 +167,6 @@ def load_options(stored_options):
 
 @app.callback(
     [Output('show-precid-c', 'children'),
-     #Output('show-ms-level', 'children'), 
      Output('stored-precquant', 'data'),
      Output('stored-precquality', 'data'),
      Output('stored-precMS1quant', 'data'),
@@ -195,28 +193,30 @@ def read_precs_data(selected_precursor, outdir_path):
     ms2_quality_file = out_prec_dir / "Precursor.Id_MS2.XIC.Corr.Raw_mapping.parquet"
     
     precursor_id = selected_precursor
-    #ms_level = selected_precursor.split("_")[1]
     title = html.Div([f"     {precursor_id}"])
-    #ms_level_info = f"{ms_level}-level quantification of this precursor is used when summarizing to protein."
     try:
         prec_quant_df = pd.read_parquet(prec_quant_file, filters=[('Precursor.Id', '==', precursor_id)])
         prec_quality_df = pd.read_parquet(prec_quality_file, filters=[('Precursor.Id', '==', precursor_id)])
         
         ms1_quant_df = pd.read_parquet(ms1_quant_file, filters=[('target_id', '==', precursor_id)])
+        ms1_quant_df = ms1_quant_df[ms1_quant_df['source_quantity'] > 0]
         ms1_quant_df['source_quantity'] = np.log2(ms1_quant_df['source_quantity'])
         ms1_quant_df['samples'] = extract_unique_parts(ms1_quant_df['samples'].values.tolist())
         
         ms1_quality_df = pd.read_parquet(ms1_quality_file, filters=[('target_id', '==', precursor_id)])
+        ms1_quality_df = ms1_quality_df[~(ms1_quality_df['source_quality'] == 0)]
         ms1_quality_df['samples'] = extract_unique_parts(ms1_quality_df['samples'].values.tolist())
         
         ms2_quant_df = pd.read_parquet(ms2_quant_file, filters=[('target_id', '==', precursor_id)])
+        ms2_quant_df = ms2_quant_df[ms2_quant_df['source_quantity'] > 0]
         ms2_quant_df['source_quantity'] = np.log2(ms2_quant_df['source_quantity'])
         ms2_quant_df['samples'] = extract_unique_parts(ms2_quant_df['samples'].values.tolist())
         
         ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', precursor_id)])
+        ms2_quality_df = ms2_quality_df[~(ms2_quality_df['source_quality'] == 0)]
         ms2_quality_df['samples'] = extract_unique_parts(ms2_quality_df['samples'].values.tolist())
         
-        return (title, #ms_level_info,
+        return (title, 
                 prec_quant_df.to_dict("records"), 
                 prec_quality_df.to_dict("records"), 
                 ms1_quant_df.to_dict("records"), 

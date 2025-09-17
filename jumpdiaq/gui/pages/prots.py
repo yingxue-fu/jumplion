@@ -1,4 +1,5 @@
 # builtin
+import ast
 from pathlib import Path
 from collections import defaultdict
 # external
@@ -31,7 +32,7 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(
             [
-                html.Label("Input meta file path", style={"font-weight": "bold"}),
+                html.Label("Meta file path", style={"font-weight": "bold"}),
                 dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
                           style={'width': '100%'}, persistence=True),
                 html.Label("Protein filtering", style={"font-weight": "bold", 'marginTop': '10px'}),
@@ -90,13 +91,13 @@ sidebar = html.Div(
                 html.Label("Select groups for comparison", style={'marginTop': '5px'}),
                 dbc.Select(id='group-A', placeholder="Group A"),
                 dbc.Select(id='group-B', placeholder="Group B", style={'marginTop': '5px'}),
-                dbc.Switch(label='Show expected ratios', id='show-exp-ratios', value=False),
                 html.Label("Input expected ratios:", style={'marginTop': '5px'}),
                 dbc.Row([
                     dbc.Col(dbc.Input(id="ratio-1", type="number", value=1.0), width=4), 
                     dbc.Col(dbc.Input(id="ratio-2", type="number", value=2.0), width=4),
                     dbc.Col(dbc.Input(id="ratio-3", type="number", value=0.25), width=4),
                 ]),
+                dbc.Switch(label='Show expected ratios', id='show-exp-ratios', value=False),
                 html.Label("Select species"),
                 dcc.Dropdown(
                     id='species-input-bench',
@@ -265,7 +266,7 @@ layout = html.Div(children=[
                                         [
                                             html.Div([
                                                 dcc.Graph(id='ratio-intensity-plot', style={'height': '500px'})
-                                            ], style={'width': '60%', 'display': 'inline-block', 'vertical-align': 'top'}),
+                                            ], style={'width': '65%', 'display': 'inline-block', 'vertical-align': 'top'}),
                                             
                                             html.Div([
                                                 dcc.Graph(id='ratio-violin-plot', style={'height': '500px'})
@@ -292,10 +293,8 @@ layout = html.Div(children=[
      Output('prot-quant-table', 'columns'),
      Output('stored-prot-quant', 'data'),
      Output('stored-prot-quality', 'data'),
-     #Output('show-cutoff', 'children'),
      Output('stored-meta', 'data')],
     Input('load-prot-quant', 'n_clicks'),
-    #State('quant-table-selector', 'value'),
     State('stored-outdir', 'data'),
     State('meta-path', 'value'),
     prevent_initial_call=True
@@ -692,7 +691,8 @@ def read_precs_data(selected_prot, outdir_path, meta):
      Input('stored-prot-prec-quant-norm', 'data'),
      Input('stored-prot-prec-quality', 'data')],  
     [State('stored-prot-quant', 'data'),
-     State('stored-prot-quality', 'data')],
+     State('stored-prot-quality', 'data'),
+     State('stored-meta', 'data')],
     prevent_initial_call=True  # Add this to prevent initial callback
 )
 def update_summ_plot(selected_prot, 
@@ -703,24 +703,22 @@ def update_summ_plot(selected_prot,
                      prec_quant_norm_data, 
                      prec_quality_data,
                      quant_data, 
-                     quality_data):
+                     quality_data, 
+                     meta_data):
     if not ctx.triggered or not selected_prot or not quant_data or not prec_quant_data:
         return (go.Figure(layout=dict(title="Select a protein to visualize protein quantification data")),
                 go.Figure(layout=dict(title="Select a protein to visualize protein quality data")))
     
     try:
-        # Retrieve selected row data
+        meta_df = pd.DataFrame(meta_data)
         quant_df = pd.DataFrame(quant_data)
-        selected_row_data = quant_df[quant_df["Protein.Group"] == selected_prot].iloc[0,:]
-        
-        #
         quality_df = pd.DataFrame(quality_data)
         quality_df.set_index('Protein.Group', drop=True, inplace=True)
         quality_df.columns = extract_unique_parts(quality_df.columns.values.tolist())
-        
-        # Make sure we're getting numerical values for the plot
-        prot_quant_values = pd.to_numeric(selected_row_data.iloc[12:], errors='coerce').values
-        prot_quality_values = pd.to_numeric(quality_df.loc[selected_prot,:], errors='coerce').values
+        # Retrieve selected row data
+        value_cols = meta_df['Sample_simp'].to_list()
+        prot_quant_values = quant_df.loc[quant_df["Protein.Group"] == selected_prot, value_cols].values[0]
+        prot_quality_values = quality_df.loc[selected_prot, value_cols].values
         
         # Create figure
         quant_fig = go.Figure()
@@ -786,9 +784,8 @@ def update_summ_plot(selected_prot,
                 summ_values = prot_quant_values - np.nanmean(prot_quant_values)
             else:
                 summ_values = prot_quant_values
-            summarization_x = quant_df.columns[12:].tolist()
             quant_fig.add_trace(go.Scatter(
-                x=summarization_x, 
+                x=value_cols, 
                 y=summ_values, 
                 mode="lines+markers",
                 name="Summarization",
@@ -796,9 +793,8 @@ def update_summ_plot(selected_prot,
                 marker=dict(color='blue', size=8)
             ))
             
-            summarization_x = quality_df.columns.tolist()
             quality_fig.add_trace(go.Scatter(
-                x=summarization_x, 
+                x=value_cols, 
                 y=prot_quality_values, 
                 mode="lines+markers",
                 name="Summarization",
@@ -891,7 +887,7 @@ def update_sequence_viewer(selected_prot, data):
     position_coverage = defaultdict(int)
     
     # Step 1: Count how many times each position is covered
-    for peptide_pos in peptides_pos:
+    for peptide_pos in ast.literal_eval(peptides_pos):
         start = peptide_pos[0] - 1
         end = peptide_pos[1]
         for i in range(start, end):
