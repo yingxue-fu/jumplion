@@ -15,7 +15,7 @@ ShowProgress = args.show_progress
 InterProgress = args.inter_progress
 
 
-def get_quantity_quality_dfs(report_df, 
+def get_quantity_quality_dfs(id_report_df, 
                              id_col,
                              sample_col,
                              secondary_id_col, 
@@ -26,8 +26,8 @@ def get_quantity_quality_dfs(report_df,
                              ):
     
     # Split and explode quantity and quality columns
-    report_df_long = (
-        report_df
+    id_report_df_long = (
+        id_report_df
         .with_columns([
             pl.col(secondary_id_col).str.split(";"),
             pl.col(quantity_col).str.split(";"),
@@ -42,7 +42,7 @@ def get_quantity_quality_dfs(report_df,
     
     # quantity
     quantity_df = (
-        report_df_long.select([
+        id_report_df_long.select([
             pl.col(id_col).cast(pl.Utf8).alias("target_id"),
             pl.col(sample_col).cast(pl.Utf8).alias("samples"),
             pl.col(secondary_id_col).cast(pl.Utf8).alias("source_id"),
@@ -52,7 +52,7 @@ def get_quantity_quality_dfs(report_df,
 
     # quality
     quality_df = (
-        report_df_long.select([
+        id_report_df_long.select([
             pl.col(id_col).cast(pl.Utf8).alias("target_id"),
             pl.col(sample_col).cast(pl.Utf8).alias("samples"),
             pl.col(secondary_id_col).cast(pl.Utf8).alias("source_id"),
@@ -108,24 +108,23 @@ def precursor_summarize(quantity_df: pl.DataFrame,
         quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
-        quantity_mat_new = quantity_mat.copy()
+        quantity_mat_fill = quantity_mat.copy()
         if fill_missing_xic:
             if xic_quality_cutoff <= 0.0:
                 missing_mask = (quality_mat < xic_quality_cutoff) | (quality_mat == 0.0)
             else:
                 missing_mask = quality_mat < xic_quality_cutoff
             missing_mask = missing_mask | (quantity_mat == 0.0)
-            quantity_mat_new[missing_mask] = np.nan
+            quantity_mat_fill[missing_mask] = np.nan
             # remove rows that contain all NaNs
-            quantity_mat_new = quantity_mat_new[~np.all(np.isnan(quantity_mat_new), axis=1)]
+            quantity_mat_fill = quantity_mat_fill[~np.all(np.isnan(quantity_mat_fill), axis=1)]
             # fill missing value
-            if quantity_mat_new.shape[0] == 0:
+            if quantity_mat_fill.shape[0] == 0:
                 continue
             else:
-                quantity_mat_new = np.nan_to_num(quantity_mat_new, nan=np.nanmin(quantity_mat_new))
+                quantity_mat_fill = np.nan_to_num(quantity_mat_fill, nan=np.nanmin(quantity_mat_fill))
         #
-        quantity_mat_new = np.log2(quantity_mat_new)
-        quantity_summed[i, :] = median_summ(quantity_mat_new, topN_rep=3)
+        quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep=3)
         #
         quality_mat_new = quality_mat.copy()
         quality_mat_new[quality_mat == 0.0] = np.nan
@@ -143,7 +142,7 @@ def precursor_summarize(quantity_df: pl.DataFrame,
     return quantity_table, quality_table
 
 def extract_annotation(id_list, 
-                       report_df: pl.DataFrame, 
+                       xic_quant_df: pl.DataFrame, 
                        id_col: str, 
                        annotation_cols: list[str] | None):
     if annotation_cols is None:
@@ -152,12 +151,12 @@ def extract_annotation(id_list,
     all_columns = [id_col] + annotation_cols
 
     # Check all columns exist
-    missing = [col for col in all_columns if col not in report_df.columns]
+    missing = [col for col in all_columns if col not in xic_quant_df.columns]
     if missing:
         raise ValueError(f"The input table has no column: {missing[0]}")
 
     # Filter rows where id_col is in id_list
-    filtered = report_df.filter(pl.col(id_col).is_in(id_list))
+    filtered = xic_quant_df.filter(pl.col(id_col).is_in(id_list))
     if filtered.is_empty():
         raise ValueError("Cannot find any of the given target IDs in the table.")
 
@@ -170,8 +169,8 @@ def extract_annotation(id_list,
 
     return joined
 
-def quantify_from_xic_report(
-        report_file, 
+def quantify_from_xic(
+        xic_quant_file, 
         id_col="Precursor.Id",
         sample_col="Run",
         secondary_id_col="MS2.XIC.Info",
@@ -184,11 +183,11 @@ def quantify_from_xic_report(
     ):
     
     columns = [sample_col, id_col, secondary_id_col, quality_col, quantity_col] + annotation_cols
-    report_df = pl.read_parquet(Path(report_file), columns=columns)
+    xic_quant_df = pl.read_parquet(Path(xic_quant_file), columns=columns)
     logging.info(f"ID column: {id_col}, Quantity column: {quantity_col}")
     
     # 1. extract quantity and quality
-    quantity_df, quality_df = get_quantity_quality_dfs(report_df, 
+    quantity_df, quality_df = get_quantity_quality_dfs(xic_quant_df, 
                                                        id_col,
                                                        sample_col,
                                                        secondary_id_col,
@@ -205,7 +204,7 @@ def quantify_from_xic_report(
 
     # 3. add annotation
     extra_names = extract_annotation(quantity_mtx["Precursor.Id"].to_list(), 
-                                     report_df, 
+                                     xic_quant_df, 
                                      id_col,
                                      annotation_cols)
     
@@ -214,7 +213,7 @@ def quantify_from_xic_report(
     
     return final_quantity_table, final_quality_table
     
-def quantify_precursors(report_file, 
+def quantify_precursors(xic_quant_file, 
                         use_raw_ms1=False,
                         use_raw_ms2=True,
                         xic_quality_cutoff=0.0, 
@@ -228,8 +227,8 @@ def quantify_precursors(report_file,
         ms1_quantity_col = "MS1.XIC.Quant.Raw"
     else:
         ms1_quantity_col = "MS1.XIC.Quant.Adjusted"
-    ms1_quantity_table, ms1_quality_table = quantify_from_xic_report(
-                                                report_file,
+    ms1_quantity_table, ms1_quality_table = quantify_from_xic(
+                                                xic_quant_file,
                                                 id_col="Precursor.Id",
                                                 sample_col="Run",
                                                 secondary_id_col="MS1.XIC.Info",
@@ -254,8 +253,8 @@ def quantify_precursors(report_file,
         ms2_quantity_col = "MS2.XIC.Quant.Raw"
     else:
         ms2_quantity_col = "MS2.XIC.Quant.Adjusted"
-    ms2_quantity_table, ms2_quality_table = quantify_from_xic_report(
-                                                report_file, 
+    ms2_quantity_table, ms2_quality_table = quantify_from_xic(
+                                                xic_quant_file, 
                                                 id_col="Precursor.Id",
                                                 sample_col="Run",
                                                 secondary_id_col="MS2.XIC.Info",
@@ -334,7 +333,7 @@ def protein_summarize(prec_quantity_table,
         quality_df_sub = quality_df_sub.filter(pl.col(prec_id_col).is_in(prec_ids)).sort(prec_id_col)
         
         # Summarization
-        if len(prec_ids) >= 1:
+        if len(prec_ids) >= 2:
             quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
             quality_mat = quality_df_sub.select(sample_cols).to_numpy()
             
@@ -384,25 +383,22 @@ def quantify_proteins(prec_quantity_table,
 
 
 ############################ summarization methods  ###########################
-def median_summ(mat, log2values=True, topN_rep=3):
-    if not log2values:
-        mat = np.log2(mat)
+def median_summ(mat, topN_rep=3):
     if mat.shape[0] == 1:
         return mat[0, :]
+    # log2 transformation
+    mat = np.log2(mat)
+    # Get relative ratios
     rowMeans = np.nanmean(mat, axis=1)
     repAbundance = np.mean(sorted(rowMeans, reverse=True)[0:topN_rep])
     mat = mat - rowMeans[:, np.newaxis]
-    
-    # Check which columns are all-NaN before computing median
-    all_nan_cols = np.all(np.isnan(mat), axis=0)
+    # Compute median of each column that aren't all-NaN
     medians = np.full(mat.shape[1], np.nan)
-    
-    # Only compute median for columns that aren't all-NaN
-    valid_cols = ~all_nan_cols
+    valid_cols = ~np.all(np.isnan(mat), axis=0)
     if np.any(valid_cols):
         medians[valid_cols] = np.nanmedian(mat[:, valid_cols], axis=0)
-        
-    out = medians + repAbundance
+    # final summaried values
+    out = np.power(2, medians + repAbundance)
     return out
 
 def topN(mat, N=3, method="mean"):
@@ -436,20 +432,22 @@ def norm_dataframe(df, data_type, tag_column, value_columns, norm_species, norm_
             logging.warning('WARNING: No matching species found in your input. Using all proteins')
             sub_df = df.clone()
         else:
-            
             sub_df = df.filter(species_tags)
-    
-    mat = sub_df.select(value_columns)
+            
+    # get norm factors
+    mat = sub_df.select([
+        pl.col(col).log(2).alias(col) for col in value_columns
+    ])
     loadBias = get_loading_bias(mat, value_columns, data_type, trim_percentage, trim_percentage)
     mat_norm, normFactors = normalization(mat, trim_percentage, trim_percentage, norm_method)
     
+    # print out info
     def indent_df(df, spaces=4, index=False):
         """Return a DataFrame string with left indentation for logging."""
         indent = " " * spaces
         df_str = df.to_string(index=index)
         return "\n".join(indent + line for line in df_str.splitlines())
-
-    #
+    
     logging.info("Loading bias before normalization:\n%s", 
                  indent_df(loadBias, spaces=4, index=False))
     medians_df = mat.median().to_pandas().T.reset_index(drop=False)
@@ -464,13 +462,14 @@ def norm_dataframe(df, data_type, tag_column, value_columns, norm_species, norm_
     medians_norm_df['Samples'] = extract_unique_parts(medians_norm_df['Samples'].to_list())
     logging.info("Median log2(Intensity) after normalization:\n%s", 
                  indent_df(medians_norm_df, spaces=4, index=False))
+    
+    # normalization of the whole df
+    df_norm = df.with_columns([
+        (pl.col(col) * (2 ** -normFactors[col])).alias(col)
+        for col in value_columns
+    ])
 
-    df_norm = df.clone()
-    for col in value_columns:
-        df_norm = df_norm.with_columns(
-            (pl.col(col) - normFactors[col]).alias(col)
-        )
-    return df_norm, normFactors
+    return df_norm
 
 def trim_matrix(mat, trim_pct_upper, trim_pct_lower):
     q25 = mat.quantile(0.25)

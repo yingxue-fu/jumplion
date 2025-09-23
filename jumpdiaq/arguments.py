@@ -72,9 +72,10 @@ class Arguments:
     trim_percentage: int = 5
     
     # Protein summarization
-    prec_quant_level: str = "ms2" # Other options: 'ms1', 'ms2'
+    prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
-    min_pep_num: int = 2
+    min_prec_num: int = 2
+    min_pep_num: int = 1
     fastas: List[str] = field(default_factory=list)
     
     # timsTOF data preprocessing (hidden from users)
@@ -219,6 +220,7 @@ def create_parser() -> argparse.ArgumentParser:
     # Protein summarization
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--min-prec-quality", type=float, help="")
+    optional_group.add_argument("--min-prec-num", type=int, help="")
     optional_group.add_argument("--min-pep-num", type=int, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     

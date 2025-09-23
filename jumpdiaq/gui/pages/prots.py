@@ -15,7 +15,7 @@ import plotly.express as px
 # local
 from jumpdiaq.utils import extract_unique_parts
 from jumpdiaq.gui.app import app, to_image_config, page_sidebar_style, logger
-from jumpdiaq.gui.utils import get_valid_ratios, lfqbench_plot
+from jumpdiaq.gui.utils import define_species, get_valid_ratios, lfqbench_plot
 
 load_figure_template(["vizro", "vizro_dark"])
 colors = {'ALL': '#1F77B4',
@@ -28,41 +28,30 @@ colors = {'ALL': '#1F77B4',
 
 sidebar = html.Div(
     [
-        html.H3("Protein Quantification"),
+        html.H3("Protein Quantification", style={"font-weight": "bold"}),
         html.Hr(),
         dbc.Nav(
             [
                 html.Label("Meta file path", style={"font-weight": "bold"}),
                 dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
                           style={'width': '100%'}, persistence=True),
-                html.Label("Protein filtering", style={"font-weight": "bold", 'marginTop': '10px'}),
-                dbc.Row([
-                    dbc.Col(html.Label("Missing value # <="), width=8),  
-                    dbc.Col(html.Div([
-                        dbc.Input(id="n-missing", 
-                                  type="number", 
-                                  value=2, 
-                                  style={"width": "32px", "height": "25px", 
-                                         "padding": "0px",
-                                         "paddingLeft": "3px",
-                                         "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
-                                         "backgroundSize": "10px"}), 
-                        html.P("/", style={"margin": "0 5px", "height": "25px"}),
-                        dbc.Input(id="n-total", 
-                                  type="number", 
-                                  value=4, 
-                                  style={"width": "32px", "height": "25px", 
-                                         "padding": "0px",
-                                         "paddingLeft": "3px",
-                                         "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
-                                         "backgroundSize": "10px"})
-                    ], style={"display": "flex", "align-items": "center"}),
-                    width=4),  
-                ], className="mt-1 mb-0 p-0"),
+                dbc.Button('Load Quantification Table', 
+                           id='load-prot-quant', n_clicks=0, color='info',
+                           style={'margin-top': '10px', "textTransform": "none"}),
+                html.Div(id='show-cutoff', style={'marginTop': '10px', 'color': 'green'}),
+                html.Hr(),
+                html.Label("Protein Intensity/CV Distribution", style={"font-weight": "bold"}),
+                dcc.Dropdown(
+                    id='species-input-violin',
+                    options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'YEAST', 'ECOLI', 'MOUSE', 'SCHPO']],
+                    placeholder="Select a species"
+                ),
+                html.Br(),
+                html.Label("Quantification Benchmark Plot", style={"font-weight": "bold"}),
                 dbc.Row([
                     dbc.Col(html.Label("Coefficient of variation <="), width=8),  
                     dbc.Col(html.Div([
-                        dbc.Input(id="max-cv", 
+                        dbc.Input(id="cv-filter", 
                                   type="number", 
                                   value=20, 
                                   style={"width": "80px", "height": "25px"}), 
@@ -70,27 +59,9 @@ sidebar = html.Div(
                     ], style={"display": "flex", "align-items": "center"}),
                     width=4),  
                 ], className="mb-1 p-0", style={"margin-top": "5px"}),
-                dbc.Button('Load Quantification Table', 
-                           id='load-prot-quant', n_clicks=0, color='info',
-                           style={'margin-top': '10px', "textTransform": "none"}),
-                html.Div(id='show-cutoff', style={'marginTop': '10px', 'color': 'green'}),
-                html.Hr(),
-                html.Label("Protein Intensity Distribution", style={"font-weight": "bold"}),
-                dbc.Select(
-                    id='species-input-violin',
-                    options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'SCHPO', 'MOUSE', 'YEAST', 'ECOLI']],
-                    placeholder="Select a species"
-                ),
-                html.Br(),
-                html.Label("Protein Summarization", style={"font-weight": "bold", 'marginBottom': '5px'}),
-                dbc.Switch(label='Show raw precursor quantity', id='show-raw', value=False),
-                dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means', value=False),
-                dbc.Switch(label='Show summarized quantity/quality', id='show-summ', value=False),
-                html.Br(),
-                html.Label("Quantification Benchmark Plot", style={"font-weight": "bold"}),
                 html.Label("Select groups for comparison", style={'marginTop': '5px'}),
-                dbc.Select(id='group-A', placeholder="Group A"),
-                dbc.Select(id='group-B', placeholder="Group B", style={'marginTop': '5px'}),
+                dcc.Dropdown(id='group-A', placeholder="Group A"),
+                dcc.Dropdown(id='group-B', placeholder="Group B", style={'marginTop': '5px'}),
                 html.Label("Input expected ratios:", style={'marginTop': '5px'}),
                 dbc.Row([
                     dbc.Col(dbc.Input(id="ratio-1", type="number", value=1.0), width=4), 
@@ -101,7 +72,7 @@ sidebar = html.Div(
                 html.Label("Select species"),
                 dcc.Dropdown(
                     id='species-input-bench',
-                    options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'SCHPO', 'MOUSE', 'YEAST', 'ECOLI']],
+                    options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'YEAST', 'ECOLI', 'MOUSE', 'SCHPO']],
                     multi=True,
                     placeholder="Select one or more species"
                 ),
@@ -132,6 +103,11 @@ sidebar = html.Div(
                     value=3,
                     marks={i: str(i) for i in range(1, 6)}
                 ),
+                html.Br(),
+                html.Label("Protein Summarization", style={"font-weight": "bold", 'marginBottom': '5px'}),
+                dbc.Switch(label='Show raw precursor quantity', id='show-raw', value=False),
+                dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means', value=False),
+                dbc.Switch(label='Show summarized quantity/quality', id='show-summ', value=False),
             ],
             vertical=True,
             pills=True,
@@ -163,7 +139,7 @@ layout = html.Div(children=[
             html.Br(),
             html.Div(children=[
                 dbc.Card([
-                    dbc.CardHeader(html.H5("Protein quantification table")),
+                    dbc.CardHeader(html.H5("Protein quantification table", style={"font-weight": "bold"})),
                     dbc.CardBody([
                         dash_table.DataTable(
                             id='prot-quant-table',
@@ -200,7 +176,7 @@ layout = html.Div(children=[
             ], className="dbc dbc-row-selectable"),
             dbc.Card(
                 [
-                    dbc.CardHeader(html.H5("Protein quantification plots")),
+                    dbc.CardHeader(html.H5("Protein quantification plots", style={"font-weight": "bold"})),
                     dbc.CardBody(
                         [
                             dbc.Tabs(
@@ -209,14 +185,16 @@ layout = html.Div(children=[
                                 children=[
                                     dbc.Tab(label="Protein Intensity Distribution", 
                                             tab_id="tab-1", label_style=tab_label_style),
-                                    dbc.Tab(label="Protein Quantity Summarization", 
+                                    dbc.Tab(label="Protein CV Distribution", 
                                             tab_id="tab-2", label_style=tab_label_style),
-                                    dbc.Tab(label="Protein Quality Summarization", 
-                                            tab_id="tab-3", label_style=tab_label_style),
-                                    dbc.Tab(label="Protein Coverage Information", 
-                                            tab_id="tab-4", label_style=tab_label_style),
                                     dbc.Tab(label="Quantification Benchmark Plot", 
+                                            tab_id="tab-3", label_style=tab_label_style),
+                                    dbc.Tab(label="Protein Quantity Summarization", 
+                                            tab_id="tab-4", label_style=tab_label_style),
+                                    dbc.Tab(label="Protein Quality Summarization", 
                                             tab_id="tab-5", label_style=tab_label_style),
+                                    dbc.Tab(label="Protein Coverage Information", 
+                                            tab_id="tab-6", label_style=tab_label_style),
                                 ],
                                 style=tab_bar_style
                             ),
@@ -225,43 +203,24 @@ layout = html.Div(children=[
                                     # Tab 1:
                                     html.Div(
                                         [
-                                            dcc.Graph(id="prot-violin-plot"),
+                                            dcc.Graph(id="prot-violin-plot", style={'height': '500px'}),
                                         ],    
                                         id="tab-1-content",
                                     ),
                                     # Tab 2:
                                     html.Div(
                                         [
-                                            dcc.Graph(id="prot-prec-quant-plot", config=to_image_config),
-                                            dbc.Button("Check Precursors", id="check-prec-quantity", 
-                                                       color="info",  
-                                                       style={"font-weight": "bold",  
-                                                              "marginTop": "5px",
-                                                              "textTransform": "none"}),
+                                            html.Div([
+                                                dcc.Graph(id='cv-violin-plot', style={'height': '500px'})
+                                            ], style={'width': '45%', 'display': 'inline-block', 'vertical-align': 'top'}),
+                                            
+                                            html.Div([
+                                                dcc.Graph(id='cv-bar-plot', style={'height': '500px'})
+                                            ], style={'width': '55%', 'display': 'inline-block', 'vertical-align': 'top'}),
                                         ],    
                                         id="tab-2-content",
                                     ),
                                     # Tab 3:
-                                    html.Div(
-                                        [
-                                            dcc.Graph(id="prot-prec-quality-plot", config=to_image_config),
-                                            dbc.Button("Check Precursors", id="check-prec-quality", 
-                                                       color="info",  
-                                                       style={"font-weight": "bold", 
-                                                              "marginTop": "5px",
-                                                              "textTransform": "none"}),
-                                        ],    
-                                        id="tab-3-content",
-                                    ), 
-                                    # Tab 4:
-                                    html.Div(
-                                        [
-                                            html.Div(id='sequence-info'),
-                                            html.Div(id='sequence-viewer-container'),
-                                        ],    
-                                        id="tab-4-content",
-                                    ),  
-                                    # Tab 5:
                                     html.Div(
                                         [
                                             html.Div([
@@ -272,8 +231,41 @@ layout = html.Div(children=[
                                                 dcc.Graph(id='ratio-violin-plot', style={'height': '500px'})
                                             ], style={'width': '35%', 'display': 'inline-block', 'vertical-align': 'top'}),
                                         ], 
-                                        id="tab-5-content",
+                                        id="tab-3-content",
                                     ),
+                                    # Tab 4:
+                                    html.Div(
+                                        [
+                                            dcc.Graph(id="prot-prec-quant-plot", config=to_image_config, style={'height': '500px'}),
+                                            dbc.Button("Check Precursors", id="check-prec-quantity", 
+                                                       color="info",  
+                                                       style={"font-weight": "bold",  
+                                                              "marginTop": "5px",
+                                                              "textTransform": "none"}),
+                                        ],    
+                                        id="tab-4-content",
+                                    ),
+                                    # Tab 5:
+                                    html.Div(
+                                        [
+                                            dcc.Graph(id="prot-prec-quality-plot", config=to_image_config, style={'height': '500px'}),
+                                            dbc.Button("Check Precursors", id="check-prec-quality", 
+                                                       color="info",  
+                                                       style={"font-weight": "bold", 
+                                                              "marginTop": "5px",
+                                                              "textTransform": "none"}),
+                                        ],    
+                                        id="tab-5-content",
+                                    ), 
+                                    # Tab 6:
+                                    html.Div(
+                                        [
+                                            html.Div(id='sequence-info'),
+                                            html.Div(id='sequence-viewer-container'),
+                                        ],    
+                                        id="tab-6-content",
+                                    ),  
+
                                 ],
                                 className="p-1"
                             )
@@ -312,10 +304,10 @@ def load_quant_table(n_clicks, outdir_path, meta_path):
     
     try:
         quant_df = pd.read_csv(quant_csv_path)
-        meta = pd.read_csv(meta_path)
+        meta_df = pd.read_csv(meta_path)
         
         # Make the samples the same order as in the meta file
-        sample_names = meta['Sample'].values.tolist()
+        sample_names = meta_df['Sample'].values.tolist()
         quant_df = quant_df.loc[:, quant_df.columns[0:3].values.tolist() + sample_names]
         
         # Simplify the sample name
@@ -324,7 +316,14 @@ def load_quant_table(n_clicks, outdir_path, meta_path):
             quant_df.columns[0:3].values.tolist() + 
             simple_sample_names
         )
-        meta['Sample_simp'] = simple_sample_names
+        meta_df['Sample_simp'] = simple_sample_names
+        
+        # Calculate CV
+        groups = sorted(meta_df['Group'].dropna().unique().tolist())
+        for group in groups:
+            cols_group = meta_df.loc[meta_df['Group'] == group, 'Sample_simp'].values
+            group_df = quant_df[cols_group]
+            quant_df[f'CV_{group}'] = (group_df.std(axis=1) / group_df.mean(axis=1)) * 100
         
         # Combine with protein coverage info
         prot_pep_df = pd.read_csv(prot_pep_info_path)
@@ -334,13 +333,13 @@ def load_quant_table(n_clicks, outdir_path, meta_path):
         quant_df_to_show[simple_sample_names] = quant_df_to_show[simple_sample_names].round(3)
         #
         quality_df = pd.read_csv(quality_csv_path)
-        quality_df = quality_df.loc[:, ['Protein.Group'] + meta['Sample'].values.tolist()]
+        quality_df = quality_df.loc[:, ['Protein.Group'] + meta_df['Sample'].values.tolist()]
         
         return (quant_df_to_show.to_dict('records'), 
                 [{'name': col, 'id': col} for col in quant_df_to_show.columns], 
                 quant_df.to_dict('records'), 
                 quality_df.to_dict('records'),
-                meta.to_dict('records'))
+                meta_df.to_dict('records'))
 
     except Exception as e:
         logger.error(f"Error loading quantification table: {str(e)}")
@@ -382,22 +381,15 @@ def update_violin_plot(data, species_input, meta_data):
     meta = pd.DataFrame(meta_data)
     species_column = "Protein.Names"
     value_columns = meta['Sample_simp']
-
+    
     # Parse and clean user input
     species = [species_input] if species_input else []
-
+    
     if not species:
         df_filtered = df.copy()
         df_filtered['Species'] = 'ALL'
     else:
-        # Function to find first matching group in prot_names
-        def define_species(prot_names):
-            for s in species:
-                if s in prot_names:
-                    return s
-            return None
-
-        df['Species'] = df[species_column].apply(define_species)
+        df['Species'] = df[species_column].apply(define_species, species_list=species)
 
         # Filter out rows with no matching group
         df_filtered = df[df['Species'].notna()]
@@ -407,25 +399,31 @@ def update_violin_plot(data, species_input, meta_data):
 
     # Melt data for plotly
     df_melted = df_filtered.melt(id_vars=['Species'], value_vars=value_columns,
-                                 var_name='Variable', value_name='Value')
+                                 var_name='Sample', value_name='Intensity')
+    df_melted['log2Intensity'] = np.log2(df_melted['Intensity'])
 
     # Create figure
     fig = go.Figure()
     fig = px.violin(df_melted, 
-                    x='Variable', 
-                    y='Value', 
+                    x='Sample', 
+                    y='log2Intensity', 
                     color='Species', 
                     color_discrete_map=colors,
                     box=True, 
                     points='outliers')
-
+    
+    fig.update_traces(
+        points='outliers', 
+        marker=dict(opacity=0.5, size=0.5*10),
+        selector=dict(type="violin")  # Apply only to box traces
+    )
+    
     fig.update_layout(
         title='', 
         xaxis_title="Runs",
         yaxis_title="Log2(Intensity)",
         violingap=0,
         template="vizro",
-        height=700,
         legend=dict(
             orientation='h',
             yanchor='bottom',
@@ -439,25 +437,176 @@ def update_violin_plot(data, species_input, meta_data):
 
 
 @app.callback(
+    Output('cv-violin-plot', 'figure'),
+    Output('cv-bar-plot', 'figure'),
+    Input('stored-prot-quant', 'data'),
+    Input('species-input-violin', 'value')
+)
+def update_CV_plots(data, species_input):
+    if data is None:
+        return dash.no_update
+
+    # Load data
+    df = pd.DataFrame(data)
+    species_column = "Protein.Names"
+    CV_columns = [col for col in df.columns if 'CV_' in col]
+    
+    # Parse and clean user input
+    species = [species_input] if species_input else []
+    
+    if not species:
+        df_filtered = df.copy()
+        df_filtered['Species'] = 'ALL'
+    else:
+        df['Species'] = df[species_column].apply(define_species, species_list=species)
+
+        # Filter out rows with no matching group
+        df_filtered = df[df['Species'].notna()]
+
+        if df_filtered.empty:
+            return px.scatter(title='No matching species found in your input.')
+
+    # Melt data for plotly
+    df_melted = df_filtered.melt(id_vars=['Species'], value_vars=CV_columns,
+                                 var_name='Group', value_name='CV')
+    df_melted['Group'] = df_melted['Group'].str.replace('CV_', '')
+    
+    # Create figure
+    fig_violin = go.Figure()
+    fig_violin = px.violin(df_melted, 
+                           x='Group', 
+                           y='CV', 
+                           color='Species', 
+                           color_discrete_map=colors,
+                           box=True, 
+                           points='outliers')
+
+    fig_violin.update_layout(
+        title='', 
+        xaxis_title="Group",
+        yaxis_title="CV",
+        violingap=0,
+        template="vizro",
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='center',
+            x=0.5
+        )
+    )
+    
+    fig_violin.update_traces(
+        points='outliers', 
+        marker=dict(opacity=0.5, size=0.5*10),
+        selector=dict(type="violin")  # Apply only to box traces
+    )
+    
+    # Calculate count statistics for each variable
+    count_stats = []
+    groups = df_melted['Group'].unique().tolist()
+    for group in groups:
+        var_data = df_melted[df_melted['Group'] == group]['CV']
+        total_count = len(var_data)
+        
+        stats = {
+            'Group': group,
+            'Total': total_count,
+            'CV<=20': (var_data <= 20).sum(),
+            'CV<=10': (var_data <= 10).sum(),
+            'CV<=5': (var_data <= 5).sum()
+        }
+        count_stats.append(stats)
+    
+    # Convert to DataFrame for easier plotting
+    count_df = pd.DataFrame(count_stats)
+    for group in groups:
+        total = count_df[count_df['Group'] == group]['Total'].iloc[0]
+        count_df.loc[count_df['Group'] == group, 'Total_pct'] = 100.0
+        count_df.loc[count_df['Group'] == group, 'CV<=20_pct'] = (count_df.loc[count_df['Group'] == group, 'CV<=20'].iloc[0] / total) * 100
+        count_df.loc[count_df['Group'] == group, 'CV<=10_pct'] = (count_df.loc[count_df['Group'] == group, 'CV<=10'].iloc[0] / total) * 100
+        count_df.loc[count_df['Group'] == group, 'CV<=5_pct'] = (count_df.loc[count_df['Group'] == group, 'CV<=5'].iloc[0] / total) * 100
+    
+    # Melt the count data for plotting
+    count_melted = count_df.melt(id_vars=['Group'], 
+                                 value_vars=['Total', 'CV<=20', 'CV<=10', 'CV<=5'],
+                                 var_name='CV_category', 
+                                 value_name='Count')
+    
+    # Melt the percentage data and merge
+    pct_melted = count_df.melt(id_vars=['Group'], 
+                              value_vars=['Total_pct', 'CV<=20_pct', 'CV<=10_pct', 'CV<=5_pct'],
+                              var_name='CV_category_pct', 
+                              value_name='Percentage')
+    pct_melted['CV_category'] = pct_melted['CV_category_pct'].str.replace('_pct', '')
+    
+    # Merge count and percentage data
+    count_melted = count_melted.merge(pct_melted[['Group', 'CV_category', 'Percentage']], 
+                                      on=['Group', 'CV_category'])
+    
+    # Create text annotations
+    count_melted['text'] = count_melted['Count'].astype(str) + '\n(' + count_melted['Percentage'].round(1).astype(str) + '%)'
+    
+    # Define color map with gradually darker grays
+    gray_colors = {
+        'Total': '#D3D3D3',          # Light gray
+        'CV<=20': '#A9A9A9',         # Dark gray
+        'CV<=10': '#696969',         # Dim gray
+        'CV<=5': '#2F2F2F'           # Very dark gray
+    }
+    
+    # Create bar plot
+    fig_bar = px.bar(count_melted, 
+                     x='Group', 
+                     y='Count', 
+                     color='CV_category',
+                     color_discrete_map=gray_colors,
+                     barmode='group',
+                     #title='Number of proteins by CV Category',
+                     text='text',
+                     labels={'Count': 'Number of proteins', 'CV_category': 'CV Category'})
+    fig_bar.update_traces(textposition='inside', textfont_size=14)
+    
+    # Update layout for better appearance
+    fig_bar.update_layout(
+        xaxis_title='Group',
+        yaxis_title='Number of proteins',
+        legend_title='',
+        legend=dict(
+            orientation="h",  # horizontal legend
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5
+        ),
+    )
+    
+    return fig_violin, fig_bar
+
+
+@app.callback(
     Output("tab-1-content", "style"),
     Output("tab-2-content", "style"),
     Output("tab-3-content", "style"),
     Output("tab-4-content", "style"),
     Output("tab-5-content", "style"),
+    Output("tab-6-content", "style"),
     Input("tabs", "active_tab")
 )
 def toggle_tab(tab):
     styles = {"display": "none"}
     if tab == "tab-1":
-        return {}, styles, styles, styles, styles
+        return {}, styles, styles, styles, styles, styles
     elif tab == "tab-2":
-        return styles, {}, styles, styles, styles
+        return styles, {}, styles, styles, styles, styles
     elif tab == "tab-3":
-        return styles, styles, {}, styles, styles
+        return styles, styles, {}, styles, styles, styles
     elif tab == "tab-4":
-        return styles, styles, styles, {}, styles
+        return styles, styles, styles, {}, styles, styles
+    elif tab == "tab-5":
+        return styles, styles, styles, styles, {}, styles
     else:
-        return styles, styles, styles, styles, {}
+        return styles, styles, styles, styles, styles, {}
 
 @app.callback(
     Output('group-A', 'options'),
@@ -483,7 +632,8 @@ def generate_group_options(meta):
     [Output('ratio-intensity-plot', 'figure'),
      Output('ratio-violin-plot', 'figure'),
      Output('stored-valid-prots', 'data')],
-    [Input('species-input-bench', 'value'),
+    [Input('cv-filter', 'value'),
+     Input('species-input-bench', 'value'),
      Input('show-exp-ratios', 'value'),
      Input('ratio-1', 'value'),
      Input('ratio-2', 'value'),
@@ -497,7 +647,7 @@ def generate_group_options(meta):
      State('stored-meta', 'data')],
     prevent_initial_call=True
 )
-def update_benchmark_plot(species_input, show_exp_ratios, ratio_1, ratio_2, ratio_3, group_A, group_B, point_size, point_opacity, y_span, data, meta):
+def update_benchmark_plot(cv_filter, species_input, show_exp_ratios, ratio_1, ratio_2, ratio_3, group_A, group_B, point_size, point_opacity, y_span, data, meta):
     if data is None:
         return dash.no_update, dash.no_update, {}
     
@@ -508,6 +658,13 @@ def update_benchmark_plot(species_input, show_exp_ratios, ratio_1, ratio_2, rati
     species_column = "Protein.Names"
     tag_column = "Protein.Group"
     value_columns = extract_unique_parts(meta['Sample'].to_list())
+    cv_columns = [col for col in df.columns if 'CV_' in col]
+    
+    for cv_col in cv_columns:
+        print(f"Filtering proteins based on the {cv_col} (<={cv_filter})")
+        print(f"Before: {df.shape[0]}")
+        df = df[df[cv_col] <= cv_filter]
+        print(f"After: {df.shape[0]}")
     
     # Parse and clean user input
     species = [s.strip() for s in species_input] if species_input else []
@@ -517,19 +674,10 @@ def update_benchmark_plot(species_input, show_exp_ratios, ratio_1, ratio_2, rati
         df_filtered = df.copy()
         df_filtered['Species'] = 'ALL'
     else:
-        # Function to find first matching group in prot_names
-        def define_species(prot_name):
-            if pd.isna(prot_name):
-                return None
-            for s in species:
-                if s in prot_name:
-                    return s
-            return None
-
-        df['Species'] = df[species_column].apply(define_species)
+        df['Species'] = df[species_column].apply(define_species, species_list=species)
         # Filter out rows with no matching group
         df_filtered = df[df['Species'].notna()]
-
+        print(f"Number of proteins without species annotation: {df.shape[0] - df_filtered.shape[0]}")
         if df_filtered.empty:
             empty_fig = px.scatter(title='No matching species found in your input.')
             return empty_fig, empty_fig, {}
@@ -542,10 +690,10 @@ def update_benchmark_plot(species_input, show_exp_ratios, ratio_1, ratio_2, rati
     cols_B = meta.index[meta['Group'] == group_B]  
     
     # Create LFQBench plots
-    mat = df_filtered[value_columns]
+    mat = np.log2(df_filtered[value_columns])
     valid_prots = get_valid_ratios(mat, protein_tags, protein_species, species_list, 
-                                 sample_groups=[group_A, group_B], 
-                                 cols_A=cols_A, cols_B=cols_B)
+                                   sample_groups=[group_A, group_B], 
+                                   cols_A=cols_A, cols_B=cols_B)
     scatter_fig, violin_fig = lfqbench_plot(
         valid_prots, species_list, show_exp_ratios, exp_ratios, 
         colors=colors, span=y_span, point_cex=point_size, 
@@ -717,7 +865,7 @@ def update_summ_plot(selected_prot,
         quality_df.columns = extract_unique_parts(quality_df.columns.values.tolist())
         # Retrieve selected row data
         value_cols = meta_df['Sample_simp'].to_list()
-        prot_quant_values = quant_df.loc[quant_df["Protein.Group"] == selected_prot, value_cols].values[0]
+        prot_quant_values = np.log2(quant_df.loc[quant_df["Protein.Group"] == selected_prot, value_cols].values[0])
         prot_quality_values = quality_df.loc[selected_prot, value_cols].values
         
         # Create figure
@@ -744,6 +892,7 @@ def update_summ_plot(selected_prot,
             sampled_colors = px.colors.sample_colorscale(default_colorscale, num_traces)
         trace_colors = dict(zip(unique_precursors, sampled_colors))
         for tract_id, group in prec_quant_df.groupby("Precursor.Id_MS_type"):
+            group["Y"] = np.log2(group["Y"])
             if sub_row_means:
                 quant_fig.add_trace(go.Scatter(
                     x=group["X"], 
@@ -808,7 +957,6 @@ def update_summ_plot(selected_prot,
             xaxis_title="Runs",
             yaxis_title="Log2(Ratio)" if sub_row_means else "Log2(Intensity)",
             template="vizro",
-            height=500,
             xaxis=dict(domain=[0, 0.7]),  # Plot uses only 70% of width
             legend=dict(
                 yanchor="middle",
@@ -827,7 +975,6 @@ def update_summ_plot(selected_prot,
             xaxis_title="Runs",
             yaxis_title="Quality",
             template="vizro",
-            height=500,
             xaxis=dict(domain=[0, 0.7]),  # Plot uses only 70% of width
             legend=dict(
                 yanchor="middle",
@@ -862,7 +1009,8 @@ def update_summ_plot(selected_prot,
 def update_sequence_viewer(selected_prot, data):
     if not ctx.triggered or not selected_prot or not data:
         return (html.Div("Select a protein to show its coverage information", 
-                        style={'fontSize': '20px', 
+                        style={'height': '500px',
+                               'fontSize': '20px', 
                                'marginTop': '15px',
                                'marginLeft': '20px'}), 
                 None)

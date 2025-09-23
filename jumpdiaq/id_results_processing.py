@@ -438,7 +438,7 @@ def map_peptides(protein_seqs, peptide_seqs):
 
 
 def extract_from_single_fasta(fasta_file, protein_ids, extract_sequence=True):
-    logging.info(f"Extracting protein information from fasta file: {fasta_file}")
+    logging.info(f"Extracting protein information from FASTA file: {fasta_file}")
     
     prot_info = {}
 
@@ -497,4 +497,3 @@ def extract_prot_info_from_FASTAs(fasta_files, protein_ids, extract_sequence=Tru
         prot_info_final.to_csv(out_file, index=False)
 
     return prot_info_final
-

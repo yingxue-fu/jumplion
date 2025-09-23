@@ -16,7 +16,7 @@ from jumpdiaq.gui.app import app, page_sidebar_style, logger
 
 sidebar = html.Div(
     [
-        html.H3("Analyze"),
+        html.H3("Analyze", style={"font-weight": "bold"}),
         html.Hr(),
         dbc.Nav(
             [   

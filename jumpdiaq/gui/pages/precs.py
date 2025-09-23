@@ -20,18 +20,19 @@ ms2_colors = px.colors.qualitative.Bold
 
 sidebar = html.Div(
     [
-        html.H3("Precursor Quantification"),
+        html.H3("Precursor Quantification", style={"font-weight": "bold"}),
         html.Hr(),
         dbc.Nav(
             [   
-                html.Label(id='protein-label', style={"font-weight": "bold"}),
+                html.Label('Select a precursor', style={"font-weight": "bold"}),
                 dcc.Dropdown(id='precursor-dropdown', placeholder="Select a Precursor"),
+                html.Label(id='protein-label', style={'marginTop': '5px'}),
                 html.Br(),
-                html.Label("For cross-run", style={"font-weight": "bold"}),
+                html.Label("Precursor summarization", style={"font-weight": "bold"}),
                 dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means-xic', value=False),
                 dbc.Switch(label='Show summarized quantity/quality', id='show-prec-summ', value=False),
                 html.Br(),
-                html.Label("For individual run", style={"font-weight": "bold"}),
+                html.Label("Show precursor XICs in a run", style={"font-weight": "bold"}),
                 dcc.Dropdown(id='run-dropdown', placeholder="Select a Run"),
                 dbc.Switch(label='Show Interpolated MS1 XICs', id='show-ms1-inter', value=False, 
                            className="d-inline-block", style={'marginTop': '5px'}),
@@ -72,7 +73,7 @@ layout = html.Div(children=[
         dbc.Col(sidebar, width=4),
         dbc.Col([
             dbc.Tabs([
-                dbc.Tab(label='Cross-run', children=[
+                dbc.Tab(label='Precursor summarization', children=[
                         dbc.Row([
                             dbc.Col(html.Div(id='show-precid-c', style={'fontSize': '20px'}), width=11)
                         ], style={'margin-top': '20px'}),
@@ -81,7 +82,7 @@ layout = html.Div(children=[
                             dcc.Graph(id="prec-quality-plot"),
                             ], className="p-2")
                 ], label_style=tab_label_style),
-                dbc.Tab(label='Individual run', children=[
+                dbc.Tab(label='Precursor XICs', children=[
                     dbc.Row([
                         dbc.Col(html.Div(id='show-precid-i', style={'fontSize': '20px'}), width=11)
                     ], style={'margin-top': '20px'}),
@@ -151,7 +152,7 @@ def string2float(float_strings: List[str], decimal: int) -> List[str]:
     Input('selected-prot', 'data'),
 )
 def update_protein_label(protein_name):
-    return f"For protein: {protein_name}"
+    return f"Protein: {protein_name}"
 
 @app.callback(
     Output('precursor-dropdown', 'options'),

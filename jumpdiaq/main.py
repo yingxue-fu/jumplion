@@ -35,10 +35,9 @@ def main():
     cores = psutil.cpu_count(logical=False)   # Physical cores
     threads = psutil.cpu_count(logical=True)  # Logical threads
     mem_info = psutil.virtual_memory()
-    mem_available = mem_info.available / (1024 ** 3)
-    # save memory mode
-    SaveMemory = True if mem_available < 64 else False
-    
+    mem_avail = mem_info.available / (1024 ** 3)
+    mem_total = mem_info.total / (1024 ** 3)
+
     # Read arguments
     args, cmd = parse_arguments(sys.argv[1:])
     if args is None:
@@ -52,13 +51,13 @@ def main():
     out_pub_dir = Path(OutDir) / 'publication'
     
     logger = setup_logger(False, OutDir)
-    logger.info("=======================================")
-    logger.info(f"  JUMPdiaq (v{jumpdiaq.__version__})")
+    logger.info("=====================================")
+    logger.info(f"    JUMPdiaq (v{jumpdiaq.__version__})")
     logger.info(" ")
     logger.info(f"  OS: {system} {release}, {architecture} ")
     logger.info(f" CPU: {cores} Cores, {threads} Threads")
-    logger.info(f" RAM: {mem_available:.0f} GB/{mem_info.total / (1024 ** 3):.0f} GB  (Avail/Total) ")
-    logger.info("=======================================\n")
+    logger.info(f" RAM: {mem_avail:.0f} GB/{mem_total:.0f} GB  (Avail/Total) ")
+    logger.info("=====================================\n")
     logger.info(f"Command: {cmd}\n")
     
     # Copy the parameter file
@@ -97,6 +96,7 @@ def main():
     ## Protein quantification
     PrecQuantLevel = args.prec_quant_level
     MinPrecQuality = args.min_prec_quality
+    MinPrecNum = args.min_prec_num
     MinPepNum = args.min_pep_num
     
     # XIC quantification
@@ -140,7 +140,9 @@ def main():
             run.process()
             run.free()
             del run
-            if SaveMemory:
+            # determine if performing garbage collection
+            if psutil.virtual_memory().available / (1024 ** 3) < 32:
+                logging.info("Available RAM less than 32 GB, performing garbage collection")
                 gc.collect()
 
         ## XIC quantification across runs
@@ -165,14 +167,13 @@ def main():
     # NormSpecies='HUMAN'
     # NormMethod='median'
     # TrimPercentage=5
-    prec_quantity_table_norm, norm_factors = norm_dataframe(
-                                                 prec_quantity_table, 
-                                                 data_type='Precursor',
-                                                 tag_column='Protein.Names', 
-                                                 value_columns=prec_quantity_table.columns[4:-2], 
-                                                 norm_species=NormSpecies, 
-                                                 norm_method=NormMethod, 
-                                                 trim_percentage=TrimPercentage)
+    prec_quantity_table_norm = norm_dataframe(prec_quantity_table, 
+                                              data_type='Precursor',
+                                              tag_column='Protein.Names', 
+                                              value_columns=prec_quantity_table.columns[4:-2], 
+                                              norm_species=NormSpecies, 
+                                              norm_method=NormMethod, 
+                                              trim_percentage=TrimPercentage)
     prec_quantity_table_norm.write_parquet(out_pub_dir / "precursor_quantity_summ_table_norm.parquet")
     
     # Protein quantification
@@ -197,9 +198,10 @@ def main():
         logging.warning("WARNING: no FASTA files are provided, protein coverage will not be calculated.")
     prot_prec_pep_info.to_csv(out_int_dir / "prot_prec_pep_info.csv", index=False)
     
-    # Filter based on the number of peptides
-    logging.info(f"Filtering proteins based on the number of peptides (>= {MinPepNum})")
-    accepted_pgs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Peptides'] >= MinPepNum]
+    # Filter based on the number of peptides and precursors
+    logging.info(f"Filtering proteins based on the number of precursors (>={MinPrecNum}) and peptides (>={MinPepNum})")
+    accepted = (prot_prec_pep_info['n.Precursors'] >= MinPrecNum) & (prot_prec_pep_info['n.Peptides'] >= MinPepNum)
+    accepted_pgs = prot_prec_pep_info['Protein.Group'][accepted]
     prot_quantity_table_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(accepted_pgs))
     prot_quantity_table_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
     

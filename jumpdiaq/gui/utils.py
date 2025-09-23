@@ -98,6 +98,86 @@ def ratio_violin_plot(ratios, labels, colors, ylim=None, text_cex=1):
     return fig
 
 
+def ratio_density_plot(ratios, labels, colors, ylim=None, opacity=0.5, point_cex=0.3, text_cex=1):
+    df = pd.DataFrame({'Value': ratios, 'Label': labels})
+    df = df[df['Value'].notna()]
+    
+    fig = px.histogram(
+        df,
+        y="Value",
+        color="Label",
+        histnorm='percent',
+        opacity=0.8,
+        color_discrete_map=colors,
+        marginal="box" 
+    )
+    
+    # Customize the marginal box plot
+    fig.update_traces(
+        boxpoints='outliers', 
+        marker=dict(opacity=opacity, size=point_cex*10),
+        width=0.8,  # Increase thickness of horizontal boxplot
+        selector=dict(type="box")  # Apply only to box traces
+    )
+        
+    fig.update_layout(
+        font=dict(size=14 * text_cex),
+        xaxis_title='Percentage (%)',
+        yaxis_title=None,  # Explicitly remove the y-axis title
+        margin=dict(l=100, r=5),  # Increase right margin to make room for annotations
+        showlegend=False, 
+        xaxis=dict(domain=[0, 0.5]),   # Main plot gets the bottom 75% of vertical space
+        xaxis2=dict(domain=[0.55, 1.0]) 
+    )
+    
+    if ylim is not None:
+        fig.update_yaxes(range=ylim)
+        
+    # Calculate statistics for each group
+    group_stats = df.groupby('Label')['Value'].agg(['count', 'median', 'mean', 'std'])
+    
+    # Place annotation just slightly to the left 
+    annotation_x = -0.15  # 5% left of min
+    
+    # Add annotations for each group, spaced vertically
+    for i, label in enumerate(group_stats.index):
+        count = group_stats.loc[label, 'count']
+        median = group_stats.loc[label, 'median']
+        mean = group_stats.loc[label, 'mean']
+        std = group_stats.loc[label, 'std']
+        
+        # Use the mean as the y position if no ylim is specified
+        annotation_y = mean * (2 * (ylim[1] - abs(mean)) / 3)
+    
+        # Add annotation
+        stats_text = f"{label}<br>n = {count}<br>Median: {median:.2f}<br>Mean: {mean:.2f}<br>SD: {std:.2f}"
+        fig.add_annotation(
+            x=annotation_x,
+            y=annotation_y,
+            text=stats_text,
+            showarrow=False,
+            font=dict(size=10 * text_cex),
+            xanchor='right',  # Anchor to the left so text extends to the right
+            yanchor='middle',
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor=colors[label],
+            borderwidth=1,
+            xref='paper',  
+            yref='y'   
+        )
+    
+    return fig
+
+# Function to find first matching group in prot_names
+def define_species(prot_name, species_list=['HUMAN', 'ECOLI', 'YEAST']):
+    if pd.isna(prot_name):
+        return None
+    for s in species_list:
+        if s in prot_name:
+            return s
+    return None
+
+
 def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, cols_A, cols_B):
     if sample_groups is None:
         sample_groups = ['A', 'B']
@@ -107,6 +187,7 @@ def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, 
         species_list = [species_list]
     
     # Convert matrix to numpy array if it's not already
+    print(f"Total number of proteins for benchmark plot: {mat.shape[0]}")
     if isinstance(mat, pd.DataFrame):
         mat_np = mat.values
     else:
@@ -121,8 +202,10 @@ def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, 
         values_A = [mat_log2[i, j] for j in cols_A if not np.isnan(mat_log2[i, j])]
         values_B = [mat_log2[i, j] for j in cols_B if not np.isnan(mat_log2[i, j])]
         # only compute the mean when there are more than two values in each group
-        A_means.append(np.mean(values_A) if len(values_A) > 1 else np.nan)
-        B_means.append(np.mean(values_B) if len(values_B) > 1 else np.nan)
+        A_mean = np.mean(values_A) if len(values_A) > 1 else np.nan
+        B_mean = np.mean(values_B) if len(values_B) > 1 else np.nan
+        A_means.append(A_mean)
+        B_means.append(B_mean)
     
     # Calculate log2 ratios
     R = [a - b for a, b in zip(A_means, B_means)]       
@@ -150,8 +233,8 @@ def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, 
         valid_xys = [(prot_tag, B, ratio) for prot_tag, B, ratio in zip(species_prot_tag, species_B, species_R) 
                      if np.isfinite(B) and np.isfinite(ratio)]
         valid_prots[species] = valid_xys
-        #print(f"{species}: valid ratios with at least two replicates in each of A and B: {len(valid_xys)}")
-    
+        print(f"{species}: valid ratios with at least two replicates in each of A and B: {len(valid_xys)}")
+        
     return valid_prots
 
 
@@ -211,24 +294,22 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
         xaxis_title=f'Log2 ({sample_groups[1]})',
         yaxis_title=f'Log2 ({sample_groups[0]} / {sample_groups[1]})',
         yaxis=dict(range=[-span, span]),
-        xaxis=dict(
-            range=[
-                np.quantile(all_valid_B, 0.001) if len(all_valid_B) else 0,
-                np.quantile(all_valid_B, 0.999) if len(all_valid_B) else 1
-            ]
-        ),
         showlegend=False,
         plot_bgcolor='white',
         title=title,
         font=dict(size=14*text_cex),
+        margin=dict(l=5, r=5),
     )
     
     # Create box-histogram plot
-    ratio_dist_fig = ratio_violin_plot(
+    ratio_dist_fig = ratio_density_plot(
         all_valid_R, 
         species_vec, 
         colors,
-        ylim=[-span, span]
+        [-span, span],
+        opacity,
+        point_cex,
+        text_cex
     )
     
     if show_exp_ratios:
@@ -244,23 +325,3 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
             )
     
     return ratio_intensity_fig, ratio_dist_fig
-
-# Helper functions
-def rmeans(data_array, axis=1):
-    """Calculate row means, ignoring NaN values"""
-    return np.nanmean(data_array, axis=axis)
-
-def rcvs(data_array):
-    """Calculate coefficient of variation for each row, ignoring NaN values"""
-    return np.nanstd(data_array, axis=1) / np.nanmean(data_array, axis=1)
-
-def rsums(data_array, axis=1):
-    """Calculate row sums, treating NaN as 0"""
-    return np.sum(~np.isnan(data_array), axis=axis)
-
-def alpha(hex_color, alpha_value):
-    """Add alpha transparency to hex color"""
-    # Convert hex to rgba
-    hex_color = hex_color.lstrip('#')
-    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    return f'rgba{rgb + (alpha_value,)}'
