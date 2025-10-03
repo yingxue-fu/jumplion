@@ -1,7 +1,6 @@
 # builtin
 import re
 import json
-import random
 import logging
 from pathlib import Path
 # external
@@ -139,13 +138,13 @@ def process_id_results(id_file,
     #############################################
     # 3. Choose precursors for mass calibration #
     #############################################
-    id_df_cal = id_df[id_df['Q.Value'] < max_qvalue_cal]
-    rt_mat_cal = rt_mat[(rt_mat.shape[1] - rt_mat.isna().sum(axis=1)) >= min_runs_cal]
-    mass_cal_precs = list(set(rt_mat_cal.index.values).intersection(set(id_df_cal['Precursor.Id'].drop_duplicates())))
-    logging.info(f"{len(mass_cal_precs)} precursors with Q-values < {max_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
-    random.seed(42)
-    mass_cal_precs = random.sample(mass_cal_precs, min(len(mass_cal_precs), max_mass_cal))
-    logging.info(f"{len(mass_cal_precs)} of them are randomly selected for mass calibration\n")
+    id_df_cal = id_df.loc[id_df['Q.Value'] < max_qvalue_cal, ['Precursor.Id', 'Run', 'Q.Value']]
+    q_mat_cal = id_df_cal.pivot(index='Precursor.Id', columns='Run', values='Q.Value')
+    q_mat_cal = q_mat_cal[(q_mat_cal.shape[1] - q_mat_cal.isna().sum(axis=1)) >= min_runs_cal]
+    logging.info(f"{len(q_mat_cal)} precursors with Q-values < {max_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
+    q_means = q_mat_cal.mean(axis=1, numeric_only=True)
+    mass_cal_precs = q_means.nsmallest(max_mass_cal).index.values
+    logging.info(f"The top {len(mass_cal_precs)} (ordered by average Q-value) of them are selected for mass calibration\n")
     
     # mark precursors used for calibration
     lib_df_uniq_prec['mass_cal'] = 0
