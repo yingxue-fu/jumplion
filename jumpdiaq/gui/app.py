@@ -27,11 +27,11 @@ page_sidebar_style = {
 
 to_image_config = {
     'toImageButtonOptions': {
-        'format': 'png',
+        'format': 'svg',
         'filename': 'custom_plot',
-        'height': 500,  # Adjust as needed
-        'width': 1000,  # Adjust as needed
-        'scale': 2      # Increase for higher resolution
+        'height': 300,  # Adjust as needed
+        'width': 250,  # Adjust as needed
+        #'scale': 2      # Increase for higher resolution (for png/jpeg formats)
     }
 }
 

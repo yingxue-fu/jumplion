@@ -58,18 +58,18 @@ sidebar = html.Div(
                                               "textTransform": "none"})
                         ], width=12, className="d-flex justify-content-end"),
                 ]),
-                html.Label("Identification report", style={"font-weight": "bold"}),
-                dbc.Input(id='idreport-path', type='text', 
-                          placeholder='Precursor-level identification report', 
+                html.Label("Precursor IDs", style={"font-weight": "bold"}),
+                dbc.Input(id='prec-ids-path', type='text', 
+                          placeholder='Path of the precursor ID table', 
                           style={'width': '100%'}, persistence=True),
                 html.Label("Spectral library", style={"font-weight": "bold", "margin-top": "10px"}),
                 dbc.Input(id='speclib-path', type='text', placeholder='Path of a spectral library file', 
                           style={'width': '100%'}, persistence=True),
                 html.Label("FASTA files", style={"font-weight": "bold", "margin-top": "10px"}),
                 dbc.Input(id='fasta-path', type='text', 
-                          placeholder='Path of fasta files (.fasta, .fas)', 
+                          placeholder='Path of FASTA files (.fasta, .fas)', 
                           style={'width': '100%'}, persistence=True),
-                dcc.Dropdown(id='fasta-selector', placeholder='Select fasta files', 
+                dcc.Dropdown(id='fasta-selector', placeholder='Select FASTA files', 
                              multi=True, style={'width': '100%'}, 
                              className="p-0 mt-1"),
                 dbc.Col(dbc.Button("Select all", id="select-all-fasta",
@@ -128,8 +128,8 @@ sidebar = html.Div(
                     dbc.CardBody([
                         html.P('Use existing results', style={"font-weight": "bold"}, className="mt-1 mb-0"),
                         dbc.Row([
-                            dbc.Col(html.Label("skip_id_process"), width=8),  
-                            dbc.Col(dbc.Checklist(id="skip-id-process",
+                            dbc.Col(html.Label("skip_id_processing"), width=8),  
+                            dbc.Col(dbc.Checklist(id="skip-id-processing",
                                                   options=[{"label": "Enabled", "value": "yes"}],
                                                   value=[],
                                                   inline=True), 
@@ -144,8 +144,8 @@ sidebar = html.Div(
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("use_xic_report"), width=8),  
-                            dbc.Col(dbc.Checklist(id="use-xic-report",
+                            dbc.Col(html.Label("use_xic_quant"), width=8),  
+                            dbc.Col(dbc.Checklist(id="use-xic-quant",
                                                   options=[{"label": "Enabled", "value": "yes"}],
                                                   value=[],
                                                   inline=True), 
@@ -286,26 +286,26 @@ sidebar = html.Div(
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("ms2_priority_quality"), width=8),  
-                            dbc.Col(dbc.Input(id="ms2-priority-quality", 
+                            dbc.Col(html.Label("min_1hitw_quality"), width=8),  
+                            dbc.Col(dbc.Input(id="min-1hitw-quality", 
                                               type="number", 
-                                              value=0.8, 
+                                              value=0.7, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("max_n_precs"), width=8),  
-                            dbc.Col(dbc.Input(id="max-n-precs", 
+                            dbc.Col(html.Label("min_prec_num"), width=8),  
+                            dbc.Col(dbc.Input(id="min-prec-num", 
                                               type="number", 
-                                              value=100, 
+                                              value=2, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("prot_quality_cutoffs"), width=8),  
-                            dbc.Col(dbc.Input(id="prot-quality-cutoffs", 
+                            dbc.Col(html.Label("min_pep_num"), width=8),  
+                            dbc.Col(dbc.Input(id="min-pep-num", 
                                               type="number", 
-                                              value=10, 
+                                              value=1, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
@@ -434,7 +434,7 @@ def msfile_checkboxes(path, select_clicks, clear_clicks):
     if path:
         files = list_ms_files(path)
         if not files:
-            return html.Div("No valid MS files found in the path.")
+            return html.Div("No valid MS files found in the path.", style={"color": "red"})
 
         triggered = ctx.triggered_id
         checked = triggered == 'select-all-msfiles'
@@ -454,7 +454,7 @@ def msfile_checkboxes(path, select_clicks, clear_clicks):
             ) for f in files
         ]
     else:
-        return html.Div("Input the path to show availabe files.")
+        return html.Div("Input the path to show availabe files.", style={"color": "gray"})
 
 @app.callback(
     Output('selected-msfiles', 'data'),
@@ -794,14 +794,14 @@ def update_process_state(log_value, n_intervals, process_state):
     State('no-msfile', 'is_open'),
     State('msfile-path', 'value'), 
     State('selected-msfiles', 'data'),
-    State('idreport-path', 'value'),
+    State('prec-ids-path', 'value'),
     State('speclib-path', 'value'),
     State('fasta-path', 'value'), 
     State('fasta-selector', 'value'),
     State('outdir-path', 'value'),
-    State('skip-id-process', 'value'),
+    State('skip-id-processing', 'value'),
     State('use-saved-xic', 'value'),
-    State('use-xic-report', 'value'),
+    State('use-xic-quant', 'value'),
     State('min-runs-quant', 'value'),
     State('min-runs-model', 'value'),
     State('min-runs-cal', 'value'),
@@ -815,9 +815,9 @@ def update_process_state(log_value, n_intervals, process_state):
     State('norm-method', 'value'),
     State('trim-percentage', 'value'),
     State('prec-quant-level', 'value'),
-    State('ms2-priority-quality', 'value'),
-    State('max-n-precs', 'value'),
-    State('prot-quality-cutoffs', 'value'),
+    State('min-1hitw-quality', 'value'),
+    State('min-prec-num', 'value'),
+    State('min-pep-num', 'value'),
     prevent_initial_call=True
 )
 def run_jumpdiaq(
@@ -825,14 +825,14 @@ def run_jumpdiaq(
         no_msfile_open,
         msfile_path,
         selected_msfiles,  
-        idreport,
+        prec_ids,
         speclib,
         fasta_path,
         fastas,
         outdir,
-        skip_id_process,
+        skip_id_processing,
         use_saved_xic,
-        use_xic_report,
+        use_xic_quant,
         min_runs_quant,
         min_runs_model,
         min_runs_cal,
@@ -846,9 +846,9 @@ def run_jumpdiaq(
         norm_method,
         trim_percentage,
         prec_quant_level,
-        ms2_priority_quality,
-        max_n_precs,
-        prot_quality_cutoffs
+        min_1hitw_quality,
+        min_prec_num,
+        min_pep_num
         ):
     if n_clicks_run == 0 or not outdir:
         return no_msfile_open, None, dash.no_update
@@ -868,10 +868,10 @@ def run_jumpdiaq(
             full_path = os.path.join(msfile_path, msfile)
             cmd_args.append(full_path)
     
-    # Add report file
-    if idreport:
-        cmd_args.append("--id-report")
-        cmd_args.append(str(Path(idreport)))
+    # Add prec ids file
+    if prec_ids:
+        cmd_args.append("--prec-ids")
+        cmd_args.append(str(Path(prec_ids)))
     
     # Add library file
     if speclib:
@@ -893,8 +893,8 @@ def run_jumpdiaq(
         cmd_args.append(outdir)
     
     # 
-    if 'yes' in skip_id_process:
-        cmd_args.append("--skip-id-process")
+    if 'yes' in skip_id_processing:
+        cmd_args.append("--skip-id-processing")
         cmd_args.append("1")
         
     # 
@@ -903,8 +903,8 @@ def run_jumpdiaq(
         cmd_args.append("1")
             
     # 
-    if 'yes' in use_xic_report:
-        cmd_args.append("--use-xic-report")
+    if 'yes' in use_xic_quant:
+        cmd_args.append("--use-xic-quant")
         cmd_args.append("1")
     
     cmd_args.append("--min-runs-quant")
@@ -944,12 +944,12 @@ def run_jumpdiaq(
     # 
     cmd_args.append("--prec-quant-level")
     cmd_args.append(prec_quant_level)
-    cmd_args.append("--ms2-priority-quality")
-    cmd_args.append(str(ms2_priority_quality))
-    cmd_args.append("--max-n-precs")
-    cmd_args.append(str(max_n_precs))
-    cmd_args.append("--prot-quality-cutoffs") 
-    cmd_args.append(str(prot_quality_cutoffs))
+    cmd_args.append("--min-1hitw-quality")
+    cmd_args.append(str(min_1hitw_quality))
+    cmd_args.append("--min-prec-num")
+    cmd_args.append(str(min_prec_num))
+    cmd_args.append("--min-pep-num") 
+    cmd_args.append(str(min_pep_num))
     
     #
     cmd_args.append("--show-progress")

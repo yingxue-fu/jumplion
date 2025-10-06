@@ -7,13 +7,13 @@ import psutil    # cpu and memory info
 import platform  # os info
 import logging
 from pathlib import Path
+from importlib.metadata import version
 # external
 import polars as pl
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg') 
 # local
-import jumpdiaq
 from jumpdiaq.arguments import parse_arguments, setup_logger, close_logger
 from jumpdiaq.utils import remove_extension, get_file_name
 
@@ -52,11 +52,11 @@ def main():
     
     logger = setup_logger(False, OutDir)
     logger.info("=====================================")
-    logger.info(f"    JUMPdiaq (v{jumpdiaq.__version__})")
+    logger.info(f"     JUMPdiaq (v{version('jumpdiaq')})")
     logger.info(" ")
-    logger.info(f"  OS: {system} {release}, {architecture} ")
-    logger.info(f" CPU: {cores} Cores, {threads} Threads")
-    logger.info(f" RAM: {mem_avail:.0f} GB/{mem_total:.0f} GB  (Avail/Total) ")
+    logger.info(f"   OS: {system} {release}, {architecture} ")
+    logger.info(f"  CPU: {cores} Cores, {threads} Threads")
+    logger.info(f"  RAM: {mem_avail:.0f} GB/{mem_total:.0f} GB  (Avail/Total) ")
     logger.info("=====================================\n")
     logger.info(f"Command: {cmd}\n")
     
@@ -76,14 +76,14 @@ def main():
 
     # Input files
     MSFiles = args.ms_files
-    IdFile = args.id_report
+    IdFile = args.prec_ids
     LibFile = args.spec_lib
     
     # Parameters
     ## Use existing results
-    SkipIDprocess = args.skip_id_process
+    SkipIDProcessing = args.skip_id_processing
     UseSavedXIC = args.use_saved_xic
-    UseXICReport = args.use_xic_report
+    UseXICQuant = args.use_xic_quant
     ## Precursor quantification
     UseRawMS1 = args.use_raw_ms1
     UseRawMS2 = args.use_raw_ms2
@@ -96,18 +96,19 @@ def main():
     ## Protein quantification
     PrecQuantLevel = args.prec_quant_level
     MinPrecQuality = args.min_prec_quality
+    Min1HitWQuality = args.min_1hitw_quality
     MinPrecNum = args.min_prec_num
     MinPepNum = args.min_pep_num
     
     # XIC quantification
     xic_quant_file = out_pub_dir / 'xic_quantification.parquet'
-    if UseXICReport:
-        logging.info(f"Using existing XIC quantification report: {xic_quant_file}") 
+    if UseXICQuant:
+        logging.info(f"Using existing XIC quantification result: {xic_quant_file}") 
     else:
         logging.info(f"{len(MSFiles)} runs will be analyzed")
         
         ## Skip ID results processing
-        if SkipIDprocess:
+        if SkipIDProcessing:
             prec_rt_file = out_int_dir / "prec_rt_info.csv"
             logging.info(f"ID results processing skipped. Using existing precursor RTs (and IMs): {prec_rt_file}\n") 
             prec_rts = pd.read_csv(prec_rt_file)
@@ -180,13 +181,40 @@ def main():
     prot_quantity_table, prot_quality_table = quantify_proteins(prec_quantity_table_norm, 
                                                                 prec_quality_table,
                                                                 min_prec_quality=MinPrecQuality)
+    # Calculate the number of peptides of a protein
+    prot_prec_pep_info = get_prot_prec_pep_info(xic_quant_file)
+    prot_quantity_table = pl.from_pandas(prot_prec_pep_info).join(prot_quantity_table, 
+                                                                  on='Protein.Group', 
+                                                                  how='inner')
+    prot_name_cols = ['Protein.Group', 'Protein.Names', 'Genes']
+    remaining_cols = [col for col in prot_quantity_table.columns if col not in prot_name_cols]
+    prot_quantity_table = prot_quantity_table.select(prot_name_cols + remaining_cols)
+    
+    # save file
     prot_quantity_table.write_csv(out_pub_dir / "protein.group_quantity_matrix_all.csv")
     prot_quality_table.write_csv(out_pub_dir / "protein.group_quality_matrix.csv")
     
-    # Calculate the number of peptides of a protein
-    prot_prec_pep_info = get_prot_prec_pep_info(xic_quant_file)
+    # For one-hit wonder (protein with one precursor), filter based on quality
+    logging.info(f"Removing low quality (<={Min1HitWQuality}) one-hit wonders (proteins with one precursor)")
+    prot_1_prec = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] == 1]
+    prot_2more_precs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] >= 2]
+
+    prot_quality_1prec = prot_quality_table.filter(pl.col('Protein.Group').is_in(prot_1_prec)).to_pandas()
+    prot_quality_1prec['row_median'] = prot_quality_1prec.iloc[:, 3:].median(axis=1)
+    prot_1_prec_f = prot_quality_1prec['Protein.Group'][prot_quality_1prec['row_median'] >= Min1HitWQuality]
     
-    # Calculate protein coverage
+    prots_accept_1 = pd.concat([prot_2more_precs, prot_1_prec_f])
+    prot_quantity_table_1st_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(prots_accept_1))
+    prot_quantity_table_1st_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
+    
+    # Further filtering
+    logging.info(f"Filtering proteins based on the number of precursors (>={MinPrecNum}) and peptides (>={MinPepNum})")
+    accepted = (prot_prec_pep_info['n.Precursors'] >= MinPrecNum) & (prot_prec_pep_info['n.Peptides'] >= MinPepNum)
+    prots_accept_2 = prot_prec_pep_info['Protein.Group'][accepted]
+    prot_quantity_table_2nd_f = prot_quantity_table_1st_f.filter(pl.col('Protein.Group').is_in(prots_accept_2))
+    prot_quantity_table_2nd_f.write_csv(out_pub_dir / "protein.group_quantity_matrix_prec_filtering.csv")
+    
+    # Calculate protein coverage (mainly for GUI)
     FastaFiles = args.fastas
     if len(FastaFiles):
         try:
@@ -196,14 +224,7 @@ def main():
             logging.warning(f"WARNING: cannot read the FASTA file. {e}")
     else:
         logging.warning("WARNING: no FASTA files are provided, protein coverage will not be calculated.")
-    prot_prec_pep_info.to_csv(out_int_dir / "prot_prec_pep_info.csv", index=False)
-    
-    # Filter based on the number of peptides and precursors
-    logging.info(f"Filtering proteins based on the number of precursors (>={MinPrecNum}) and peptides (>={MinPepNum})")
-    accepted = (prot_prec_pep_info['n.Precursors'] >= MinPrecNum) & (prot_prec_pep_info['n.Peptides'] >= MinPepNum)
-    accepted_pgs = prot_prec_pep_info['Protein.Group'][accepted]
-    prot_quantity_table_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(accepted_pgs))
-    prot_quantity_table_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
+    prot_prec_pep_info.to_parquet(out_int_dir / "prot_prec_pep_info.parquet", index=False)
     
     logging.info("Finished!")
     close_logger(logger)

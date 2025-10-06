@@ -11,7 +11,7 @@ from dash import dcc, html, Input, Output, State, dash_table#, callback_context
 from dash_bootstrap_templates import load_figure_template
 # local
 from jumpdiaq.utils import extract_unique_parts
-from jumpdiaq.gui.app import app, page_sidebar_style, logger
+from jumpdiaq.gui.app import app, to_image_config, page_sidebar_style, logger
 
 
 load_figure_template(["vizro", "vizro_dark"])
@@ -34,8 +34,10 @@ sidebar = html.Div(
                 html.Br(),
                 html.Label("Show precursor XICs in a run", style={"font-weight": "bold"}),
                 dcc.Dropdown(id='run-dropdown', placeholder="Select a Run"),
-                dbc.Switch(label='Show Interpolated MS1 XICs', id='show-ms1-inter', value=False, 
+                dbc.Switch(label='Show interpolated MS1 XICs', id='show-ms1-inter', value=False, 
                            className="d-inline-block", style={'marginTop': '5px'}),
+                dbc.Switch(label='Show smoothed optimal XIC', id='show-optimal', value=False, 
+                           className="d-inline-block"),
                 html.Hr(),
                 dbc.Button("Go back to Proteins", id="view-prot-prec", 
                            color="info",  
@@ -62,13 +64,13 @@ tab_label_style = {
 }
 
 layout = html.Div(children=[
-    dcc.Store(id='stored-precquant'),  # Store the protein quantification data
-    dcc.Store(id='stored-precquality'),
-    dcc.Store(id='stored-precMS1quant'),
-    dcc.Store(id='stored-precMS1quality'),
-    dcc.Store(id='stored-precMS2quant'),
-    dcc.Store(id='stored-precMS2quality'),
-    dcc.Store(id='stored-report'),  # Added for storing DataFrame
+    dcc.Store(id='stored-prec-quant'),  # Store the protein quantification data
+    dcc.Store(id='stored-prec-quality'),
+    dcc.Store(id='stored-prec-MS1quant'),
+    dcc.Store(id='stored-prec-MS1quality'),
+    dcc.Store(id='stored-prec-MS2quant'),
+    dcc.Store(id='stored-prec-MS2quality'),
+    dcc.Store(id='stored-prec-report'),  # Added for storing DataFrame
     dbc.Row([
         dbc.Col(sidebar, width=4),
         dbc.Col([
@@ -78,8 +80,8 @@ layout = html.Div(children=[
                             dbc.Col(html.Div(id='show-precid-c', style={'fontSize': '20px'}), width=11)
                         ], style={'margin-top': '20px'}),
                         html.Div([   
-                            dcc.Graph(id="prec-quant-plot"),
-                            dcc.Graph(id="prec-quality-plot"),
+                            dcc.Graph(id="prec-quant-plot", config=to_image_config),
+                            dcc.Graph(id="prec-quality-plot", config=to_image_config),
                             ], className="p-2")
                 ], label_style=tab_label_style),
                 dbc.Tab(label='Precursor XICs', children=[
@@ -90,12 +92,12 @@ layout = html.Div(children=[
                         dbc.Col(html.Div(id='show-run-info', style={'fontSize': '16px', 'color': 'green'}), width=11)
                     ], style={'margin-top': '5px'}),
                     dbc.Row([
-                        dbc.Col(dcc.Graph(id='xic-plot-ms1'), width=8),
-                        dbc.Col(dcc.Graph(id='xic-plot-ms1-c'), width=4)
+                        dbc.Col(dcc.Graph(id='xic-plot-ms1', config=to_image_config), width=8),
+                        dbc.Col(dcc.Graph(id='xic-plot-ms1-c', config=to_image_config), width=4)
                     ], style={'margin-top': '5px', 'margin-right': '10px'}),
                     dbc.Row([
-                        dbc.Col(dcc.Graph(id='xic-plot-ms2'), width=8),
-                        dbc.Col(dcc.Graph(id='xic-plot-ms2-c'), width=4)
+                        dbc.Col(dcc.Graph(id='xic-plot-ms2', config=to_image_config), width=8),
+                        dbc.Col(dcc.Graph(id='xic-plot-ms2-c', config=to_image_config), width=4)
                     ], style={'margin-top': '5px', 'margin-right': '10px'}),
                     dbc.Row([
                         dbc.Col(dash_table.DataTable(
@@ -168,12 +170,12 @@ def load_options(stored_options):
 
 @app.callback(
     [Output('show-precid-c', 'children'),
-     Output('stored-precquant', 'data'),
-     Output('stored-precquality', 'data'),
-     Output('stored-precMS1quant', 'data'),
-     Output('stored-precMS1quality', 'data'),
-     Output('stored-precMS2quant', 'data'),
-     Output('stored-precMS2quality', 'data')],
+     Output('stored-prec-quant', 'data'),
+     Output('stored-prec-quality', 'data'),
+     Output('stored-prec-MS1quant', 'data'),
+     Output('stored-prec-MS1quality', 'data'),
+     Output('stored-prec-MS2quant', 'data'),
+     Output('stored-prec-MS2quality', 'data')],
     Input('precursor-dropdown', 'value'),
     State('stored-outdir', 'data'),
     prevent_initial_call=True
@@ -234,12 +236,12 @@ def read_precs_data(selected_precursor, outdir_path):
     Output('prec-quality-plot', 'figure'),
     Input('sub-row-means-xic', 'value'),
     Input('show-prec-summ', 'value'),
-    Input('stored-precquant', 'data'),
-    Input('stored-precquality', 'data'),
-    Input('stored-precMS1quant', 'data'),
-    Input('stored-precMS1quality', 'data'),
-    Input('stored-precMS2quant', 'data'),
-    Input('stored-precMS2quality', 'data'), 
+    Input('stored-prec-quant', 'data'),
+    Input('stored-prec-quality', 'data'),
+    Input('stored-prec-MS1quant', 'data'),
+    Input('stored-prec-MS1quality', 'data'),
+    Input('stored-prec-MS2quant', 'data'),
+    Input('stored-prec-MS2quality', 'data'), 
     State('stored-meta', 'data'),
     prevent_initial_call=True  
 )
@@ -372,11 +374,12 @@ def update_summ_plot(sub_row_means_xic,
         if show_summ_value:
             for tract_id, group in prec_quant_values.groupby("MS_type"):
                 x=group["X"]
+                y_log2=np.log2(group["Y"])
                 if sub_row_means_xic:
-                    y=group["Y"]-np.nanmean(group["Y"].to_numpy())
+                    y=y_log2-np.nanmean(y_log2.to_numpy())
                     opacity=0.7
                 else:
-                    y=group["Y"]
+                    y=y_log2
                     opacity=1.0
                     
                 quant_fig.add_trace(go.Scatter(
@@ -447,7 +450,7 @@ def update_summ_plot(sub_row_means_xic,
 
 @app.callback(
     [Output('run-dropdown', 'options'),
-     Output('stored-report', 'data')],     
+     Output('stored-prec-report', 'data')],     
     Input('precursor-dropdown', 'value'),
     State('stored-outdir', 'data')
 )
@@ -487,39 +490,23 @@ def update_run_options(selected_precursor: str, outdir_path: str) -> tuple:
      Output('xic-plot-ms2-c', 'figure'),
      Output('xic-info-table', 'data')],
     Input('precursor-dropdown', 'value'),
-    Input('show-ms1-inter', 'value'),
     Input('run-dropdown', 'value'),
-    State('stored-report', 'data'),
+    Input('show-ms1-inter', 'value'),
+    Input('show-optimal', 'value'),
+    State('stored-prec-report', 'data'),
     State('stored-outdir', 'data')
 )
 def update_XIC_plots_table(selected_precursor: str, 
-                           show_interpolated_ms1: bool,
                            selected_run: str, 
-                           stored_report: List[Dict[str, Any]], 
+                           show_interpolated_ms1: bool,
+                           show_optimal: bool,
+                           stored_prec_report: List[Dict[str, Any]], 
                            outdir_path: str) -> tuple:
-    if selected_run is None or selected_precursor is None or not stored_report:
+    if selected_run is None or selected_precursor is None or not stored_prec_report:
         return ('Select a run to check precursor XICs', '', go.Figure(), 
                 go.Figure(), go.Figure(), go.Figure(), [])
 
     try:
-        report_df = pd.DataFrame(stored_report)
-        report_data = report_df[report_df['Run'] == selected_run].reset_index(drop=True)
-
-        if report_data.empty:
-            raise ValueError("No data found for selected run")
-        
-        # Get XIC file path using absolute paths
-        out_int_dir = Path(outdir_path) / 'intermediate'
-        xic_file_path = get_xic_path(out_int_dir, selected_run)
-        if not xic_file_path.exists():
-            raise FileNotFoundError(f"XIC file not found: {xic_file_path}")
-        
-        #selected_precursor = selected_precursor.split("_")[0]
-        xic_data = pd.read_parquet(xic_file_path, filters=[('Precursor.Id', '==', selected_precursor)])
-        
-        if xic_data.empty:
-            raise ValueError("No XIC data found for selected precursor")
-    
         # Extract relevant data
         prec_title = f"     {selected_precursor}"
         run_title = f"     Run: {selected_run}"
@@ -527,8 +514,23 @@ def update_XIC_plots_table(selected_precursor: str,
         # Define template based on switch state
         template = "vizro" #if switch_on else "vizro_dark"
         
+        # Get XIC file path using absolute paths
+        out_int_dir = Path(outdir_path) / 'intermediate'
+        xic_file_path = get_xic_path(out_int_dir, selected_run)
+        if not xic_file_path.exists():
+            raise FileNotFoundError(f"XIC file not found: {xic_file_path}")
+        xic_data = pd.read_parquet(xic_file_path, filters=[('Precursor.Id', '==', selected_precursor)])
+        if xic_data.empty:
+            raise ValueError("No XIC data found for selected precursor")
+        
+        #
+        prec_report_df = pd.DataFrame(stored_prec_report)
+        prec_data = prec_report_df[prec_report_df['Run'] == selected_run].reset_index(drop=True)
+        if prec_data.empty:
+            raise ValueError("No data found for selected run")
+        
         # Precursor info table
-        prec_info = report_data[['n.MS1.XICs',
+        prec_info = prec_data[['n.MS1.XICs',
                                  'MS1.XIC.Info', 
                                  'MS1.XIC.Corr.Raw', 
                                  'MS1.XIC.Quant.Raw', 
@@ -552,7 +554,7 @@ def update_XIC_plots_table(selected_precursor: str,
         })
 
         # Fragment info table
-        frag_info = report_data[['n.MS2.XICs',
+        frag_info = prec_data[['n.MS2.XICs',
                                  'MS2.XIC.Info', 
                                  'MS2.XIC.Corr.Raw', 
                                  'MS2.XIC.Quant.Raw', 
@@ -575,8 +577,8 @@ def update_XIC_plots_table(selected_precursor: str,
             "XIC Quant (Adjusted)": string2float(frag_info['MS2.XIC.Quant.Adjusted'].split(';'), 2)
         })
 
-        optimal_xic_type = report_data['Optimal.XIC.Type'].iloc[0]
-        optimal_xic = report_data['Optimal.XIC'].iloc[0]
+        optimal_xic_type = prec_data['Optimal.XIC.Type'].iloc[0]
+        optimal_xic = prec_data['Optimal.XIC'].iloc[0]
         # annotate best ion
         if optimal_xic_type == 'ms2':
             best_frag = frag_info_df.loc[optimal_xic, 'XIC Name']
@@ -659,24 +661,25 @@ def update_XIC_plots_table(selected_precursor: str,
                 marker=dict(color=ms2_colors[i])
             )) 
         
-        if optimal_xic_type == 'ms2':
-            ms2_traces_c.append(go.Scatter(
-                x=ms2_rt_c,
-                y=xic_data_c.loc[:, 'elution'].values,
-                mode='lines+markers',
-                name='optimal',
-                marker=dict(size=6, color='red'),
-                line=dict(dash='dash', color='red'),  # Use 'dash', 'dot', 'dashdot', etc.
-            ))
-        elif optimal_xic_type == 'ms1':
-            ms1_traces_c.append(go.Scatter(
-                x=ms1_rt_c,
-                y=xic_data_c.loc[:, 'elution'].values,
-                mode='lines+markers',
-                name='optimal',
-                marker=dict(size=6, color='red'),
-                line=dict(dash='dash', color='red'),  # Use 'dash', 'dot', 'dashdot', etc.
-            ))
+        if show_optimal:
+            if optimal_xic_type == 'ms2':
+                ms2_traces_c.append(go.Scatter(
+                    x=ms2_rt_c,
+                    y=xic_data_c.loc[:, 'elution'].values,
+                    mode='lines+markers',
+                    name='optimal',
+                    marker=dict(size=6, color='red'),
+                    line=dict(dash='dash', color='red'),  # Use 'dash', 'dot', 'dashdot', etc.
+                ))
+            elif optimal_xic_type == 'ms1':
+                ms1_traces_c.append(go.Scatter(
+                    x=ms1_rt_c,
+                    y=xic_data_c.loc[:, 'elution'].values,
+                    mode='lines+markers',
+                    name='optimal',
+                    marker=dict(size=6, color='red'),
+                    line=dict(dash='dash', color='red'),  # Use 'dash', 'dot', 'dashdot', etc.
+                ))
         
         if not show_interpolated_ms1:
             fig_ms1 = go.Figure(data=ms1_traces)

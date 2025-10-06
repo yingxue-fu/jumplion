@@ -1,8 +1,9 @@
+# builtin
+from importlib.metadata import version
 # external
 from dash import html
 import dash_bootstrap_components as dbc
-#
-import jumpdiaq
+
 
 layout = dbc.Container([
     dbc.Row([
@@ -13,7 +14,7 @@ layout = dbc.Container([
                         html.H4("JUMPdiaq: Integrating MS1 and MS2 Signals for Complete and Accurate Quantification in DIA Proteomics", 
                                 className="card-title"),
                         html.Div([
-                            html.Span(f"Version: {jumpdiaq.__version__}", style={"marginRight": "20px"}),
+                            html.Span(f"Version: {version('jumpdiaq')}", style={"marginRight": "20px"}),
                             html.Span([
                                 "Github: ",
                                 html.A("https://github.com/yingxue-fu/jumpdiaq", 

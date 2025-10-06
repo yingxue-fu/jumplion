@@ -9,8 +9,8 @@ import configparser
 from pathlib import Path
 from typing import List, Optional
 from dataclasses import dataclass, field, fields
+from importlib.metadata import version
 # local
-import jumpdiaq
 from jumpdiaq.utils import get_extension, MSFormatsExt
 
 @dataclass
@@ -20,14 +20,14 @@ class Arguments:
     
     # Inputs
     input_runs: List[str] = field(default_factory=list)
-    id_report: str = ""
+    prec_ids: str = ""
     spec_lib: str = ""
     out_dir: str = ""
     
     # Use existing results
-    skip_id_process: int = 0
+    skip_id_processing: int = 0
     use_saved_xic: int = 0
-    use_xic_report: int = 0
+    use_xic_quant: int = 0
     
     # ID results processing
     min_runs_quant: int = 3
@@ -74,6 +74,7 @@ class Arguments:
     # Protein summarization
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
+    min_1hitw_quality: float = 0.7
     min_prec_num: int = 2
     min_pep_num: int = 1
     fastas: List[str] = field(default_factory=list)
@@ -117,13 +118,13 @@ class Arguments:
             for fdef in fields(self):
                 if fdef.name == "tims_centroid":
                     break
-                if fdef.name == "id_report":
-                    f.write("\n# Precursor-level idetification report\n")
+                if fdef.name == "prec_ids":
+                    f.write("\n# Precursor-level idetification table\n")
                 if fdef.name == "spec_lib":
                     f.write("\n# Spectral library (support .tsv/.csv/.parquet format)\n") 
                 if fdef.name == "out_dir":
                     f.write("\n# Output directory name\n")
-                if fdef.name == "skip_id_process":
+                if fdef.name == "skip_id_processing":
                     f.write("\n\n[optional]\n")
                     f.write("# Use existing results\n")
                 if fdef.name == "min_runs_quant":
@@ -148,7 +149,7 @@ class Arguments:
         print(f"Parameter file generated to: {Path(output_path).resolve()}")
         
 def create_parser() -> argparse.ArgumentParser:
-    VERSION = jumpdiaq.__version__
+    VERSION = version('jumpdiaq')
     parser = argparse.ArgumentParser(
         description=f"JUMPdiaq (v{VERSION})",
         formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=120)
@@ -166,14 +167,14 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Inputs 
     required_group.add_argument("--input-runs", help="paths of raw files", nargs='*', default=[])
-    required_group.add_argument("--id-report", type=str, help="path to identification report")
+    required_group.add_argument("--prec-ids", type=str, help="path to precursor identification table")
     required_group.add_argument("--spec-lib", type=str, help="path to spectral library")
     required_group.add_argument("--out-dir", type=str, help="output directory name")
     
     # Use existing results
-    optional_group.add_argument("--skip-id-process", type=int, help="")
+    optional_group.add_argument("--skip-id-processing", type=int, help="")
     optional_group.add_argument("--use-saved-xic", type=int, help="")
-    optional_group.add_argument("--use-xic-report", type=int, help="")
+    optional_group.add_argument("--use-xic-quant", type=int, help="")
     
     # ID results processing
     optional_group.add_argument("--min-runs-quant", type=int, help="")
@@ -220,6 +221,7 @@ def create_parser() -> argparse.ArgumentParser:
     # Protein summarization
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--min-prec-quality", type=float, help="")
+    optional_group.add_argument("--min-1hitw-quality", type=float, help="")
     optional_group.add_argument("--min-prec-num", type=int, help="")
     optional_group.add_argument("--min-pep-num", type=int, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
@@ -317,11 +319,11 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
         out_prec_dir = out_int_dir / 'prec_quant'
         out_prec_dir.mkdir(parents=True, exist_ok=True)
     
-    if arguments.use_xic_report:
-        report_file = Path(out_pub_dir) / 'xic_quantification.parquet'
-        if not report_file.exists():
-            print(f"Cannot find the XIC quantification file {report_file}. Parameter 'use_xic_report' reset to 0.")
-            arguments.use_xic_report = 0
+    if arguments.use_xic_quant:
+        xic_quant_file = Path(out_pub_dir) / 'xic_quantification.parquet'
+        if not xic_quant_file.exists():
+            print(f"Cannot find the XIC quantification file {xic_quant_file}. Parameter 'use_xic_quant' reset to 0.")
+            arguments.use_xic_quant = 0
     
     return arguments, command
 

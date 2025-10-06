@@ -168,14 +168,28 @@ def ratio_density_plot(ratios, labels, colors, ylim=None, opacity=0.5, point_cex
     
     return fig
 
-# Function to find first matching group in prot_names
-def define_species(prot_name, species_list=['HUMAN', 'ECOLI', 'YEAST']):
+def define_species(prot_name):
+    """
+    Extract species name from protein name string.
+    """
+    # Handle null/NaN values
     if pd.isna(prot_name):
         return None
-    for s in species_list:
-        if s in prot_name:
-            return s
-    return None
+    
+    # Handle empty string
+    if not prot_name.strip():
+        return None
+    
+    # Get the main part (before semicolon if present)
+    main_part = prot_name.split(';')[0]
+    
+    # Split by underscore and check if we have at least 2 parts
+    parts = main_part.split('_')
+    
+    if len(parts) > 1:
+        return parts[1]  # Return the species part (second element)
+    else:
+        return None  # No underscore found, can't extract species
 
 
 def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, cols_A, cols_B):
@@ -238,8 +252,8 @@ def get_valid_ratios(mat, prot_tags, prot_species, species_list, sample_groups, 
     return valid_prots
 
 
-def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios, 
-                  colors, span=4, point_cex=0.3, text_cex=1, opacity=0.8, 
+def lfqbench_plot(valid_prots, species_list, colors, 
+                  span=4, point_cex=0.3, text_cex=1, opacity=0.8, 
                   sample_groups=None, title=None):
     """
     Main function to create the LFQBench plot with Plotly
@@ -252,6 +266,7 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
     all_valid_B = []
     all_valid_R = []
     species_vec = []
+    R_medians = []
     for species in species_list:
         valid_xys = valid_prots[species]
         if valid_xys:
@@ -260,6 +275,7 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
             all_valid_B = all_valid_B + list(species_B_valid)
             all_valid_R = all_valid_R + list(species_R_valid)
             species_vec = species_vec + [species] * len(species_B_valid)
+            R_medians.append(np.median(species_R_valid)) 
             
             ratio_intensity_fig.add_trace(go.Scatter(
                 x=species_B_valid,
@@ -273,18 +289,6 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
                 name=species,
                 text=prot_tag_valid,
             ))
-    
-    if show_exp_ratios:
-        for ratio in exp_ratios:
-            # Add horizontal lines at expected ratios
-            ratio_intensity_fig.add_shape(
-                type="line",
-                x0=min(all_valid_B, default=0),
-                y0=np.log2(ratio),
-                x1=max(all_valid_B, default=1),
-                y1=np.log2(ratio),
-                line=dict(color='rgba(64,64,64,0.5)', width=2, dash='dash')
-            )
     
     # Update scatter plot layout
     span = span + 0.2
@@ -312,16 +316,22 @@ def lfqbench_plot(valid_prots, species_list, show_exp_ratios, exp_ratios,
         text_cex
     )
     
-    if show_exp_ratios:
-        # Add horizontal lines at expected ratios
-        for ratio in exp_ratios:
-            ratio_dist_fig.add_shape(
-                type="line",
-                x0=-1,
-                y0=np.log2(ratio),
-                x1=3,
-                y1=np.log2(ratio),
-                line=dict(color='rgba(64,64,64,0.5)', width=2, dash='dash')
-            )
+    # Add horizontal lines at medians
+    for i, ratio in enumerate(R_medians):
+        ratio_intensity_fig.add_hline(
+            y=ratio,
+            line_color=colors[species_list[i]],
+            line_width=2,
+            line_dash="dash",
+            opacity=0.5
+        )
+        
+        ratio_dist_fig.add_hline(
+            y=ratio,
+            line_color=colors[species_list[i]],
+            line_width=2,
+            line_dash="dash",
+            opacity=0.5
+        )
     
     return ratio_intensity_fig, ratio_dist_fig
