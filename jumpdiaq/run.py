@@ -565,9 +565,13 @@ class Run:
             
         for entry in self.entries:
             entry.mass_cal = df.loc[entry.name, 'mass_cal']
-            entry.RT = df.loc[entry.name, self.run_name+'_RT']
+            run_RT = df.loc[entry.name, self.run_name+'_RT']
+            if not np.isnan(run_RT):
+                entry.RT = run_RT
             if self.tims:
-                entry.IM = df.loc[entry.name, self.run_name+'_IM']
+                run_IM = df.loc[entry.name, self.run_name+'_IM']
+                if not np.isnan(run_IM):
+                    entry.IM = run_IM
     
     
     def process(self):

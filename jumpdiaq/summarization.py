@@ -383,22 +383,65 @@ def quantify_proteins(prec_quantity_table,
 
 
 ############################ summarization methods  ###########################
+def log2_safe(mat):
+    """Safely apply log2 transformation, replacing non-positive values with NaN"""
+    result = np.full_like(mat, np.nan, dtype=float)
+    mask = mat > 0
+    result[mask] = np.log2(mat[mask])
+    return result
+
 def median_summ(mat, topN_rep=3):
+    """
+    Summarize replicate measurements using median after normalization
+    
+    Parameters:
+    -----------
+    mat : array-like
+        Input matrix (rows=ions, columns=runs)
+    topN_rep : int
+        Number of top ions to use for abundance calculation
+    
+    Returns:
+    --------
+    out : array
+        Summarized values
+    """
     if mat.shape[0] == 1:
         return mat[0, :]
+    
     # log2 transformation
-    mat = np.log2(mat)
-    # Get relative ratios
-    rowMeans = np.nanmean(mat, axis=1)
-    repAbundance = np.mean(sorted(rowMeans, reverse=True)[0:topN_rep])
+    mat = log2_safe(mat)
+    
+    # Get relative ratios (suppress empty slice warning if expected)
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', 'Mean of empty slice')
+        rowMeans = np.nanmean(mat, axis=1)
+    
+    # Handle case where all rowMeans are NaN
+    valid_means = rowMeans[~np.isnan(rowMeans)]
+    if len(valid_means) == 0:
+        # All rows are NaN, return NaN array
+        return np.full(mat.shape[1], np.nan)
+    
+    # Calculate representative abundance from top N replicates
+    topN_rep = min(topN_rep, len(valid_means))  # Handle case where fewer valid rows than topN_rep
+    repAbundance = np.mean(sorted(valid_means, reverse=True)[:topN_rep])
+    
+    # Center each row by its mean
     mat = mat - rowMeans[:, np.newaxis]
-    # Compute median of each column that aren't all-NaN
+    
+    # Compute median of each column (only for non-all-NaN columns)
     medians = np.full(mat.shape[1], np.nan)
     valid_cols = ~np.all(np.isnan(mat), axis=0)
+    
     if np.any(valid_cols):
-        medians[valid_cols] = np.nanmedian(mat[:, valid_cols], axis=0)
-    # final summaried values
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', 'All-NaN slice encountered')
+            medians[valid_cols] = np.nanmedian(mat[:, valid_cols], axis=0)
+    
+    # Final summarized values (transform back from log space)
     out = np.power(2, medians + repAbundance)
+    
     return out
 
 def topN(mat, N=3, method="mean"):

@@ -374,7 +374,7 @@ def update_summ_plot(sub_row_means_xic,
         if show_summ_value:
             for tract_id, group in prec_quant_values.groupby("MS_type"):
                 x=group["X"]
-                y_log2=np.log2(group["Y"])
+                y_log2=np.log2(pd.to_numeric(group["Y"], errors='coerce'))
                 if sub_row_means_xic:
                     y=y_log2-np.nanmean(y_log2.to_numpy())
                     opacity=0.7

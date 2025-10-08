@@ -19,6 +19,7 @@ from jumpdiaq.calibration import (refine_spline, calc_spline_vectorized,
 args = Arguments()
 SaveSupplements = args.save_supplements
 MinRunsQuant = args.min_runs_quant
+PredictRTIM = args.predict_rt_im
 MinRunsModel = args.min_runs_model
 MinRunsCal = args.min_runs_cal
 MaxQvalueCal = args.max_qvalue_cal
@@ -31,10 +32,11 @@ def process_id_results(id_file,
                        out_dir,
                        save_supplements=SaveSupplements,
                        min_runs_quant=MinRunsQuant,
+                       predict_rt_im=PredictRTIM,
                        min_runs_model=MinRunsModel,
                        min_runs_cal=MinRunsCal,
                        max_qvalue_cal=MaxQvalueCal,
-                       max_mass_cal=MaxMassCal,):
+                       max_mass_cal=MaxMassCal):
     out_int_dir = Path(out_dir) / 'intermediate'
     
     ################################################
@@ -106,34 +108,46 @@ def process_id_results(id_file,
     #######################
     # 2. RT/IM prediction #
     #######################
-    logging.info("Predicting precursor RTs (and IMs)") 
-    rt_dict, rt_segments = collect_model_data(rt_mat,  
-                                              min_runs_model,
-                                              lib_df_uniq_prec,
-                                              data_type="rt")
-    rt_mat_pred, model_accs = modeling_and_prediction(rt_dict, rt_segments, rt_mat, 
-                                                      lib_df_uniq_prec, 
-                                                      data_type="rt", 
-                                                      out_dir=out_int_dir, 
-                                                      save_model=True,
-                                                      save_plot=save_supplements)
-    rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, n_iter=5, save_plot=False)
-    if save_supplements:
-        rt_mat_pred.to_csv(out_rt_dir / "rt_mat_after_prediction.csv")
-    
-    if is_tims:
-        im_dict, im_segments = collect_model_data(im_mat,  
+    if PredictRTIM:
+        logging.info("Predicting precursor RTs (and IMs)") 
+        rt_dict, rt_segments = collect_model_data(rt_mat,  
                                                   min_runs_model,
                                                   lib_df_uniq_prec,
-                                                  data_type="im")
-        im_mat_pred, _ = modeling_and_prediction(im_dict, im_segments, im_mat, 
-                                                 lib_df_uniq_prec, 
-                                                 data_type="im",
-                                                 out_dir=out_int_dir, 
-                                                 save_model=True,
-                                                 save_plot=save_supplements)
+                                                  data_type="rt")
+        rt_mat_pred, model_accs = modeling_and_prediction(rt_dict, rt_segments, rt_mat, 
+                                                          lib_df_uniq_prec, 
+                                                          data_type="rt", 
+                                                          out_dir=out_int_dir, 
+                                                          save_model=True,
+                                                          save_plot=save_supplements)
+        rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, n_iter=5, save_plot=False)
         if save_supplements:
-            im_mat_pred.to_csv(Path(out_im_dir) / "im_mat_after_prediction.csv")
+            rt_mat_pred.to_csv(out_rt_dir / "rt_mat_after_prediction.csv")
+        
+        if is_tims:
+            im_dict, im_segments = collect_model_data(im_mat,  
+                                                      min_runs_model,
+                                                      lib_df_uniq_prec,
+                                                      data_type="im")
+            im_mat_pred, _ = modeling_and_prediction(im_dict, im_segments, im_mat, 
+                                                     lib_df_uniq_prec, 
+                                                     data_type="im",
+                                                     out_dir=out_int_dir, 
+                                                     save_model=True,
+                                                     save_plot=save_supplements)
+            if save_supplements:
+                im_mat_pred.to_csv(Path(out_im_dir) / "im_mat_after_prediction.csv")
+    
+        # combine together
+        prec_rt_info = rt_mat_pred.add_suffix('_RT')
+        if is_tims:
+            prec_rt_info = pd.concat([prec_rt_info, im_mat_pred.add_suffix('_IM')], axis=1) 
+    else:
+        logging.info("Prediction of missing precursor RTs (and IMs) is not performed\n") 
+        # combine together
+        prec_rt_info = rt_mat.add_suffix('_RT')
+        if is_tims:
+            prec_rt_info = pd.concat([prec_rt_info, im_mat.add_suffix('_IM')], axis=1) 
     
     #############################################
     # 3. Choose precursors for mass calibration #
@@ -149,13 +163,8 @@ def process_id_results(id_file,
     # mark precursors used for calibration
     lib_df_uniq_prec['mass_cal'] = 0
     lib_df_uniq_prec.loc[lib_df_uniq_prec['Precursor.Id'].isin(mass_cal_precs), 'mass_cal'] = 1
-    lib_df_uniq_prec = lib_df_uniq_prec.set_index('Precursor.Id').reindex(rt_mat_pred.index)
-    
-    rt_mat_pred = rt_mat_pred.add_suffix('_RT')
-    prec_rt_info = pd.concat([rt_mat_pred, lib_df_uniq_prec['mass_cal']], axis=1)    
-    if is_tims:
-        im_mat_pred = im_mat_pred.add_suffix('_IM')
-        prec_rt_info = pd.concat([prec_rt_info, im_mat_pred], axis=1) 
+    lib_df_uniq_prec = lib_df_uniq_prec.set_index('Precursor.Id').reindex(prec_rt_info.index)
+    prec_rt_info = pd.concat([prec_rt_info, lib_df_uniq_prec['mass_cal']], axis=1)    
     prec_rt_info.to_csv(out_int_dir / "prec_rt_info.csv")
     
     #########################################

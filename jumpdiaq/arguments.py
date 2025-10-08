@@ -31,6 +31,7 @@ class Arguments:
     
     # ID results processing
     min_runs_quant: int = 3
+    predict_rt_im: int = 1
     min_runs_model: int = 3
     min_runs_cal: int = 6
     max_qvalue_cal: float = 0.0001
@@ -178,6 +179,7 @@ def create_parser() -> argparse.ArgumentParser:
     
     # ID results processing
     optional_group.add_argument("--min-runs-quant", type=int, help="")
+    optional_group.add_argument("--predict-rt-im", type=int, help="")
     optional_group.add_argument("--min-runs-model", type=int, help="")
     optional_group.add_argument("--min-runs-cal", type=int, help="")
     optional_group.add_argument("--max-qvalue-cal", type=float, help="")

@@ -312,7 +312,7 @@ def load_quant_table(n_clicks, outdir_path, meta_path):
     out_pub_dir = Path(outdir_path) / 'publication'
     quant_csv_path = out_pub_dir / 'protein.group_quantity_matrix.csv'
     quality_csv_path = out_pub_dir / "protein.group_quality_matrix.csv"
-    prot_pep_info_path = out_int_dir / "prot_prec_pep_info.csv"
+    prot_pep_info_path = out_int_dir / "prot_prec_pep_info.parquet"
     
     try:
         quant_df = pd.read_csv(quant_csv_path)
@@ -342,14 +342,15 @@ def load_quant_table(n_clicks, outdir_path, meta_path):
         # Define protein species
         quant_df['Species'] = quant_df['Protein.Names'].apply(define_species)
         species_count = quant_df['Species'].value_counts(dropna=False) 
+        if any(species_count <= 10):
+            print("Removed proteins of the following species due to n <= 10")
+            print(species_count[species_count <= 10].to_string())
         species_list = species_count[species_count > 10].index.tolist()
         species_options = [{'label': s, 'value': s} for s in species_list if s is not None ]
         quant_df = quant_df[quant_df['Species'].isin(species_list)]
-        print("Removed proteins of the following species due to n <= 10")
-        print(species_count[species_count <= 10].to_string())
         
         # Combine with protein coverage info
-        prot_pep_df = pd.read_csv(prot_pep_info_path)
+        prot_pep_df = pd.read_parquet(prot_pep_info_path)
         quant_df = prot_pep_df.merge(quant_df, how='right')
         cols_to_show = ["Protein.Group", "Protein.Names", "Genes", "n.Precursors", "n.Peptides"]
         quant_df_to_show = quant_df[cols_to_show+simple_sample_names]
@@ -1108,7 +1109,7 @@ def update_sequence_viewer(selected_prot, data):
     position_coverage = defaultdict(int)
     
     # Step 1: Count how many times each position is covered
-    for peptide_pos in ast.literal_eval(peptides_pos):
+    for peptide_pos in peptides_pos:
         start = peptide_pos[0] - 1
         end = peptide_pos[1]
         for i in range(start, end):
