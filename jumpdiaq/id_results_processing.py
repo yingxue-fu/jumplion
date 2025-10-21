@@ -170,20 +170,20 @@ def process_id_results(id_file,
     #########################################
     # 4. determine the number of XIC points #
     #########################################
+    logging.info("Determining the number of data points to extract for an XIC")
+    # 
+    cycle_time = get_cycle_time(ms_files[0])
+    logging.info(f"Cycle time: {cycle_time} ({(cycle_time*60):3g} seconds)") 
+    average_model_acc = np.mean(model_accs)
+    average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
+    logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
+    #
     if args.n_xic_points == 0:
-        logging.info("Determining the number of data points to extract for an XIC")
-        # 
-        cycle_time = get_cycle_time(ms_files[0])
-        logging.info(f"Cycle time: {cycle_time} ({(cycle_time*60):3g} seconds)")
-        # 
-        average_model_acc = np.mean(model_accs)
-        average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
-        logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
-        # 
         args.n_xic_points = max(MinXICPoints, average_model_acc_n_points * 4 + 1)
     elif args.n_xic_points < MinXICPoints and args.n_xic_points > 0:
         logging.warning(f"WARNING: the provided number ({args.n_xic_points}) of data points to extract for an XIC may be too small")
         args.n_xic_points = MinXICPoints
+    
     logging.info(f"Number of data points to extract for a XIC set to: {args.n_xic_points}\n")
     
     return prec_rt_info
