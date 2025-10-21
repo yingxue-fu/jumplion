@@ -90,6 +90,7 @@ def main():
     XicQualityCutoff = args.xic_quality_cutoff
     FillMissingXic = args.fill_missing_xic
     ## Precursor normalization
+    Normalization = args.normalization
     NormSpecies = args.norm_species
     NormMethod = args.norm_method
     TrimPercentage = args.trim_percentage
@@ -172,6 +173,7 @@ def main():
                                               data_type='Precursor',
                                               tag_column='Protein.Names', 
                                               value_columns=prec_quantity_table.columns[4:-2], 
+                                              normalization=Normalization,
                                               norm_species=NormSpecies, 
                                               norm_method=NormMethod, 
                                               trim_percentage=TrimPercentage)

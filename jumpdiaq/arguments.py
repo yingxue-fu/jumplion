@@ -137,7 +137,7 @@ class Arguments:
                     f.write("\n# XIC quantification\n")
                 if fdef.name == "use_raw_ms1":
                     f.write("\n# Precursor summarization\n")
-                if fdef.name == "norm_species":
+                if fdef.name == "normalization":
                     f.write("\n# Precursor normalization\n")
                 if fdef.name == "prec_quant_level":
                     f.write("\n# Protein summarization\n")
@@ -216,7 +216,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
     
     # Precursor normalization
-    optional_group.add_argument("--normlization", type=str, help="")
+    optional_group.add_argument("--normalization", type=int, help="")
     optional_group.add_argument("--norm-species", type=str, help="")
     optional_group.add_argument("--norm-method", type=str, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
