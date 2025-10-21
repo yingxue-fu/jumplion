@@ -64,6 +64,7 @@ class Arguments:
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
+    fill_missing_xic: int = 1
     
     # Precursor normalization
     normalization: int = 1
@@ -89,7 +90,6 @@ class Arguments:
     gen_params: str = ""
     config_file: str = ""
     predict_rt_im: int = 1
-    fill_missing_xic: int = 1
     show_progress: int = 1
     inter_progress: int = 0    
     save_supplements: int = 1
@@ -214,6 +214,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
+    optional_group.add_argument("--fill-missing-xic", type=int, help="")
     
     # Precursor normalization
     optional_group.add_argument("--normalization", type=int, help="")
@@ -242,7 +243,6 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--save-supplements", type=int, help=argparse.SUPPRESS)
     # XIC missing value inference
     optional_group.add_argument("--predict-rt-im", type=int, help=argparse.SUPPRESS)
-    optional_group.add_argument("--fill-missing-xic", type=int, help=argparse.SUPPRESS)
     # Progress bar dispaly
     parser.add_argument("--show-progress", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--inter-progress", type=int, help=argparse.SUPPRESS)
