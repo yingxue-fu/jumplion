@@ -195,13 +195,16 @@ def main():
     prot_quality_table.write_csv(out_pub_dir / "protein.group_quality_matrix.csv")
     
     # For one-hit wonder (protein with one precursor), filter based on quality
-    logging.info(f"Removing low quality (<={Min1HitWQuality}) one-hit wonders (proteins with one precursor)")
     prot_1_prec = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] == 1]
     prot_2more_precs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] >= 2]
 
     prot_quality_1prec = prot_quality_table.filter(pl.col('Protein.Group').is_in(prot_1_prec)).to_pandas()
     prot_quality_1prec['row_median'] = prot_quality_1prec.iloc[:, 3:].median(axis=1)
-    prot_1_prec_f = prot_quality_1prec['Protein.Group'][prot_quality_1prec['row_median'] >= Min1HitWQuality]
+    if Min1HitWQuality > 0.0:
+        logging.info(f"Removing low quality (<={Min1HitWQuality}) one-hit wonders (proteins with one precursor)")
+        prot_1_prec_f = prot_quality_1prec['Protein.Group'][prot_quality_1prec['row_median'] >= Min1HitWQuality]
+    else:
+        prot_1_prec_f = prot_quality_1prec['Protein.Group']
     
     prots_accept_1 = pd.concat([prot_2more_precs, prot_1_prec_f])
     prot_quantity_table_1st_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(prots_accept_1))

@@ -463,26 +463,33 @@ def topN(mat, N=3, method="mean"):
     return out
 
 ################################## Normalization ##############################
-def norm_dataframe(df, data_type, tag_column, value_columns, norm_species, norm_method='median', trim_percentage=5):
-    logging.info(f"Performing {data_type.lower()}-level normalization")
-    if norm_species == 'ALL':
-        sub_df = df.clone()
-    else:
-        species_tags = df.select(tag_column).with_columns(
-            pl.col(tag_column).str.contains(norm_species).alias("match")
-        )["match"]
-        if species_tags.sum() == 0:
-            logging.warning('WARNING: No matching species found in your input. Using all proteins')
+def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm_species, norm_method='median', trim_percentage=5):
+    if normalization:
+        logging.info(f"Performing {data_type.lower()}-level normalization")
+        if norm_species == 'ALL':
+            logging.info(f"Use all {data_type.lower()}s for normalization")
             sub_df = df.clone()
         else:
-            sub_df = df.filter(species_tags)
-            
-    # get norm factors
+            logging.info(f"Use {norm_species} {data_type.lower()}s for normalization")
+            species_tags = df.select(tag_column).with_columns(
+                pl.col(tag_column).str.contains(norm_species).alias("match")
+            )["match"]
+            if species_tags.sum() == 0:
+                logging.warning('WARNING: No matching species found in your input. Using all proteins')
+                sub_df = df.clone()
+            else:
+                sub_df = df.filter(species_tags)
+    else:
+        logging.info(f"{data_type.lower()}-level normalization turned off")
+        sub_df = df.clone()
+        
     mat = sub_df.select([
         pl.col(col).log(2).alias(col) for col in value_columns
     ])
     loadBias = get_loading_bias(mat, value_columns, data_type, trim_percentage, trim_percentage)
-    mat_norm, normFactors = normalization(mat, trim_percentage, trim_percentage, norm_method)
+    medians_df = mat.median().to_pandas().T.reset_index(drop=False)
+    medians_df.columns = ['Samples', 'Medians']
+    medians_df['Samples'] = extract_unique_parts(medians_df['Samples'].to_list())
     
     # print out info
     def indent_df(df, spaces=4, index=False):
@@ -493,25 +500,31 @@ def norm_dataframe(df, data_type, tag_column, value_columns, norm_species, norm_
     
     logging.info("Loading bias before normalization:\n%s", 
                  indent_df(loadBias, spaces=4, index=False))
-    medians_df = mat.median().to_pandas().T.reset_index(drop=False)
-    medians_df.columns = ['Samples', 'Medians']
-    normFactors_df = pd.DataFrame(list(normFactors.items()), columns=['Samples', 'NormFactors'])
-    medians_df = medians_df.merge(normFactors_df)
-    medians_df['Samples'] = extract_unique_parts(medians_df['Samples'].to_list())
-    logging.info("Median log2(Intensity) before normalization:\n%s", 
-                 indent_df(medians_df, spaces=4, index=False))
-    medians_norm_df = mat_norm.median().to_pandas().T.reset_index(drop=False)
-    medians_norm_df.columns = ['Samples', 'Medians']
-    medians_norm_df['Samples'] = extract_unique_parts(medians_norm_df['Samples'].to_list())
-    logging.info("Median log2(Intensity) after normalization:\n%s", 
-                 indent_df(medians_norm_df, spaces=4, index=False))
     
-    # normalization of the whole df
-    df_norm = df.with_columns([
-        (pl.col(col) * (2 ** -normFactors[col])).alias(col)
-        for col in value_columns
-    ])
-
+    if normalization:
+        # get norm factors
+        mat_norm, normFactors = normalization(mat, trim_percentage, trim_percentage, norm_method)
+        normFactors_df = pd.DataFrame(list(normFactors.items()), columns=['Samples', 'NormFactors'])
+        medians_df = medians_df.merge(normFactors_df)
+        logging.info("Median log2(Intensity) before normalization:\n%s", 
+                     indent_df(medians_df, spaces=4, index=False))
+        
+        medians_norm_df = mat_norm.median().to_pandas().T.reset_index(drop=False)
+        medians_norm_df.columns = ['Samples', 'Medians']
+        medians_norm_df['Samples'] = extract_unique_parts(medians_norm_df['Samples'].to_list())
+        logging.info("Median log2(Intensity) after normalization:\n%s", 
+                     indent_df(medians_norm_df, spaces=4, index=False))
+        
+        # normalization of the whole df
+        df_norm = df.with_columns([
+            (pl.col(col) * (2 ** -normFactors[col])).alias(col)
+            for col in value_columns
+        ])
+    else:
+        logging.info("Median log2(Intensity) before normalization:\n%s", 
+                     indent_df(medians_df, spaces=4, index=False))
+        df_norm = df.clone()
+    
     return df_norm
 
 def trim_matrix(mat, trim_pct_upper, trim_pct_lower):

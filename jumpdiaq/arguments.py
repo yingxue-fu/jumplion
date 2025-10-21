@@ -31,7 +31,6 @@ class Arguments:
     
     # ID results processing
     min_runs_quant: int = 3
-    predict_rt_im: int = 1
     min_runs_model: int = 3
     min_runs_cal: int = 6
     max_qvalue_cal: float = 0.0001
@@ -65,9 +64,9 @@ class Arguments:
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
-    fill_missing_xic: int = 1
     
     # Precursor normalization
+    normalization: int = 1
     norm_species: str = "HUMAN"
     norm_method: str = "median"       # Other options: 'mean'
     trim_percentage: int = 5
@@ -89,8 +88,10 @@ class Arguments:
     # Other hidden parameters
     gen_params: str = ""
     config_file: str = ""
+    predict_rt_im: int = 1
+    fill_missing_xic: int = 1
     show_progress: int = 1
-    inter_progress: int = 0     
+    inter_progress: int = 0    
     save_supplements: int = 1
     
     # only load files in specific formats
@@ -179,7 +180,7 @@ def create_parser() -> argparse.ArgumentParser:
     
     # ID results processing
     optional_group.add_argument("--min-runs-quant", type=int, help="")
-    optional_group.add_argument("--predict-rt-im", type=int, help="")
+    
     optional_group.add_argument("--min-runs-model", type=int, help="")
     optional_group.add_argument("--min-runs-cal", type=int, help="")
     optional_group.add_argument("--max-qvalue-cal", type=float, help="")
@@ -213,9 +214,9 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
-    optional_group.add_argument("--fill-missing-xic", type=int, help="")
     
     # Precursor normalization
+    optional_group.add_argument("--normlization", type=str, help="")
     optional_group.add_argument("--norm-species", type=str, help="")
     optional_group.add_argument("--norm-method", type=str, help="")
     optional_group.add_argument("--trim-percentage", type=int, help="")
@@ -239,6 +240,9 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config-file", type=str, help=argparse.SUPPRESS)
     # Whether to save additional supplementary files
     parser.add_argument("--save-supplements", type=int, help=argparse.SUPPRESS)
+    # XIC missing value inference
+    optional_group.add_argument("--predict-rt-im", type=int, help=argparse.SUPPRESS)
+    optional_group.add_argument("--fill-missing-xic", type=int, help=argparse.SUPPRESS)
     # Progress bar dispaly
     parser.add_argument("--show-progress", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--inter-progress", type=int, help=argparse.SUPPRESS)
