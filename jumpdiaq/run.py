@@ -199,7 +199,7 @@ class RunEntry:
         _, self.ms1 = consolidate_by_duplicates(ms1_rts, self.ms1, method='first')
         _, self.ms2 = consolidate_by_duplicates(ms1_rts, self.ms2, method='sum')
         _, exp_ms1_mzs = consolidate_by_duplicates(ms1_rts, exp_ms1_mzs, method='first')
-        _, exp_ms2_mzs = consolidate_by_duplicates(ms1_rts, exp_ms2_mzs, method='first')
+        _, exp_ms2_mzs = consolidate_by_duplicates(ms1_rts, exp_ms2_mzs, method='max')
         _, exp_ims = consolidate_by_duplicates(ms1_rts, exp_ims, method='first')
         
         return exp_ms1_mzs, exp_ms2_mzs, exp_ims
@@ -217,7 +217,7 @@ class RunEntry:
         
         if (best_ms2_score >= MassCalScore and 
             mono_ms1_score >= MassCalScore and 
-            ms1_mz > E and 
+            ms1_mz > E and ms2_mz > E and
             self.ms2[apex_index, self.info.best_ms2_xic] >= MinApexIntensity):
             self.info.mass_delta_ms1 = ms1_mz - self.prec.mz
             self.info.mass_delta_ms2 = ms2_mz - self.info.best_ms2_mz

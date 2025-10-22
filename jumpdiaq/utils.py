@@ -128,7 +128,16 @@ def consolidate_by_duplicates(indices, data, method='sum'):
             consolidated = np.zeros((len(unique_indices), data.shape[1]))
             for i, row in enumerate(data):
                 consolidated[inverse[i]] += row
-                
+    elif method == 'max':
+        # Keep maximum value at duplicate indices
+        if data.ndim == 1:
+            consolidated = np.full(len(unique_indices), -np.inf)
+            for i, val in enumerate(data):
+                consolidated[inverse[i]] = max(consolidated[inverse[i]], val)
+        else:  # 2-D array
+            consolidated = np.full((len(unique_indices), data.shape[1]), -np.inf)
+            for i, row in enumerate(data):
+                consolidated[inverse[i]] = np.maximum(consolidated[inverse[i]], row)
     elif method == 'first':
         # Keep first occurrence
         if data.ndim == 1:
@@ -146,7 +155,7 @@ def consolidate_by_duplicates(indices, data, method='sum'):
                     consolidated[inverse[i]] = row
                     seen.add(inverse[i])
     else:
-        raise ValueError("method must be 'sum' or 'first'")
+        raise ValueError("method must be 'sum', 'first', or 'max'")
     
     return unique_indices, consolidated
 
