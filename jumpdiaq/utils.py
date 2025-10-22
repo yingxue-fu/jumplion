@@ -88,6 +88,69 @@ def estimate_isotopes(peptide_mass, threshold=0.1):
     return n_peaks
 
 
+def consolidate_by_duplicates(indices, data, method='sum'):
+    """
+    Consolidate data array based on duplicate values in indices array.
+    
+    Parameters:
+    -----------
+    indices : array-like
+        Array containing potentially duplicate index values
+    data : array-like
+        1-D or 2-D array to consolidate (must have same length as indices in first dimension)
+    method : str
+        'sum' - sum values at duplicate indices
+        'first' - keep first occurrence of duplicate indices
+    
+    Returns:
+    --------
+    unique_indices : array
+        Unique index values
+    consolidated_data : array
+        Consolidated data array
+    """
+    indices = np.array(indices)
+    data = np.array(data)
+    
+    # Find unique indices and their inverse mapping
+    unique_indices, inverse = np.unique(indices, return_inverse=True)
+    has_duplicates = len(unique_indices) < len(indices)
+    if not has_duplicates:
+        return indices, data
+    
+    if method == 'sum':
+        # Sum values at duplicate indices
+        if data.ndim == 1:
+            consolidated = np.zeros(len(unique_indices))
+            for i, val in enumerate(data):
+                consolidated[inverse[i]] += val
+        else:  # 2-D array
+            consolidated = np.zeros((len(unique_indices), data.shape[1]))
+            for i, row in enumerate(data):
+                consolidated[inverse[i]] += row
+                
+    elif method == 'first':
+        # Keep first occurrence
+        if data.ndim == 1:
+            consolidated = np.zeros(len(unique_indices))
+            seen = set()
+            for i, val in enumerate(data):
+                if inverse[i] not in seen:
+                    consolidated[inverse[i]] = val
+                    seen.add(inverse[i])
+        else:  # 2-D array
+            consolidated = np.zeros((len(unique_indices), data.shape[1]))
+            seen = set()
+            for i, row in enumerate(data):
+                if inverse[i] not in seen:
+                    consolidated[inverse[i]] = row
+                    seen.add(inverse[i])
+    else:
+        raise ValueError("method must be 'sum' or 'first'")
+    
+    return unique_indices, consolidated
+
+
 def generate_group_indices(column_names: List[str], group_df: pd.DataFrame, 
                           col_name_column: str = 'Sample', 
                           group_column: str = 'Group') -> List[List[int]]:

@@ -350,10 +350,21 @@ def load_mzml(file_name):
 
 def load_timsTOF_d(bruker_d_folder_name):
     meta_data, ms1_frames_df, ms2_frames_df, _ = get_meta_bruker(bruker_d_folder_name, False, False)
-    scan_max_index = int(ms1_frames_df.NumScans.max())
+    # # Add Cycle column based on Precursor pattern
+    # cycle = 1
+    # cycles = []
+    # prev_precursor = None
+    # for precursor in ms2_frames_df['Precursor']:
+    #     # When precursor goes back to 1, it's a new cycle
+    #     if prev_precursor is not None and precursor == 1 and prev_precursor != 1:
+    #         cycle += 1
+    #     cycles.append(cycle)
+    #     prev_precursor = precursor
+    # ms2_frames_df['Cycle'] = cycles
+    mobility_scan_max_index = int(ms1_frames_df['NumScans'].max())
     mobility_values, mz_values = get_mobility_mz(bruker_d_folder_name, 
                                                  meta_data,
-                                                 scan_max_index)
+                                                 mobility_scan_max_index)
     
     reader = timsrust_pyo3.FrameReader(bruker_d_folder_name)
     frames = reader.read_all_frames()
@@ -366,6 +377,7 @@ def load_timsTOF_d(bruker_d_folder_name):
     ms2_idx = 0
     rt_conversion = 1.0 / 60.0
     for i, frame in enumerate(progress_bar(frames, ShowProgress, InterProgress)):
+        # frame = frames[i]
         mzs = mz_values[frame.tof_indices].astype(PeakMzDtype)
         ims = np.repeat(mobility_values, np.diff(frame.scan_offsets)).astype(PeakIMDtype)
         intensities = np.array(frame.intensities, dtype=PeakIntensityDtype)
