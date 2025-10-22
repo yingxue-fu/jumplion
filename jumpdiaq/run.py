@@ -154,8 +154,8 @@ class RunEntry:
     def extract_xic(self, from_idx: int, to_idx: int, report_mz_im: int):
         l = to_idx - from_idx
         
-        self.ms1_rts = np.zeros(l)
-        self.ms2_rts = np.zeros(l)
+        ms1_rts = np.zeros(l)
+        ms2_rts = np.zeros(l)
         
         # extracted intensities
         self.ms1 = np.zeros((l, MaxPrIsotopes))   # of isotopic peaks
@@ -173,11 +173,11 @@ class RunEntry:
             ind = k - from_idx
             
             ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1 # search MS2 rt of the apex point      
-            self.ms1_rts[ind] = self.run.ms1_RT[ms1_left]
+            ms1_rts[ind] = self.run.ms1_RT[ms1_left]
             
             n_isotopes = min(MaxPrIsotopes, self.info.n_isotopic_peaks)
             for j in range(n_isotopes):
-                query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], self.ms1_rts[ind], 
+                query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], ms1_rts[ind], 
                                         self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
                     self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1x[ms1_left].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
@@ -185,8 +185,8 @@ class RunEntry:
                     self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1x[ms1_left].level(query_mz, self.run.MassAccuracyMS1)
             
             for fr in range(self.info.n_frs):
-                self.ms2_rts[ind] = self.run.ms2_RT[i]
-                query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz, self.ms2_rts[ind], 
+                ms2_rts[ind] = self.run.ms2_RT[i]
+                query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz, ms2_rts[ind], 
                                         self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
                     self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2x[i].level(report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
@@ -195,12 +195,12 @@ class RunEntry:
                 if self.ms2[ind, fr] < MinXicIntensity:
                     self.ms2[ind, fr] = 0.0
         
-        self.ms1_rts, self.ms2_rts = consolidate_by_duplicates(self.ms1_rts, self.ms2_rts, method='first')
-        _, self.ms1 = consolidate_by_duplicates(self.ms1_rts, self.ms1, method='first')
-        _, self.ms2 = consolidate_by_duplicates(self.ms1_rts, self.ms2, method='sum')
-        _, exp_ms1_mzs = consolidate_by_duplicates(self.ms1_rts, exp_ms1_mzs, method='first')
-        _, exp_ms2_mzs = consolidate_by_duplicates(self.ms1_rts, exp_ms2_mzs, method='first')
-        _, exp_ims = consolidate_by_duplicates(self.ms1_rts, exp_ims, method='first')
+        self.ms1_rts, self.ms2_rts = consolidate_by_duplicates(ms1_rts, ms2_rts, method='first')
+        _, self.ms1 = consolidate_by_duplicates(ms1_rts, self.ms1, method='first')
+        _, self.ms2 = consolidate_by_duplicates(ms1_rts, self.ms2, method='sum')
+        _, exp_ms1_mzs = consolidate_by_duplicates(ms1_rts, exp_ms1_mzs, method='first')
+        _, exp_ms2_mzs = consolidate_by_duplicates(ms1_rts, exp_ms2_mzs, method='first')
+        _, exp_ims = consolidate_by_duplicates(ms1_rts, exp_ims, method='first')
         
         return exp_ms1_mzs, exp_ms2_mzs, exp_ims
     

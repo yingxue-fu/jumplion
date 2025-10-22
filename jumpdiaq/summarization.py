@@ -503,7 +503,7 @@ def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm
     
     if normalization:
         # get norm factors
-        mat_norm, normFactors = normalization(mat, trim_percentage, trim_percentage, norm_method)
+        mat_norm, normFactors = normalize(mat, trim_percentage, trim_percentage, norm_method)
         normFactors_df = pd.DataFrame(list(normFactors.items()), columns=['Samples', 'NormFactors'])
         medians_df = medians_df.merge(normFactors_df)
         logging.info("Median log2(Intensity) before normalization:\n%s", 
@@ -573,7 +573,7 @@ def get_loading_bias(mat, sample_names, data_type, trim_pct_upper, trim_pct_lowe
     })
     return loadBias
 
-def normalization(mat, trim_pct_upper, trim_pct_lower, norm_method):
+def normalize(mat, trim_pct_upper, trim_pct_lower, norm_method):
     mat_f = trim_matrix(mat, trim_pct_upper, trim_pct_lower)
     
     if norm_method == "mean":
