@@ -534,7 +534,7 @@ class Info:
 
                 # re-define optimal xic
                 if optimal_xic_type != global_optimal_xic_type:
-                    apex = ms1.shape[0] // 2
+                    apex = ms2.shape[0] // 2
                     (_, _, _, 
                      scores, 
                      optimal_xic, 
