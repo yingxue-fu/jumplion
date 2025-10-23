@@ -270,7 +270,7 @@ class RunEntry:
          elution_apex, fwhm) = identify_optimal_xic(
                                          self.ms1_i, 
                                          self.ms2, 
-                                         apex=initial_apex-start, 
+                                         apex=self.ms2.shape[0] // 2, 
                                          radius=CorrRadius, 
                                          corr_method=CorrMethod, 
                                          shape_weighted=WeightByShape,

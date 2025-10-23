@@ -7,7 +7,7 @@ JUMPdiaq can be installed via pip and is compatible with both Windows and Linux 
 conda create -n jumpdiaq python=3.12
 conda activate jumpdiaq
 conda install mono # required in Linux for reading Thermo .raw file; skip this line for Windows
-pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" # after publishing, the command will be 'pip install jumpdiaq'
+pip install "jumpdiaq[gui] @ git+https://yingxue-fu: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@github.com/yingxue-fu/jumpdiaq.git" # after publishing, the command will be 'pip install jumpdiaq'
 ```
 
 ### Getting started
