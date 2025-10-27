@@ -22,6 +22,7 @@ class Arguments:
     input_runs: List[str] = field(default_factory=list)
     prec_ids: str = ""
     spec_lib: str = ""
+    sample_meta: str = ""
     out_dir: str = ""
     
     # Use existing results
@@ -65,6 +66,7 @@ class Arguments:
     use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
     fill_missing_xic: int = 1
+    fill_method: str = "global_min"
     
     # Precursor normalization
     normalization: int = 1
@@ -124,6 +126,8 @@ class Arguments:
                     f.write("\n# Precursor-level idetification table\n")
                 if fdef.name == "spec_lib":
                     f.write("\n# Spectral library (support .tsv/.csv/.parquet format)\n") 
+                if fdef.name == "sample_meta":
+                    f.write("\n# Sample meta info (support .csv format)\n") 
                 if fdef.name == "out_dir":
                     f.write("\n# Output directory name\n")
                 if fdef.name == "skip_id_processing":
@@ -171,6 +175,7 @@ def create_parser() -> argparse.ArgumentParser:
     required_group.add_argument("--input-runs", help="paths of raw files", nargs='*', default=[])
     required_group.add_argument("--prec-ids", type=str, help="path to precursor identification table")
     required_group.add_argument("--spec-lib", type=str, help="path to spectral library")
+    required_group.add_argument("--sample-meta", type=str, help="path to sample meta info")
     required_group.add_argument("--out-dir", type=str, help="output directory name")
     
     # Use existing results
@@ -180,7 +185,6 @@ def create_parser() -> argparse.ArgumentParser:
     
     # ID results processing
     optional_group.add_argument("--min-runs-quant", type=int, help="")
-    
     optional_group.add_argument("--min-runs-model", type=int, help="")
     optional_group.add_argument("--min-runs-cal", type=int, help="")
     optional_group.add_argument("--max-qvalue-cal", type=float, help="")
@@ -215,6 +219,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
     optional_group.add_argument("--fill-missing-xic", type=int, help="")
+    optional_group.add_argument("--fill-method", type=str, help="")
     
     # Precursor normalization
     optional_group.add_argument("--normalization", type=int, help="")

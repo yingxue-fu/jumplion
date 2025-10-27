@@ -56,7 +56,7 @@ def main():
     logger.info(" ")
     logger.info(f"   OS: {system} {release}, {architecture} ")
     logger.info(f"  CPU: {cores} Cores, {threads} Threads")
-    logger.info(f"  RAM: {mem_avail:.0f} GB/{mem_total:.0f} GB  (Avail/Total) ")
+    logger.info(f"  RAM: {mem_avail:.0f} GB/{mem_total:.0f} GB (Avail/Total) ")
     logger.info("=====================================\n")
     logger.info(f"Command: {cmd}\n")
     
@@ -89,6 +89,7 @@ def main():
     UseRawMS2 = args.use_raw_ms2
     XicQualityCutoff = args.xic_quality_cutoff
     FillMissingXic = args.fill_missing_xic
+    FillMethod = args.fill_method
     ## Precursor normalization
     Normalization = args.normalization
     NormSpecies = args.norm_species
@@ -154,12 +155,16 @@ def main():
         lib.report(xic_quant_file, MSFiles, prec_prot_relation)
     
     # Precursor quantification
+    sample_meta_file = args.sample_meta
     out_prec_dir = out_int_dir / 'prec_quant'
-    prec_quantity_table, prec_quality_table = quantify_precursors(xic_quant_file, 
+    prec_quantity_table, prec_quality_table = quantify_precursors(
+                                                  xic_quant_file, 
+                                                  sample_meta_file,
                                                   use_raw_ms1=UseRawMS1,
                                                   use_raw_ms2=UseRawMS2,
                                                   xic_quality_cutoff=XicQualityCutoff,
                                                   fill_missing_xic=FillMissingXic,
+                                                  fill_method=FillMethod,
                                                   prec_quant_level=PrecQuantLevel,
                                                   out_dir=str(out_prec_dir))
     prec_quantity_table.write_parquet(out_pub_dir / "precursor_quantity_summ_table.parquet")

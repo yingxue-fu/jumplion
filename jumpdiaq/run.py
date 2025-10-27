@@ -12,7 +12,7 @@ from jumpdiaq.utils import (CorrRadius, CorrMethod, WeightByShape, WeightByInten
                             CorrWeight, ShapeWeight, IntensityWeight, MinShapeScore,
                             MinXicIntensity, MinApexIntensity, MinApexEvidence,
                             MassCalBins, MassCalBinsMax, MassCalScore, C13delta, 
-                            fExclude, E, INF, estimate_isotopes, consolidate_by_duplicates,
+                            fExclude, E, INF, estimate_isotopes, consolidate_by_ms1,
                             remove_extension, get_file_name, progress_bar)
 from jumpdiaq.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
 from jumpdiaq.calibration import (split_into_rt_bins, 
@@ -195,12 +195,12 @@ class RunEntry:
                 if self.ms2[ind, fr] < MinXicIntensity:
                     self.ms2[ind, fr] = 0.0
         
-        self.ms1_rts, self.ms2_rts = consolidate_by_duplicates(ms1_rts, ms2_rts, method='first')
-        _, self.ms1 = consolidate_by_duplicates(ms1_rts, self.ms1, method='first')
-        _, self.ms2 = consolidate_by_duplicates(ms1_rts, self.ms2, method='sum')
-        _, exp_ms1_mzs = consolidate_by_duplicates(ms1_rts, exp_ms1_mzs, method='first')
-        _, exp_ms2_mzs = consolidate_by_duplicates(ms1_rts, exp_ms2_mzs, method='max')
-        _, exp_ims = consolidate_by_duplicates(ms1_rts, exp_ims, method='first')
+        self.ms1_rts, self.ms2_rts = consolidate_by_ms1(ms1_rts, ms2_rts, method='first')
+        _, self.ms1 = consolidate_by_ms1(ms1_rts, self.ms1, method='first')
+        _, self.ms2 = consolidate_by_ms1(ms1_rts, self.ms2, method='sum')
+        _, exp_ms1_mzs = consolidate_by_ms1(ms1_rts, exp_ms1_mzs, method='first')
+        _, exp_ms2_mzs = consolidate_by_ms1(ms1_rts, exp_ms2_mzs, method='max')
+        _, exp_ims = consolidate_by_ms1(ms1_rts, exp_ims, method='first')
         
         return exp_ms1_mzs, exp_ms2_mzs, exp_ims
     

@@ -24,7 +24,6 @@ MinRunsModel = args.min_runs_model
 MinRunsCal = args.min_runs_cal
 MaxQvalueCal = args.max_qvalue_cal
 MaxMassCal = args.max_mass_cal
-MinXICPoints = 21
 
 def process_id_results(id_file, 
                        lib_file, 
@@ -178,12 +177,12 @@ def process_id_results(id_file,
     average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
     logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
     #
+    MinXICPoints = max(21, average_model_acc_n_points * 4 + 1)
     if args.n_xic_points == 0:
-        args.n_xic_points = max(MinXICPoints, average_model_acc_n_points * 4 + 1)
+        args.n_xic_points = MinXICPoints
     elif args.n_xic_points < MinXICPoints and args.n_xic_points > 0:
         logging.warning(f"WARNING: the provided number ({args.n_xic_points}) of data points to extract for an XIC may be too small")
         args.n_xic_points = MinXICPoints
-    
     logging.info(f"Number of data points to extract for a XIC set to: {args.n_xic_points}\n")
     
     return prec_rt_info

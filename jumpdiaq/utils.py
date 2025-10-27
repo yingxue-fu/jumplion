@@ -88,7 +88,7 @@ def estimate_isotopes(peptide_mass, threshold=0.1):
     return n_peaks
 
 
-def consolidate_by_duplicates(indices, data, method='sum'):
+def consolidate_by_ms1(indices, data, method='sum'):
     """
     Consolidate data array based on duplicate values in indices array.
     
@@ -161,15 +161,15 @@ def consolidate_by_duplicates(indices, data, method='sum'):
 
 
 def generate_group_indices(column_names: List[str], group_df: pd.DataFrame, 
-                          col_name_column: str = 'Sample', 
-                          group_column: str = 'Group') -> List[List[int]]:
+                           col_name_column: str = 'Sample', 
+                           group_column: str = 'Group') -> List[List[int]]:
     """
     Generate group indices from column names and grouping DataFrame.
     
     Parameters:
     -----------
     column_names : List[str]
-        List of column names in the order they appear in your matrix
+        List of column names in the order they appear in the matrix
     group_df : pd.DataFrame
         DataFrame with column names and their corresponding groups
     col_name_column : str
@@ -207,15 +207,15 @@ def generate_group_indices(column_names: List[str], group_df: pd.DataFrame,
     return group_indices
 
 
-def group_wise_imputation(data: np.ndarray, group_indices: List[List[int]]) -> np.ndarray:
+def missing_value_imputation(
+        data: np.ndarray, 
+        column_names, 
+        group_df,
+        fill_method='global_min') -> np.ndarray:
     """
-    Perform group-wise imputation on a numpy array.
-    
-    For each row and each group:
-    - If group has ≥2 non-missing values: impute missing values with group mean
-    - If group has 0 or 1 non-missing value: impute missing values with group minimum (across all rows)
-    - If group has 0 non-missing values: keep as NaN
-    
+    Perform missing value imputation on a numpy array.
+    For each row and each group, impute missing values with group minimum (across all rows)
+
     Parameters:
     -----------
     data : np.ndarray
@@ -231,46 +231,38 @@ def group_wise_imputation(data: np.ndarray, group_indices: List[List[int]]) -> n
     # Create a copy to avoid modifying original data
     imputed_data = data.copy()
     
-    # Calculate group minimums across all rows for fallback imputation
-    group_mins = {}
-    for group_idx, col_indices in enumerate(group_indices):
-        group_data = data[:, col_indices]
-        # Get minimum value across all rows and columns in this group
-        # Handle case where all values in group are NaN
-        if np.all(np.isnan(group_data)):
-            group_mins[group_idx] = np.nan  # or any default value you prefer
-            #print(f"Warning: All values in group {group_idx} are NaN. Using 0.0 as fallback.")
-        else:
-            group_mins[group_idx] = np.nanmin(group_data)
-    
-    # Process each row
-    for row_idx in range(data.shape[0]):
-        # Process each group
+    # Calculate global minimum
+    global_min = np.nanmin(imputed_data)
+    if fill_method == 'global_min':
+        imputed_data = np.nan_to_num(imputed_data, nan=global_min)
+    elif fill_method == 'local_min':
+        group_indices = generate_group_indices(column_names, group_df)
+        # Calculate group minimums across all rows
+        group_mins = {}
         for group_idx, col_indices in enumerate(group_indices):
-            # Get values for this group in current row
-            group_values = data[row_idx, col_indices]
-            
-            # Find non-missing values
-            non_missing_mask = ~np.isnan(group_values)
-            non_missing_values = group_values[non_missing_mask]
-            non_missing_count = len(non_missing_values)
-            
-            # Find missing value positions
-            missing_mask = np.isnan(group_values)
-            
-            if np.any(missing_mask):  # Only impute if there are missing values
-                if non_missing_count >= 2:
-                    # Use mean of non-missing values in this row's group
-                    #fill_value = np.mean(non_missing_values)
+            group_data = data[:, col_indices]
+            if np.all(np.isnan(group_data)):
+                # Handle case where all values in group are NaN
+                group_mins[group_idx] = global_min 
+            else:
+                # Get minimum value across all rows and columns in this group
+                group_mins[group_idx] = np.nanmin(group_data)
+        
+        # Process each row
+        for row_idx in range(data.shape[0]):
+            # Process each group
+            for group_idx, col_indices in enumerate(group_indices):
+                # Get values for this group in current row
+                group_values = data[row_idx, col_indices]
+                # Find missing value positions
+                missing_mask = np.isnan(group_values)
+                # Impute if there are missing values
+                if np.any(missing_mask):  
                     fill_value = group_mins[group_idx]
-                else:
-                    # Use minimum value of this group across all rows
-                    fill_value = group_mins[group_idx]
-                
-                # Fill missing values
-                for i, col_idx in enumerate(col_indices):
-                    if missing_mask[i]:
-                        imputed_data[row_idx, col_idx] = fill_value
+                    # Fill missing values
+                    for i, col_idx in enumerate(col_indices):
+                        if missing_mask[i]:
+                            imputed_data[row_idx, col_idx] = fill_value
     
     return imputed_data
 

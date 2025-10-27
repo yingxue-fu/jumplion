@@ -8,7 +8,7 @@ import pandas as pd
 import polars as pl
 # local
 from jumpdiaq.arguments import Arguments
-from jumpdiaq.utils import progress_bar, extract_unique_parts
+from jumpdiaq.utils import progress_bar, extract_unique_parts, missing_value_imputation
 
 args = Arguments()
 ShowProgress = args.show_progress
@@ -68,8 +68,10 @@ def get_quantity_quality_dfs(id_report_df,
 
 def precursor_summarize(quantity_df: pl.DataFrame, 
                         quality_df: pl.DataFrame,
+                        sample_meta: pd.DataFrame,
                         xic_quality_cutoff=0.0,
                         fill_missing_xic=True,
+                        fill_method='global_min'
                         ):
 
     # Pivot input tables
@@ -122,7 +124,10 @@ def precursor_summarize(quantity_df: pl.DataFrame,
             if quantity_mat_fill.shape[0] == 0:
                 continue
             else:
-                quantity_mat_fill = np.nan_to_num(quantity_mat_fill, nan=np.nanmin(quantity_mat_fill))
+                quantity_mat_fill = missing_value_imputation(quantity_mat_fill, 
+                                                             sample_cols, 
+                                                             sample_meta,
+                                                             fill_method)
         #
         quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep=3)
         #
@@ -171,6 +176,7 @@ def extract_annotation(id_list,
 
 def quantify_from_xic(
         xic_quant_file, 
+        sample_meta_file,
         id_col="Precursor.Id",
         sample_col="Run",
         secondary_id_col="MS2.XIC.Info",
@@ -179,11 +185,13 @@ def quantify_from_xic(
         annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
         out_dir="",
         xic_quality_cutoff=0.0, 
-        fill_missing_xic=True
+        fill_missing_xic=True,
+        fill_method='local_min',
     ):
     
     columns = [sample_col, id_col, secondary_id_col, quality_col, quantity_col] + annotation_cols
     xic_quant_df = pl.read_parquet(Path(xic_quant_file), columns=columns)
+    sample_meta_df = pd.read_csv(sample_meta_file)
     logging.info(f"ID column: {id_col}, Quantity column: {quantity_col}")
     
     # 1. extract quantity and quality
@@ -199,8 +207,10 @@ def quantify_from_xic(
     # 2. summarize
     quantity_mtx, quality_mtx = precursor_summarize(quantity_df, 
                                                     quality_df, 
+                                                    sample_meta_df,
                                                     xic_quality_cutoff,
-                                                    fill_missing_xic)
+                                                    fill_missing_xic, 
+                                                    fill_method)
 
     # 3. add annotation
     extra_names = extract_annotation(quantity_mtx["Precursor.Id"].to_list(), 
@@ -214,10 +224,12 @@ def quantify_from_xic(
     return final_quantity_table, final_quality_table
     
 def quantify_precursors(xic_quant_file, 
+                        sample_meta_file,
                         use_raw_ms1=False,
                         use_raw_ms2=True,
                         xic_quality_cutoff=0.0, 
                         fill_missing_xic=True,
+                        fill_method='local_min',
                         prec_quant_level='ms2',
                         out_dir=""):
     
@@ -229,6 +241,7 @@ def quantify_precursors(xic_quant_file,
         ms1_quantity_col = "MS1.XIC.Quant.Adjusted"
     ms1_quantity_table, ms1_quality_table = quantify_from_xic(
                                                 xic_quant_file,
+                                                sample_meta_file,
                                                 id_col="Precursor.Id",
                                                 sample_col="Run",
                                                 secondary_id_col="MS1.XIC.Info",
@@ -237,7 +250,9 @@ def quantify_precursors(xic_quant_file,
                                                 annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
                                                 out_dir=out_dir,
                                                 xic_quality_cutoff=xic_quality_cutoff,
-                                                fill_missing_xic=fill_missing_xic)
+                                                fill_missing_xic=fill_missing_xic, 
+                                                fill_method=fill_method
+                                                )
     ms1_quantity_table = ms1_quantity_table.with_columns(pl.lit('MS1').alias('MS_type'))
     ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
     ms1_quantity_table = ms1_quantity_table.with_columns([
@@ -255,6 +270,7 @@ def quantify_precursors(xic_quant_file,
         ms2_quantity_col = "MS2.XIC.Quant.Adjusted"
     ms2_quantity_table, ms2_quality_table = quantify_from_xic(
                                                 xic_quant_file, 
+                                                sample_meta_file,
                                                 id_col="Precursor.Id",
                                                 sample_col="Run",
                                                 secondary_id_col="MS2.XIC.Info",
@@ -263,7 +279,8 @@ def quantify_precursors(xic_quant_file,
                                                 annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
                                                 out_dir=out_dir,
                                                 xic_quality_cutoff=xic_quality_cutoff,
-                                                fill_missing_xic=fill_missing_xic
+                                                fill_missing_xic=fill_missing_xic, 
+                                                fill_method=fill_method
                                                 )
     ms2_quantity_table = ms2_quantity_table.with_columns(pl.lit('MS2').alias('MS_type'))
     ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))
