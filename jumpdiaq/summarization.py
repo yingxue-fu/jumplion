@@ -506,7 +506,6 @@ def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm
     loadBias = get_loading_bias(mat, value_columns, data_type, trim_percentage, trim_percentage)
     medians_df = mat.median().to_pandas().T.reset_index(drop=False)
     medians_df.columns = ['Samples', 'Medians']
-    medians_df['Samples'] = extract_unique_parts(medians_df['Samples'].to_list())
     
     # print out info
     def indent_df(df, spaces=4, index=False):
@@ -523,6 +522,7 @@ def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm
         mat_norm, normFactors = normalize(mat, trim_percentage, trim_percentage, norm_method)
         normFactors_df = pd.DataFrame(list(normFactors.items()), columns=['Samples', 'NormFactors'])
         medians_df = medians_df.merge(normFactors_df)
+        medians_df['Samples'] = extract_unique_parts(medians_df['Samples'].to_list())
         logging.info("Median log2(Intensity) before normalization:\n%s", 
                      indent_df(medians_df, spaces=4, index=False))
         
@@ -538,6 +538,7 @@ def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm
             for col in value_columns
         ])
     else:
+        medians_df['Samples'] = extract_unique_parts(medians_df['Samples'].to_list())
         logging.info("Median log2(Intensity) before normalization:\n%s", 
                      indent_df(medians_df, spaces=4, index=False))
         df_norm = df.clone()
