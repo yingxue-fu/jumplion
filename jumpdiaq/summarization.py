@@ -191,7 +191,10 @@ def quantify_from_xic(
     
     columns = [sample_col, id_col, secondary_id_col, quality_col, quantity_col] + annotation_cols
     xic_quant_df = pl.read_parquet(Path(xic_quant_file), columns=columns)
-    sample_meta_df = pd.read_csv(sample_meta_file)
+    sample_meta_df = pd.DataFrame()
+    if fill_missing_xic and fill_method == 'local_min':
+        logging.info(f"Reading sample meta info from {sample_meta_file}")
+        sample_meta_df = pd.read_csv(sample_meta_file)
     logging.info(f"ID column: {id_col}, Quantity column: {quantity_col}")
     
     # 1. extract quantity and quality

@@ -160,22 +160,23 @@ def consolidate_by_ms1(indices, data, method='sum'):
     return unique_indices, consolidated
 
 
-def generate_group_indices(column_names: List[str], group_df: pd.DataFrame, 
-                           col_name_column: str = 'Sample', 
+def generate_group_indices(sample_names: List[str], 
+                           sample_meta: pd.DataFrame, 
+                           sample_column: str = 'Sample', 
                            group_column: str = 'Group') -> List[List[int]]:
     """
-    Generate group indices from column names and grouping DataFrame.
+    Generate group indices from sample names and sample meta.
     
     Parameters:
     -----------
-    column_names : List[str]
-        List of column names in the order they appear in the matrix
-    group_df : pd.DataFrame
-        DataFrame with column names and their corresponding groups
-    col_name_column : str
-        Name of the column in group_df that contains column names
+    sample_names : List[str]
+        List of sample names in the order they appear in the matrix
+    sample_meta : pd.DataFrame
+        DataFrame with sample names and their corresponding groups
+    sample_column : str
+        Name of the column in sample_meta that contains sample names
     group_column : str
-        Name of the column in group_df that contains group assignments
+        Name of the column in sample_meta that contains group assignments
         
     Returns:
     --------
@@ -183,14 +184,14 @@ def generate_group_indices(column_names: List[str], group_df: pd.DataFrame,
         List of lists, where each inner list contains column indices for a group
     """
     # Create a mapping from column name to its index in the matrix
-    col_name_to_index = {name: idx for idx, name in enumerate(column_names)}
+    col_name_to_index = {name: idx for idx, name in enumerate(sample_names)}
     
     # Create a dictionary to store groups
     group_dict = {}
     
     # Process each row in the group DataFrame
-    for _, row in group_df.iterrows():
-        col_name = row[col_name_column]
+    for _, row in sample_meta.iterrows():
+        col_name = row[sample_column]
         group = row[group_column]
         
         # Check if column name exists in our matrix
@@ -209,8 +210,8 @@ def generate_group_indices(column_names: List[str], group_df: pd.DataFrame,
 
 def missing_value_imputation(
         data: np.ndarray, 
-        column_names, 
-        group_df,
+        sample_names, 
+        sample_meta,
         fill_method='global_min') -> np.ndarray:
     """
     Perform missing value imputation on a numpy array.
@@ -236,7 +237,7 @@ def missing_value_imputation(
     if fill_method == 'global_min':
         imputed_data = np.nan_to_num(imputed_data, nan=global_min)
     elif fill_method == 'local_min':
-        group_indices = generate_group_indices(column_names, group_df)
+        group_indices = generate_group_indices(sample_names, sample_meta)
         # Calculate group minimums across all rows
         group_mins = {}
         for group_idx, col_indices in enumerate(group_indices):
