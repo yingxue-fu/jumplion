@@ -71,7 +71,8 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                         sample_meta: pd.DataFrame,
                         xic_quality_cutoff=0.0,
                         fill_missing_xic=True,
-                        fill_method='global_min'
+                        fill_method='global_min',
+                        fill_factor=1.5
                         ):
 
     # Pivot input tables
@@ -127,7 +128,8 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                 quantity_mat_fill = missing_value_imputation(quantity_mat_fill, 
                                                              sample_cols, 
                                                              sample_meta,
-                                                             fill_method)
+                                                             fill_method,
+                                                             fill_factor)
         #
         quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep=3)
         #
@@ -187,6 +189,7 @@ def quantify_from_xic(
         xic_quality_cutoff=0.0, 
         fill_missing_xic=True,
         fill_method='local_min',
+        fill_factor=1.5
     ):
     
     columns = [sample_col, id_col, secondary_id_col, quality_col, quantity_col] + annotation_cols
@@ -213,7 +216,8 @@ def quantify_from_xic(
                                                     sample_meta_df,
                                                     xic_quality_cutoff,
                                                     fill_missing_xic, 
-                                                    fill_method)
+                                                    fill_method,
+                                                    fill_factor)
 
     # 3. add annotation
     extra_names = extract_annotation(quantity_mtx["Precursor.Id"].to_list(), 
@@ -233,6 +237,7 @@ def quantify_precursors(xic_quant_file,
                         xic_quality_cutoff=0.0, 
                         fill_missing_xic=True,
                         fill_method='local_min',
+                        fill_factor=1.5,
                         prec_quant_level='ms2',
                         out_dir=""):
     
@@ -254,7 +259,8 @@ def quantify_precursors(xic_quant_file,
                                                 out_dir=out_dir,
                                                 xic_quality_cutoff=xic_quality_cutoff,
                                                 fill_missing_xic=fill_missing_xic, 
-                                                fill_method=fill_method
+                                                fill_method=fill_method,
+                                                fill_factor=fill_factor
                                                 )
     ms1_quantity_table = ms1_quantity_table.with_columns(pl.lit('MS1').alias('MS_type'))
     ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
@@ -283,7 +289,8 @@ def quantify_precursors(xic_quant_file,
                                                 out_dir=out_dir,
                                                 xic_quality_cutoff=xic_quality_cutoff,
                                                 fill_missing_xic=fill_missing_xic, 
-                                                fill_method=fill_method
+                                                fill_method=fill_method,
+                                                fill_factor=fill_factor
                                                 )
     ms2_quantity_table = ms2_quantity_table.with_columns(pl.lit('MS2').alias('MS_type'))
     ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))

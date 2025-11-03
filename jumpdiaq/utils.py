@@ -212,7 +212,8 @@ def missing_value_imputation(
         data: np.ndarray, 
         sample_names, 
         sample_meta,
-        fill_method='global_min') -> np.ndarray:
+        fill_method='global_min',
+        fill_factor=1.5) -> np.ndarray:
     """
     Perform missing value imputation on a numpy array.
     For each row and each group, impute missing values with group minimum (across all rows)
@@ -235,7 +236,7 @@ def missing_value_imputation(
     # Calculate global minimum
     global_min = np.nanmin(imputed_data)
     if fill_method == 'global_min':
-        imputed_data = np.nan_to_num(imputed_data, nan=global_min)
+        imputed_data = np.nan_to_num(imputed_data, nan=fill_factor*global_min)
     elif fill_method == 'local_min':
         group_indices = generate_group_indices(sample_names, sample_meta)
         # Calculate group minimums across all rows
@@ -263,7 +264,7 @@ def missing_value_imputation(
                     # Fill missing values
                     for i, col_idx in enumerate(col_indices):
                         if missing_mask[i]:
-                            imputed_data[row_idx, col_idx] = fill_value
+                            imputed_data[row_idx, col_idx] = fill_factor*fill_value
     
     return imputed_data
 

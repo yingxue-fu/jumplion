@@ -67,6 +67,7 @@ class Arguments:
     xic_quality_cutoff: float = 0.0
     fill_missing_xic: int = 1
     fill_method: str = "global_min"
+    fill_factor: float = 1.5
     
     # Precursor normalization
     normalization: int = 1
@@ -220,12 +221,13 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
     optional_group.add_argument("--fill-missing-xic", type=int, help="")
     optional_group.add_argument("--fill-method", type=str, help="")
+    optional_group.add_argument("--fill-factor", type=float, help="")
     
     # Precursor normalization
     optional_group.add_argument("--normalization", type=int, help="")
     optional_group.add_argument("--norm-species", type=str, help="")
     optional_group.add_argument("--norm-method", type=str, help="")
-    optional_group.add_argument("--trim-percentage", type=int, help="")
+    optional_group.add_argument("--trim-percentage", type=float, help="")
     
     # Protein summarization
     optional_group.add_argument("--prec-quant-level", type=str, help="")
