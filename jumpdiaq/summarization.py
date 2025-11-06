@@ -241,85 +241,90 @@ def quantify_precursors(xic_quant_file,
                         prec_quant_level='ms2',
                         out_dir=""):
     
-    # MS1-level quantification
-    logging.info("Quantifying precursors at MS1-level")
-    if use_raw_ms1:
-        ms1_quantity_col = "MS1.XIC.Quant.Raw"
-    else:
-        ms1_quantity_col = "MS1.XIC.Quant.Adjusted"
-    ms1_quantity_table, ms1_quality_table = quantify_from_xic(
-                                                xic_quant_file,
-                                                sample_meta_file,
-                                                id_col="Precursor.Id",
-                                                sample_col="Run",
-                                                secondary_id_col="MS1.XIC.Info",
-                                                quantity_col=ms1_quantity_col,
-                                                quality_col="MS1.XIC.Corr.Raw",
-                                                annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
-                                                out_dir=out_dir,
-                                                xic_quality_cutoff=xic_quality_cutoff,
-                                                fill_missing_xic=fill_missing_xic, 
-                                                fill_method=fill_method,
-                                                fill_factor=fill_factor
-                                                )
-    ms1_quantity_table = ms1_quantity_table.with_columns(pl.lit('MS1').alias('MS_type'))
-    ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
-    ms1_quantity_table = ms1_quantity_table.with_columns([
-        (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
-    ])
-    ms1_quality_table = ms1_quality_table.with_columns([
-        (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
-    ])
-
-    # MS2-level quantification
-    logging.info("Quantifying precursors at MS2-level")
-    if use_raw_ms2:
-        ms2_quantity_col = "MS2.XIC.Quant.Raw"
-    else:
-        ms2_quantity_col = "MS2.XIC.Quant.Adjusted"
-    ms2_quantity_table, ms2_quality_table = quantify_from_xic(
-                                                xic_quant_file, 
-                                                sample_meta_file,
-                                                id_col="Precursor.Id",
-                                                sample_col="Run",
-                                                secondary_id_col="MS2.XIC.Info",
-                                                quantity_col=ms2_quantity_col,
-                                                quality_col="MS2.XIC.Corr.Raw",
-                                                annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
-                                                out_dir=out_dir,
-                                                xic_quality_cutoff=xic_quality_cutoff,
-                                                fill_missing_xic=fill_missing_xic, 
-                                                fill_method=fill_method,
-                                                fill_factor=fill_factor
-                                                )
-    ms2_quantity_table = ms2_quantity_table.with_columns(pl.lit('MS2').alias('MS_type'))
-    ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))
-    ms2_quantity_table = ms2_quantity_table.with_columns([
-        (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
-    ])
-    ms2_quality_table = ms2_quality_table.with_columns([
-        (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
-    ])
-    
-    # Combine MS1 and MS2 quantification
-    ms1_quality_table = ms1_quality_table.select(ms2_quality_table.columns)
-    ms1_quantity_table = ms1_quantity_table.select(ms2_quantity_table.columns)
-    ms1_ms2_quality_table = pl.concat([ms1_quality_table, ms2_quality_table], how="vertical")
-    ms1_ms2_quantity_table = pl.concat([ms1_quantity_table, ms2_quantity_table], how="vertical")
-    
-    # Save to files
-    ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
-    ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
-    
     # Choose between MS1 and MS2 precursor quantification
-    if prec_quant_level == 'ms1':
-        logging.info("Using only MS1-level precursor quantity for further analysis")
-        return ms1_quantity_table, ms1_quality_table
-    elif prec_quant_level == 'ms2':
+    if prec_quant_level in ['ms1', 'ms1_ms2']:
+        # MS1-level quantification
+        logging.info("Quantifying precursors at MS1-level")
+        if use_raw_ms1:
+            ms1_quantity_col = "MS1.XIC.Quant.Raw"
+        else:
+            ms1_quantity_col = "MS1.XIC.Quant.Adjusted"
+        ms1_quantity_table, ms1_quality_table = quantify_from_xic(
+                                                    xic_quant_file,
+                                                    sample_meta_file,
+                                                    id_col="Precursor.Id",
+                                                    sample_col="Run",
+                                                    secondary_id_col="MS1.XIC.Info",
+                                                    quantity_col=ms1_quantity_col,
+                                                    quality_col="MS1.XIC.Corr.Raw",
+                                                    annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
+                                                    out_dir=out_dir,
+                                                    xic_quality_cutoff=xic_quality_cutoff,
+                                                    fill_missing_xic=fill_missing_xic, 
+                                                    fill_method=fill_method,
+                                                    fill_factor=fill_factor
+                                                    )
+        ms1_quantity_table = ms1_quantity_table.with_columns(pl.lit('MS1').alias('MS_type'))
+        ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
+        ms1_quantity_table = ms1_quantity_table.with_columns([
+            (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
+        ])
+        ms1_quality_table = ms1_quality_table.with_columns([
+            (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
+        ])
+        
+        if prec_quant_level == 'ms1':
+            logging.info("Using only MS1-level precursor quantity for further analysis")
+            return ms1_quantity_table, ms1_quality_table
+        
+    if prec_quant_level in ['ms2', 'ms1_ms2']:
         logging.info("Using only MS2-level precursor quantity for further analysis")
-        return ms2_quantity_table, ms2_quality_table
-    elif prec_quant_level == 'ms1_ms2':
+        # MS2-level quantification
+        logging.info("Quantifying precursors at MS2-level")
+        if use_raw_ms2:
+            ms2_quantity_col = "MS2.XIC.Quant.Raw"
+        else:
+            ms2_quantity_col = "MS2.XIC.Quant.Adjusted"
+        ms2_quantity_table, ms2_quality_table = quantify_from_xic(
+                                                    xic_quant_file, 
+                                                    sample_meta_file,
+                                                    id_col="Precursor.Id",
+                                                    sample_col="Run",
+                                                    secondary_id_col="MS2.XIC.Info",
+                                                    quantity_col=ms2_quantity_col,
+                                                    quality_col="MS2.XIC.Corr.Raw",
+                                                    annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
+                                                    out_dir=out_dir,
+                                                    xic_quality_cutoff=xic_quality_cutoff,
+                                                    fill_missing_xic=fill_missing_xic, 
+                                                    fill_method=fill_method,
+                                                    fill_factor=fill_factor
+                                                    )
+        ms2_quantity_table = ms2_quantity_table.with_columns(pl.lit('MS2').alias('MS_type'))
+        ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))
+        ms2_quantity_table = ms2_quantity_table.with_columns([
+            (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
+        ])
+        ms2_quality_table = ms2_quality_table.with_columns([
+            (pl.col("Precursor.Id").cast(pl.Utf8) + "_" + pl.col("MS_type").cast(pl.Utf8)).alias("Precursor.Id_MS_type")
+        ])
+        
+        if prec_quant_level == 'ms2':
+            logging.info("Using only MS2-level precursor quantity for further analysis")
+            return ms2_quantity_table, ms2_quality_table
+        
+    if prec_quant_level == 'ms1_ms2':
         logging.info("Using a hybrid of MS1- and MS2-level quantity for further analysis")
+        # Combine MS1 and MS2 quantification
+        ms1_quality_table = ms1_quality_table.select(ms2_quality_table.columns)
+        ms1_quantity_table = ms1_quantity_table.select(ms2_quantity_table.columns)
+        ms1_ms2_quality_table = pl.concat([ms1_quality_table, ms2_quality_table], how="vertical")
+        ms1_ms2_quantity_table = pl.concat([ms1_quantity_table, ms2_quantity_table], how="vertical")
+        
+        # Save to files
+        ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
+        ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
+        
         return ms1_ms2_quantity_table, ms1_ms2_quality_table
 
 
