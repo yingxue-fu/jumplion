@@ -1,4 +1,5 @@
 # builtin
+import bisect
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Dict
@@ -115,7 +116,7 @@ class RunEntry:
         self.IM = 0.0
         
         self.fInit = 0       # binary 000
-        self.scan_index = np.zeros(1)  # ms2 scan indices corresponding to the precursor
+        self.target_ms2_index = np.zeros(1)  # ms2 scan indices corresponding to the precursor
         self.info = XICGroupInfo()
         
         self.ms1_rts = None
@@ -148,8 +149,8 @@ class RunEntry:
     
     def build_index(self):
         window_index = self.run.get_window_index(self.prec.mz)
-        scan_index = (np.arange(self.run.n_cycle) * self.run.n_window_per_cycle) + window_index
-        self.scan_index = scan_index[scan_index < len(self.run.ms2x)]
+        target_ms2_index = (np.arange(self.run.n_cycle) * self.run.n_ms2_per_cycle) + window_index
+        self.target_ms2_index = target_ms2_index[target_ms2_index < len(self.run.ms2sp)]
     
     def extract_xic(self, from_idx: int, to_idx: int, report_mz_im: int):
         l = to_idx - from_idx
@@ -168,11 +169,11 @@ class RunEntry:
                 
         for k in range(from_idx, to_idx):
             
-            i = self.scan_index[k]
+            i = self.target_ms2_index[k]
             rt = self.run.ms2_RT[i]
             ind = k - from_idx
             
-            ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1 # search MS2 rt of the apex point      
+            ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1 
             ms1_rts[ind] = self.run.ms1_RT[ms1_left]
             
             n_isotopes = min(MaxPrIsotopes, self.info.n_isotopic_peaks)
@@ -180,18 +181,18 @@ class RunEntry:
                 query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], ms1_rts[ind], 
                                         self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1x[ms1_left].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
+                    self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1sp[ms1_left].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
                 else:             
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1x[ms1_left].level(query_mz, self.run.MassAccuracyMS1)
+                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1sp[ms1_left].level(query_mz, self.run.MassAccuracyMS1)
             
             for fr in range(self.info.n_frs):
-                ms2_rts[ind] = self.run.ms2_RT[i]
+                ms2_rts[ind] = rt
                 query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz, ms2_rts[ind], 
                                         self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
-                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2x[i].level(report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
+                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2sp[i].level(report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
                 else:             
-                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr] = self.run.ms2x[i].level(query_mz, self.run.MassAccuracyMS2)
+                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr] = self.run.ms2sp[i].level(query_mz, self.run.MassAccuracyMS2)
                 if self.ms2[ind, fr] < MinXicIntensity:
                     self.ms2[ind, fr] = 0.0
         
@@ -246,14 +247,14 @@ class RunEntry:
             
         self.info.clear()
         # determine initial peak based on RT
-        scan_RTs = self.run.ms2_RT[self.scan_index]
-        initial_apex = min(np.argmin(np.abs(scan_RTs - self.RT)), 
-                           len(self.scan_index) - 3)
+        target_ms2_RTs = self.run.ms2_RT[self.target_ms2_index]
+        initial_apex = min(np.argmin(np.abs(target_ms2_RTs - self.RT)), 
+                           len(self.target_ms2_index) - 3)
            
         # set XIC extraction boundaries 
         R = int(n_xic_points // 2)
         start = max(0, initial_apex - R)
-        stop = min(len(self.scan_index) - 2, initial_apex + R)
+        stop = min(len(self.target_ms2_index) - 2, initial_apex + R)
         
         # extract chromatograms
         report_mz_im = 1 if stage == 0 else 0
@@ -352,8 +353,8 @@ class Run:
         self.tims = False
 
         # 
-        self.ms1x = None
-        self.ms2x = None
+        self.ms1sp = None
+        self.ms2sp = None
         
         self.ms1_RT = None
         self.ms2_RT = None
@@ -361,9 +362,10 @@ class Run:
         self.RT_min = 0.0
         self.RT_max = 0.0
         
-        self.ms2_cycle_num = []
+        
+        self.ms2_cycle = []
         self.n_cycle = 0
-        self.n_window_per_cycle = 0
+        self.n_ms2_per_cycle = 0
         self.window_settings = {}
         
         self.min_ms2_mz = 0.0
@@ -392,8 +394,8 @@ class Run:
     
     def free(self):
         # for arrays
-        self.ms1x[:] = None
-        self.ms2x[:] = None
+        self.ms1sp[:] = None
+        self.ms2sp[:] = None
         self.ms1_RT[:] = None
         self.ms2_RT[:] = None
         # for lib
@@ -411,15 +413,15 @@ class Run:
         
         ext = get_extension(ms_file_path)
         if ext == 'raw':
-            self.ms1x, self.ms2x = load_thermo_raw(ms_file_path)
+            self.ms1sp, self.ms2sp = load_thermo_raw(ms_file_path)
         elif ext == 'mzml':
-            self.ms1x, self.ms2x = load_mzml(ms_file_path)
+            self.ms1sp, self.ms2sp = load_mzml(ms_file_path)
         elif ext == 'd':
             self.tims = True
-            self.ms1x, self.ms2x = load_timsTOF_d(ms_file_path)
+            self.ms1sp, self.ms2sp = load_timsTOF_d(ms_file_path)
         
-        ms1_cnt = len(self.ms1x)
-        ms2_cnt = len(self.ms2x)
+        ms1_cnt = len(self.ms1sp)
+        ms2_cnt = len(self.ms2sp)
         
         if not ms2_cnt:
             logging.warning("No MS2 spectra: aborting")
@@ -433,110 +435,135 @@ class Run:
         return True
     
 
-    def init(self, min_ms1_range_overlap=0.25):
+    def init(self):
         '''
         Derive window settings and cycle information of current run.
         '''
         
-        self.ms1_RT = np.array([ms1.RT for ms1 in self.ms1x])
-        self.ms2_RT = np.array([ms2.RT for ms2 in self.ms2x])
+        # extract all RTs
+        self.ms1_RT = np.array([sp.RT for sp in self.ms1sp])
+        self.ms2_RT = np.array([sp.RT for sp in self.ms2sp])
         
-        # initialize variables
-        ms2_cnt = len(self.ms2x)
-        self.ms2_cycle_num = np.zeros(ms2_cnt, dtype=np.int32)
-        if ms2_cnt:
-            self.ms2_cycle_num[0] = 0
-            self.min_ms1_isolation_mz = self.ms2x[0].window_low
-            self.max_ms1_isolation_mz = self.ms2x[0].window_high
+        # define ms1 windows as the m/z range of the ms1 spectra
+        ms1_mz_min = INF
+        ms1_mz_max = -INF
+        for ms1 in self.ms1sp:
+            if not ms1.size():
+                ms1.window_low = ms1.window_high = 0.0
+            else:
+                ms1.window_low = ms1.peaks_mz[0] + 0.25
+                ms1.window_high = ms1.peaks_mz[-1] - 0.25
+                if ms1.window_low < ms1_mz_min:
+                    ms1_mz_min = ms1.window_low
+                if ms1.window_high > ms1_mz_max:
+                    ms1_mz_max = ms1.window_high
+        logging.info(f"Detected MS1 spectra m/z range: {(ms1_mz_min-0.25):.1f} - {(ms1_mz_max+0.25):.1f}")
         
-        # assigning the cycle number to each ms2 spectrum
+        # get the ms2 spectra m/z range
+        ms2_mz_min = INF
+        ms2_mz_max = -INF
+        for ms2 in self.ms2sp:
+            if ms2.size():
+                if ms2.peaks_mz[0] < ms2_mz_min:
+                    ms2_mz_min = ms2.peaks_mz[0]
+                if ms2.peaks_mz[-1] > ms2_mz_max:
+                    ms2_mz_max = ms2.peaks_mz[-1]
+        if ms2_mz_min < ms2_mz_max:
+            self.min_ms2_mz = np.round(ms2_mz_min)
+            self.max_ms2_mz = np.round(ms2_mz_max)
+        logging.info(f"Detected MS2 spectra m/z range: {self.min_ms2_mz} - {self.max_ms2_mz}")
+        
+        # assigning the cycle number based on the cycle of ms2 spectrum
+        ms2_cnt = len(self.ms2sp)
+        self.ms2_cycle = np.zeros(ms2_cnt, dtype=np.int32)
+        window_low_begin = self.ms2sp[0].window_low
+        window_high_begin = self.ms2sp[0].window_high
+        self.min_ms1_isolation_mz = window_low_begin
+        self.max_ms1_isolation_mz = window_high_begin
         cycle = 0
-        window_low_begin = self.ms2x[0].window_low
-        window_high_begin = self.ms2x[0].window_high
         for i in range(1, ms2_cnt):
-            
-            # handle overlapping windows
+            # for overlapping m/z windows
             # Case #1:
             # o------o
             #    o------o
-            if (self.ms2x[i - 1].window_low < self.ms2x[i].window_low - E
-                and self.ms2x[i - 1].window_high < self.ms2x[i].window_high - E
-                and self.ms2x[i - 1].window_high > self.ms2x[i].window_low + E):
+            if (self.ms2sp[i - 1].window_low < self.ms2sp[i].window_low - E
+                and self.ms2sp[i - 1].window_high < self.ms2sp[i].window_high - E
+                and self.ms2sp[i - 1].window_high > self.ms2sp[i].window_low + E):
                 # make the border equal to the average 
                 # o----o
                 #      o----o
-                self.ms2x[i - 1].window_high = self.ms2x[i].window_low = (self.ms2x[i - 1].window_high + self.ms2x[i].window_low) * 0.5
+                self.ms2sp[i - 1].window_high = self.ms2sp[i].window_low = (self.ms2sp[i - 1].window_high + self.ms2sp[i].window_low) * 0.5
             # Case #2:
             #     o------o
             # o------o
-            if (self.ms2x[i - 1].window_low > self.ms2x[i].window_low + E
-                and self.ms2x[i - 1].window_high > self.ms2x[i].window_high + E
-                and self.ms2x[i - 1].window_low < self.ms2x[i].window_high - E):
+            if (self.ms2sp[i - 1].window_low > self.ms2sp[i].window_low + E
+                and self.ms2sp[i - 1].window_high > self.ms2sp[i].window_high + E
+                and self.ms2sp[i - 1].window_low < self.ms2sp[i].window_high - E):
                 # make the border equal to the average 
                 #      o----o
                 # o----o
-                self.ms2x[i - 1].window_low = self.ms2x[i].window_high = (self.ms2x[i - 1].window_low + self.ms2x[i].window_high) * 0.5
+                self.ms2sp[i - 1].window_low = self.ms2sp[i].window_high = (self.ms2sp[i - 1].window_low + self.ms2sp[i].window_high) * 0.5
             
             # assigning the cycle number to each ms2 spectrum
-            if (self.ms2x[i].window_high == window_high_begin
-                and self.ms2x[i].window_low == window_low_begin):
+            if (self.ms2sp[i].window_high == window_high_begin
+                and self.ms2sp[i].window_low == window_low_begin):
                 cycle += 1
-                self.ms2_cycle_num[i] = cycle
+                self.ms2_cycle[i] = cycle
             else:
-                self.ms2_cycle_num[i] = cycle
+                self.ms2_cycle[i] = cycle
 
             # get the isolation window m/z range
-            if self.ms2x[i].window_low < self.min_ms1_isolation_mz:
-                self.min_ms1_isolation_mz = self.ms2x[i].window_low
-            if self.ms2x[i].window_high > self.max_ms1_isolation_mz:
-                self.max_ms1_isolation_mz = self.ms2x[i].window_high
+            if self.ms2sp[i].window_low < self.min_ms1_isolation_mz:
+                self.min_ms1_isolation_mz = self.ms2sp[i].window_low
+            if self.ms2sp[i].window_high > self.max_ms1_isolation_mz:
+                self.max_ms1_isolation_mz = self.ms2sp[i].window_high
         
         logging.info(f"Detected MS1 isolation m/z range: {self.min_ms1_isolation_mz:.1f} - {self.max_ms1_isolation_mz:.1f}")
         
         # number of total cycles
         self.n_cycle = cycle + 1
         
-        # number of windows in a cycle
-        self.n_window_per_cycle = 0
+        # assigning the cycle number to ms1 spectra
+        last_ms2_indices = list({val: i for i, val in enumerate(self.ms2_cycle)}.values())
+        last_ms2_rt = self.ms2_RT[last_ms2_indices]
+        self.ms1_cycle = [bisect.bisect_left(last_ms2_rt, rt) for rt in self.ms1_RT]
+        
+        # Count the number of ms1/ms2 spectra in a cycle
+        def get_cycle_log(counts_per_cycle, cycle_nums, ms_level):
+            # Sort by cycle_counts (descending)
+            sorted_pairs = sorted(zip(counts_per_cycle, cycle_nums), key=lambda x: x[1], reverse=True)
+            log_messages = [
+                f"{n_cycle} {'cycle has' if n_cycle == 1 else 'cycles have'} {count} {ms_level} spectra" 
+                for count, n_cycle in sorted_pairs
+            ]
+            cycle_log = "; ".join(log_messages)
+            return f"For {ms_level}: " + cycle_log
+        # MS1
+        _, ms1_counts = np.unique(self.ms1_cycle, return_counts=True)
+        ms1_per_cycle, cycle_counts = np.unique(ms1_counts, return_counts=True)
+        logging.info(get_cycle_log(ms1_per_cycle, cycle_counts, 'MS1'))
+        self.n_ms1_per_cycle = np.median(ms1_per_cycle)
+        # MS2
+        _, ms2_counts = np.unique(self.ms2_cycle, return_counts=True)
+        ms2_per_cycle, cycle_counts = np.unique(ms2_counts, return_counts=True)
+        logging.info(get_cycle_log(ms2_per_cycle, cycle_counts, 'MS2'))
+        self.n_ms2_per_cycle = np.max(ms2_per_cycle)
+        
+        # extract window settings
         window_idx = []
         window_lows = []
         window_highs = []
-        for i, x in enumerate(self.ms2_cycle_num):
+        for i, x in enumerate(self.ms2_cycle):
             if x == 0:
                 window_idx.append(i)
-                window_lows.append(self.ms2x[i].window_low)
-                window_highs.append(self.ms2x[i].window_high)
+                window_lows.append(self.ms2sp[i].window_low)
+                window_highs.append(self.ms2sp[i].window_high)
             else:
-                self.n_window_per_cycle = i
-                break
-        
-        # 
+                break 
         self.window_settings = {'Index': np.array(window_idx), 
                                 'Low': np.array(window_lows), 
                                 'High': np.array(window_highs)}
         
-        # get the ms2 spectra m/z range
-        t_min = INF
-        t_max = -INF
-        for i in range(ms2_cnt):
-            if self.ms2x[i].size():
-                if self.ms2x[i].peaks_mz[0] < t_min:
-                    t_min = self.ms2x[i].peaks_mz[0]
-                if self.ms2x[i].peaks_mz[-1] > t_max:
-                    t_max = self.ms2x[i].peaks_mz[-1]
-        if t_min < t_max:
-            self.min_ms2_mz = np.round(t_min)
-            self.max_ms2_mz = np.round(t_max)
-        logging.info(f"Detected MS2 spectra m/z range: {self.min_ms2_mz} - {self.max_ms2_mz}")
-    
-        # define ms1 windows as the mz range of the ms1 spectra
-        for ms1 in self.ms1x:
-            if not ms1.size():
-                ms1.window_low = ms1.window_high = 0.0
-            else:
-                ms1.window_low = min(ms1.peaks_mz[0], ms1.peaks_mz[-1]) + min_ms1_range_overlap
-                ms1.window_high = max(ms1.peaks_mz[0], ms1.peaks_mz[-1]) - min_ms1_range_overlap
-
 
     def get_window_index(self, mz):
         window_lows = self.window_settings['Low']

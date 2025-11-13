@@ -278,7 +278,6 @@ def quantify_precursors(xic_quant_file,
             return ms1_quantity_table, ms1_quality_table
         
     if prec_quant_level in ['ms2', 'ms1_ms2']:
-        logging.info("Using only MS2-level precursor quantity for further analysis")
         # MS2-level quantification
         logging.info("Quantifying precursors at MS2-level")
         if use_raw_ms2:

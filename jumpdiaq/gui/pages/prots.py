@@ -748,8 +748,9 @@ def update_ratio_intensity_plot(cv_filter, group_A, group_B, y_span, point_size,
     df = pd.DataFrame(data)
     meta = pd.DataFrame(meta) 
     value_columns = extract_unique_parts(meta['Sample'].to_list())
-    cv_columns = [col for col in df.columns if 'CV_' in col]
     
+    print(f"Comparing between {group_A} and {group_B}")
+    cv_columns = [f'CV_{group_A}', f'CV_{group_B}']
     for cv_col in cv_columns:
         print(f"Filtering proteins based on the {cv_col} (<={cv_filter})")
         print(f"Before: {df.shape[0]}")
