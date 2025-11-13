@@ -61,7 +61,7 @@ class Arguments:
     intf_factor_ms1: float = 1.2
     intf_factor_ms2: float = 1.5
     
-    # Precursor summarization
+    # Precursor quantification
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
@@ -75,7 +75,7 @@ class Arguments:
     norm_method: str = "median"       # Other options: 'mean'
     trim_percentage: int = 5
     
-    # Protein summarization
+    # Protein quantification
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
     min_1hitw_quality: float = 0.7
@@ -141,11 +141,11 @@ class Arguments:
                 if fdef.name == "min_fr_quant":
                     f.write("\n# XIC quantification\n")
                 if fdef.name == "use_raw_ms1":
-                    f.write("\n# Precursor summarization\n")
+                    f.write("\n# Precursor quantification\n")
                 if fdef.name == "normalization":
                     f.write("\n# Precursor normalization\n")
                 if fdef.name == "prec_quant_level":
-                    f.write("\n# Protein summarization\n")
+                    f.write("\n# Protein quantification\n")
                 value = getattr(self, fdef.name)
                 if isinstance(value, list):
                     f.write(f"{fdef.name} = \n")
@@ -215,7 +215,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--intf-factor-ms1", type=float, help="")
     optional_group.add_argument("--intf-factor-ms2", type=float, help="")
     
-    # Precursor summarization
+    # Precursor quantification
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
@@ -229,7 +229,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--norm-method", type=str, help="")
     optional_group.add_argument("--trim-percentage", type=float, help="")
     
-    # Protein summarization
+    # Protein quantification
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--min-prec-quality", type=float, help="")
     optional_group.add_argument("--min-1hitw-quality", type=float, help="")
