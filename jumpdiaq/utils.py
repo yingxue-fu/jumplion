@@ -7,6 +7,7 @@ from typing import List
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+from numba import njit
 
 # 
 MSFormatsExt = {"mzml", "raw", "d"}  
@@ -158,6 +159,39 @@ def consolidate_by_ms1(indices, data, method='sum'):
         raise ValueError("method must be 'sum', 'first', or 'max'")
     
     return unique_indices, consolidated
+
+
+@njit
+def weighted_average_mz(mzs, intensities):
+    """
+    Calculate the weighted average of mzs based on intensities.
+    
+    Args:
+        mzs: NumPy array of numerical mzs
+        intensities: NumPy array of intensities corresponding to each value
+    
+    Returns:
+        Tuple of (total_intensities, weighted_average)
+    """
+    # Numba doesn't support exceptions, so we handle edge cases differently
+    if len(mzs) != len(intensities):
+        return 0.0, 0.0  # Return zeros for error case
+    
+    if len(mzs) == 0:
+        return 0.0, 0.0  # Return zeros for empty arrays
+    
+    # Calculate weighted sum and total weight
+    weighted_sum = 0.0
+    total_intensities = 0.0
+    
+    for i in range(len(mzs)):
+        weighted_sum += mzs[i] * intensities[i]
+        total_intensities += intensities[i]
+    
+    if total_intensities == 0.0:
+        return 0.0, 0.0
+    
+    return total_intensities, weighted_sum / total_intensities
 
 
 def generate_group_indices(sample_names: List[str], 

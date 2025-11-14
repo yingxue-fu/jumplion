@@ -13,7 +13,7 @@ from jumpdiaq.utils import (CorrRadius, CorrMethod, WeightByShape, WeightByInten
                             CorrWeight, ShapeWeight, IntensityWeight, MinShapeScore,
                             MinXicIntensity, MinApexIntensity, MinApexEvidence,
                             MassCalBins, MassCalBinsMax, MassCalScore, C13delta, 
-                            fExclude, E, INF, estimate_isotopes, consolidate_by_ms1,
+                            fExclude, E, INF, estimate_isotopes, consolidate_by_ms1, weighted_average_mz,
                             remove_extension, get_file_name, progress_bar)
 from jumpdiaq.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
 from jumpdiaq.calibration import (split_into_rt_bins, 
@@ -174,9 +174,10 @@ class RunEntry:
             ind = k - from_idx
             
             cycle_ms1_index = np.where(np.array(self.run.ms1_cycle) == k)[0]
+            ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1
             if not len(cycle_ms1_index):
-                cycle_ms1_index = np.array(np.searchsorted(self.run.ms1_RT, rt) - 1)
-            ms1_rts[ind] = np.min(self.run.ms1_RT[cycle_ms1_index])
+                cycle_ms1_index = np.array(ms1_left)
+            ms1_rts[ind] = self.run.ms1_RT[ms1_left]
             
             n_ms1_cycle = len(cycle_ms1_index)
             n_isotopes = min(MaxPrecNum, self.info.n_isotopic_peaks)
@@ -190,7 +191,7 @@ class RunEntry:
                     cycle_ms1_mzs = np.zeros(n_ms1_cycle)
                     for ms1_i in range(n_ms1_cycle):
                         cycle_ms1_intensities[ms1_i], cycle_ms1_mzs[ms1_i] = self.run.ms1sp[cycle_ms1_index[ms1_i]].level(query_mz, self.run.MassAccuracyMS1)
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = np.sum(cycle_ms1_intensities), cycle_ms1_mzs[np.argmax(cycle_ms1_intensities)]
+                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = weighted_average_mz(cycle_ms1_mzs, cycle_ms1_intensities)
             
             for fr in range(self.info.n_prods):
                 ms2_rts[ind] = rt
