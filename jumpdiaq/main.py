@@ -100,8 +100,8 @@ def main():
     PrecQuantLevel = args.prec_quant_level
     MinPrecQuality = args.min_prec_quality
     Min1HitWQuality = args.min_1hitw_quality
-    MinPrecNum = args.min_prec_num
-    MinPepNum = args.min_pep_num
+    MinPrecCount = args.min_prec_count
+    MinPepCount = args.min_pep_count
     
     # XIC quantification
     xic_quant_file = out_pub_dir / 'xic_quantification.parquet'
@@ -220,8 +220,8 @@ def main():
     prot_quantity_table_1st_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
     
     # Further filtering
-    logging.info(f"Filtering proteins based on the number of precursors (>={MinPrecNum}) and peptides (>={MinPepNum})")
-    accepted = (prot_prec_pep_info['n.Precursors'] >= MinPrecNum) & (prot_prec_pep_info['n.Peptides'] >= MinPepNum)
+    logging.info(f"Filtering proteins based on the number of precursors (>={MinPrecCount}) and peptides (>={MinPepCount})")
+    accepted = (prot_prec_pep_info['n.Precursors'] >= MinPrecCount) & (prot_prec_pep_info['n.Peptides'] >= MinPepCount)
     prots_accept_2 = prot_prec_pep_info['Protein.Group'][accepted]
     prot_quantity_table_2nd_f = prot_quantity_table_1st_f.filter(pl.col('Protein.Group').is_in(prots_accept_2))
     prot_quantity_table_2nd_f.write_csv(out_pub_dir / "protein.group_quantity_matrix_prec_filtering.csv")

@@ -23,8 +23,8 @@ from jumpdiaq.utils import (progress_bar, remove_extension, location_to_file_nam
 from jumpdiaq.elution_peaks import identify_optimal_xic, calculate_quantity
 
 args = Arguments()
-MaxPrIsotopes = args.max_pr_isotopes
-MaxFr = args.max_fr_quant
+MaxPrecNum = args.max_prec_num
+MaxProdNum = args.max_prod_num
 IntfRemoval = args.intf_removal
 IntfFactorMS1 = args.intf_factor_ms1
 IntfFactorMS2 = args.intf_factor_ms2
@@ -392,8 +392,8 @@ class QuantEntry:
     ms1_rt = None
     ms2_rt = None
 
-    ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxPrIsotopes)])
-    ms2_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxFr)])
+    ms1_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxPrecNum)])
+    ms2_quant: List[XICQuant] = field(default_factory=lambda: [XICQuant() for _ in range(MaxProdNum)])
 
 class Info:
     def __init__(self):
@@ -498,8 +498,8 @@ class Info:
     def quantify(self, ms_files, out_dir):
         logging.info("Quantifying XICs")
         
-        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrIsotopes)]
-        ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxFr)]
+        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrecNum)]
+        ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxProdNum)]
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
         
         data_rows = []

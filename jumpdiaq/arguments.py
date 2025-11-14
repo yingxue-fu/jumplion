@@ -38,6 +38,7 @@ class Arguments:
     max_mass_cal: int = 5000
     
     # XIC extraction
+    ## Number of data points in a XIC
     n_xic_points: int = 21
     ## Mass calibration
     mass_calibration: int = 1    
@@ -51,11 +52,12 @@ class Arguments:
     fix_im_window: int = 0
     im_window: float = 0.01
     individual_im_window: int = 0
+    ## Number of precursor and product ions
+    max_prec_num: int = 5
+    min_prod_num: int = 3
+    max_prod_num: int = 6
     
     # XIC quantification
-    min_fr_quant: int = 3
-    max_fr_quant: int = 6
-    max_pr_isotopes: int = 5
     optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     intf_removal: int = 1
     intf_factor_ms1: float = 1.2
@@ -79,8 +81,8 @@ class Arguments:
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
     min_1hitw_quality: float = 0.7
-    min_prec_num: int = 2
-    min_pep_num: int = 1
+    min_prec_count: int = 2
+    min_pep_count: int = 1
     fastas: List[str] = field(default_factory=list)
     
     # timsTOF data preprocessing (hidden from users)
@@ -138,7 +140,7 @@ class Arguments:
                     f.write("\n# ID results processing\n")
                 if fdef.name == "n_xic_points":
                     f.write("\n# XIC extraction\n")
-                if fdef.name == "min_fr_quant":
+                if fdef.name == "optimal_xic_source":
                     f.write("\n# XIC quantification\n")
                 if fdef.name == "use_raw_ms1":
                     f.write("\n# Precursor quantification\n")
@@ -205,11 +207,11 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--fix-im-window", type=int, help="")
     optional_group.add_argument("--im-window", type=float, help="")
     optional_group.add_argument("--individual-im-window", type=int, help="")
+    optional_group.add_argument("--max-prec-num", type=int, help="")
+    optional_group.add_argument("--min-prod-num", type=int, help="")
+    optional_group.add_argument("--max-prod-num", type=int, help="")
     
     # XIC quantification
-    optional_group.add_argument("--min-fr-quant", type=int, help="")
-    optional_group.add_argument("--max-fr-quant", type=int, help="")
-    optional_group.add_argument("--max-pr-isotopes", type=int, help="")  
     optional_group.add_argument("--optimal-xic-source", type=str, help="")
     optional_group.add_argument("--intf-removal", type=int, help="")
     optional_group.add_argument("--intf-factor-ms1", type=float, help="")
@@ -233,8 +235,8 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--min-prec-quality", type=float, help="")
     optional_group.add_argument("--min-1hitw-quality", type=float, help="")
-    optional_group.add_argument("--min-prec-num", type=int, help="")
-    optional_group.add_argument("--min-pep-num", type=int, help="")
+    optional_group.add_argument("--min-prec-count", type=int, help="")
+    optional_group.add_argument("--min-pep-count", type=int, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
     # timsTOF data preprocessing

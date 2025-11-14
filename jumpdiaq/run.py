@@ -35,10 +35,10 @@ MassCalAcc = args.mass_cal_acc
 IndividualMassAcc = args.individual_mass_acc
 IMWindowCal = args.im_window_cal
 IndividualIMWindow = args.individual_im_window
+MaxPrecNum = args.max_prec_num
+MinProdNum = args.min_prod_num
+MaxProdNum = args.max_prod_num
 # XIC quantification
-MinFr = args.min_fr_quant
-MaxFr = args.max_fr_quant
-MaxPrIsotopes = args.max_pr_isotopes
 OptimalXicSource = args.optimal_xic_source
 
 
@@ -51,7 +51,7 @@ class XICGroupInfo:
     # MS2 ion info
     products: List[None] = field(default_factory=list)   # A list of product ions to extract XIC
     prodi: List[int] = field(default_factory=list)          # Product ion index
-    n_frs: int = 0
+    n_prods: int = 0
     
     # XIC apex and peak width (fwhm)
     apex: int = 0
@@ -142,8 +142,8 @@ class RunEntry:
             if len(self.info.products) == max_prod:
                 break
         
-        self.info.n_frs = len(self.info.products)
-        if self.info.n_frs < min_prod:  # default: at least 3 products
+        self.info.n_prods = len(self.info.products)
+        if self.info.n_prods < min_prod:  # default: at least 3 products
             self.info.products.clear()
             self.info.prodi.clear()
     
@@ -159,13 +159,13 @@ class RunEntry:
         ms2_rts = np.zeros(l)
         
         # extracted intensities
-        self.ms1 = np.zeros((l, MaxPrIsotopes))   # of isotopic peaks
-        self.ms2 = np.zeros((l, MaxFr))
+        self.ms1 = np.zeros((l, MaxPrecNum))   # of isotopic peaks
+        self.ms2 = np.zeros((l, MaxProdNum))
         
         # extracted mzs
-        exp_ms1_mzs = np.zeros((l, MaxPrIsotopes))
-        exp_ms2_mzs = np.zeros((l, MaxFr))
-        exp_ims = np.zeros((l, MaxPrIsotopes))
+        exp_ms1_mzs = np.zeros((l, MaxPrecNum))
+        exp_ms2_mzs = np.zeros((l, MaxProdNum))
+        exp_ims = np.zeros((l, MaxPrecNum))
                 
         for k in range(from_idx, to_idx):
             
@@ -173,19 +173,26 @@ class RunEntry:
             rt = self.run.ms2_RT[i]
             ind = k - from_idx
             
-            ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1 
-            ms1_rts[ind] = self.run.ms1_RT[ms1_left]
+            cycle_ms1_index = np.where(np.array(self.run.ms1_cycle) == k)[0]
+            if not len(cycle_ms1_index):
+                cycle_ms1_index = np.array(np.searchsorted(self.run.ms1_RT, rt) - 1)
+            ms1_rts[ind] = np.min(self.run.ms1_RT[cycle_ms1_index])
             
-            n_isotopes = min(MaxPrIsotopes, self.info.n_isotopic_peaks)
+            n_ms1_cycle = len(cycle_ms1_index)
+            n_isotopes = min(MaxPrecNum, self.info.n_isotopic_peaks)
             for j in range(n_isotopes):
                 query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], ms1_rts[ind], 
                                         self.run.MassCalCenter, MassCalBins)
                 if self.run.tims: # return mobility
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1sp[ms1_left].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
-                else:             
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1sp[ms1_left].level(query_mz, self.run.MassAccuracyMS1)
+                    self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1sp[cycle_ms1_index[0]].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
+                else:
+                    cycle_ms1_intensities = np.zeros(n_ms1_cycle)
+                    cycle_ms1_mzs = np.zeros(n_ms1_cycle)
+                    for ms1_i in range(n_ms1_cycle):
+                        cycle_ms1_intensities[ms1_i], cycle_ms1_mzs[ms1_i] = self.run.ms1sp[cycle_ms1_index[ms1_i]].level(query_mz, self.run.MassAccuracyMS1)
+                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = np.sum(cycle_ms1_intensities), cycle_ms1_mzs[np.argmax(cycle_ms1_intensities)]
             
-            for fr in range(self.info.n_frs):
+            for fr in range(self.info.n_prods):
                 ms2_rts[ind] = rt
                 query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz, ms2_rts[ind], 
                                         self.run.MassCalCenter, MassCalBins)
@@ -236,11 +243,11 @@ class RunEntry:
         # for stage = 1, perform quantification and export XIC
         if not self.fInit:
             # theoritical MS1 m/zs
-            self.info.ms1_mzs = self.prec.mz + (C13delta * np.arange(0, MaxPrIsotopes) / self.prec.charge)
+            self.info.ms1_mzs = self.prec.mz + (C13delta * np.arange(0, MaxPrecNum) / self.prec.charge)
             self.info.n_isotopic_peaks = estimate_isotopes(self.prec.mz * self.prec.charge)
             # get products info and build ms2 scan index
-            self.prepare_products(MinFr, MaxFr)
-            if not self.info.n_frs:
+            self.prepare_products(MinProdNum, MaxProdNum)
+            if not self.info.n_prods:
                 return
             self.build_index()
             self.fInit = 1
@@ -291,9 +298,9 @@ class RunEntry:
         self.info.optimal_xic_type = optimal_xic_type
         
         ms2_scores = scores[len(self.info.ms1_mzs):]
-        best_fr = np.argmax(ms2_scores[0:self.info.n_frs])
-        self.info.best_ms2_xic = best_fr
-        self.info.best_ms2_mz = self.info.products[best_fr].mz
+        best_prod = np.argmax(ms2_scores[0:self.info.n_prods])
+        self.info.best_ms2_xic = best_prod
+        self.info.best_ms2_mz = self.info.products[best_prod].mz
         self.info.apex = elution_apex
         self.info.fwhm = fwhm
         
@@ -303,7 +310,7 @@ class RunEntry:
                                           exp_ims,
                                           exp_ms1_mzs, 
                                           exp_ms2_mzs, 
-                                          ms2_scores[best_fr], 
+                                          ms2_scores[best_prod], 
                                           scores[0])
             return
         
@@ -327,7 +334,7 @@ class RunEntry:
         xg.info.fwhm = self.info.fwhm
         
         xg.info.n_isotopic_peaks = self.info.n_isotopic_peaks
-        xg.info.n_frs = self.info.n_frs
+        xg.info.n_prods = self.info.n_prods
         
         xg.info.scores = self.info.scores
         xg.info.optimal_xic = self.info.optimal_xic
@@ -823,9 +830,9 @@ class Run:
         
         
     def export_xics(self):
-        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrIsotopes)]
-        ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxFr)]
-        ms1_interpol_cols = [f'ms1_interpol_M{i}' for i in range(MaxPrIsotopes)]
+        ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrecNum)]
+        ms2_intensity_cols = [f'ms2_intensity_prod{i}' for i in range(MaxProdNum)]
+        ms1_interpol_cols = [f'ms1_interpol_M{i}' for i in range(MaxPrecNum)]
         column_names = ['Precursor.Id', 'row_type', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ms1_interpol_cols
         
         data_rows = []
@@ -834,21 +841,21 @@ class Run:
             ms1_mzs = xic_group.info.ms1_mzs.tolist()
             ms1_indices = [xic_group.pr] * len(ms1_mzs)
             ms2_mzs = [fr.mz for fr in xic_group.info.products]
-            ms2_mzs += [0.0] * (MaxFr - len(ms2_mzs))
+            ms2_mzs += [0.0] * (MaxProdNum - len(ms2_mzs))
             ms2_indices = xic_group.info.prodi
-            ms2_indices += [0.0] * (MaxFr - len(ms2_indices))
+            ms2_indices += [0.0] * (MaxProdNum - len(ms2_indices))
             
             optimal_xic = xic_group.info.optimal_xic
             optimal_xic_type = xic_group.info.optimal_xic_type
             n_isotopic_peaks = xic_group.info.n_isotopic_peaks
-            n_frs = xic_group.info.n_frs
+            n_prods = xic_group.info.n_prods
             
             apex = xic_group.info.apex
             fwhm = xic_group.info.fwhm
             
             # mz_row: use 0.0 placeholders for rt, plus best fragment mz at the end
             index_row = [xic_group.id, 'index_row'] + [optimal_xic, optimal_xic_type] + ms1_indices + ms2_indices + ms1_indices
-            mz_row = [xic_group.id, 'mz_row'] + [n_isotopic_peaks, n_frs] + ms1_mzs + ms2_mzs + ms1_mzs
+            mz_row = [xic_group.id, 'mz_row'] + [n_isotopic_peaks, n_prods] + ms1_mzs + ms2_mzs + ms1_mzs
             score_row = [xic_group.id, 'score_row'] + [apex, fwhm] + xic_group.info.scores['score'].tolist() + [0.0] * len(ms1_mzs)
             data_rows.append(index_row)
             data_rows.append(mz_row)
