@@ -61,8 +61,8 @@ class Arguments:
     use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
     fill_missing_xic: int = 1
-    fill_method: str = "global_min"
-    fill_factor: float = 1.5
+    fill_method: str = "local_min"
+    fill_factor: float = 0.5
     
     # Precursor normalization
     normalization: int = 1
@@ -73,7 +73,7 @@ class Arguments:
     # Protein quantification
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
-    min_1hitw_quality: float = 0.7
+    min_1hitw_quality: float = 0.5
     min_prec_count: int = 2
     min_pep_count: int = 1
     fastas: List[str] = field(default_factory=list)
