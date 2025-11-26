@@ -73,6 +73,8 @@ def process_id_results(id_file,
     ###########################################
     # 1. Choose precursors for quantification #
     ###########################################
+    if min_runs_quant == 0:
+        min_runs_quant = 3
     logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
     # get rt and im matrix
     rt_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='RT')
@@ -109,6 +111,8 @@ def process_id_results(id_file,
     #######################
     if PredictRTIM:
         logging.info("Predicting precursor RTs (and IMs)") 
+        if min_runs_model == 0:
+            min_runs_model = len(ms_files) // 2
         rt_dict, rt_segments = collect_model_data(rt_mat,  
                                                   min_runs_model,
                                                   lib_df_uniq_prec,
@@ -151,6 +155,8 @@ def process_id_results(id_file,
     #############################################
     # 3. Choose precursors for mass calibration #
     #############################################
+    if min_runs_cal == 0:
+        min_runs_cal = len(ms_files)
     id_df_cal = id_df.loc[id_df['Q.Value'] < max_qvalue_cal, ['Precursor.Id', 'Run', 'Q.Value']]
     q_mat_cal = id_df_cal.pivot(index='Precursor.Id', columns='Run', values='Q.Value')
     q_mat_cal = q_mat_cal[(q_mat_cal.shape[1] - q_mat_cal.isna().sum(axis=1)) >= min_runs_cal]

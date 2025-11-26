@@ -30,13 +30,6 @@ class Arguments:
     use_saved_xic: int = 0
     use_xic_quant: int = 0
     
-    # ID results processing
-    min_runs_quant: int = 3
-    min_runs_model: int = 3
-    min_runs_cal: int = 6
-    max_qvalue_cal: float = 0.0001
-    max_mass_cal: int = 5000
-    
     # XIC extraction
     ## Number of data points in a XIC
     n_xic_points: int = 21
@@ -85,6 +78,14 @@ class Arguments:
     min_pep_count: int = 1
     fastas: List[str] = field(default_factory=list)
     
+    # ID results processing (hidden from users)
+    min_runs_quant: int = 0
+    predict_rt_im: int = 1
+    min_runs_model: int = 0
+    min_runs_cal: int = 0
+    max_qvalue_cal: float = 0.0001
+    max_mass_cal: int = 5000
+    
     # timsTOF data preprocessing (hidden from users)
     tims_centroid: int = 0
     weighted_centroid: int = 1
@@ -94,7 +95,6 @@ class Arguments:
     # Other hidden parameters
     gen_params: str = ""
     config_file: str = ""
-    predict_rt_im: int = 1
     show_progress: int = 1
     inter_progress: int = 0    
     save_supplements: int = 1
@@ -123,7 +123,7 @@ class Arguments:
             f.write("# Input runs: .raw/.mzML files for Thermo instruments or diaPASEF .d files for timsTOF instruments\n")
             f.write("# Leave the 'input_runs = ' row empty when there are multiple files. The same applies to the 'fastas = ' parameter.\n")
             for fdef in fields(self):
-                if fdef.name == "tims_centroid":
+                if fdef.name == "min_runs_quant":
                     break
                 if fdef.name == "prec_ids":
                     f.write("\n# Precursor-level idetification table\n")
@@ -136,8 +136,6 @@ class Arguments:
                 if fdef.name == "skip_id_processing":
                     f.write("\n\n[optional]\n")
                     f.write("# Use existing results\n")
-                if fdef.name == "min_runs_quant":
-                    f.write("\n# ID results processing\n")
                 if fdef.name == "n_xic_points":
                     f.write("\n# XIC extraction\n")
                 if fdef.name == "optimal_xic_source":
@@ -186,13 +184,6 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--use-saved-xic", type=int, help="")
     optional_group.add_argument("--use-xic-quant", type=int, help="")
     
-    # ID results processing
-    optional_group.add_argument("--min-runs-quant", type=int, help="")
-    optional_group.add_argument("--min-runs-model", type=int, help="")
-    optional_group.add_argument("--min-runs-cal", type=int, help="")
-    optional_group.add_argument("--max-qvalue-cal", type=float, help="")
-    optional_group.add_argument("--max-mass-cal", type=int, help="")
-    
     # XIC extraction
     optional_group.add_argument("--n-xic-points", type=int, help="")
     ## Mass calibration
@@ -239,6 +230,14 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-pep-count", type=int, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
+    # ID results processing
+    optional_group.add_argument("--min-runs-quant", type=int, help=argparse.SUPPRESS)
+    optional_group.add_argument("--predict-rt-im", type=int, help=argparse.SUPPRESS)
+    optional_group.add_argument("--min-runs-model", type=int, help=argparse.SUPPRESS)
+    optional_group.add_argument("--min-runs-cal", type=int, help=argparse.SUPPRESS)
+    optional_group.add_argument("--max-qvalue-cal", type=float, help=argparse.SUPPRESS)
+    optional_group.add_argument("--max-mass-cal", type=int, help=argparse.SUPPRESS)
+    
     # timsTOF data preprocessing
     parser.add_argument("--tims-centroid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--weighted-centroid", type=int, help=argparse.SUPPRESS)
@@ -250,8 +249,6 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config-file", type=str, help=argparse.SUPPRESS)
     # Whether to save additional supplementary files
     parser.add_argument("--save-supplements", type=int, help=argparse.SUPPRESS)
-    # XIC missing value inference
-    optional_group.add_argument("--predict-rt-im", type=int, help=argparse.SUPPRESS)
     # Progress bar dispaly
     parser.add_argument("--show-progress", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--inter-progress", type=int, help=argparse.SUPPRESS)
