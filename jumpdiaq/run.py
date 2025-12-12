@@ -812,7 +812,7 @@ class Run:
         mean = im_cali_data['im_delta'].mean()
         sd = im_cali_data['im_delta'].std()
         logging.info(f"Mean and SD of ion mobility error: {mean:4g} and {sd:5g}")
-        im_boundary = max(abs(mean+3*sd), abs(mean-3*sd)) * 1.25
+        im_boundary = max(abs(mean+3*sd), abs(mean-3*sd)) * 1.5
         self.IM_window = np.round(im_boundary, 3)
 
         if save_cal_info:
