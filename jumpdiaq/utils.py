@@ -37,8 +37,8 @@ INF = np.float64(10000000.0)
 
 #
 C13delta = 1.003355
-proton = 1.007825035
-OH = 17.003288
+proton = 1.007276
+OH = 17.00273965
 
 #
 fTypeB = 1 << 0      # 00000001 (binary) or 1 (decimal)
@@ -246,6 +246,8 @@ def missing_value_imputation(
         data: np.ndarray, 
         sample_names, 
         sample_meta,
+        sample_column, 
+        group_column,
         fill_method='global_min',
         fill_factor=1.5) -> np.ndarray:
     """
@@ -272,7 +274,7 @@ def missing_value_imputation(
     if fill_method == 'global_min':
         imputed_data = np.nan_to_num(imputed_data, nan=fill_factor*global_min)
     elif fill_method == 'local_min':
-        group_indices = generate_group_indices(sample_names, sample_meta)
+        group_indices = generate_group_indices(sample_names, sample_meta, sample_column, group_column)
         # Calculate group minimums across all rows
         group_mins = {}
         for group_idx, col_indices in enumerate(group_indices):

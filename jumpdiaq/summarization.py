@@ -69,6 +69,8 @@ def get_quantity_quality_dfs(id_report_df,
 def precursor_summarize(quantity_df: pl.DataFrame, 
                         quality_df: pl.DataFrame,
                         sample_meta: pd.DataFrame,
+                        sample_column='Sample', 
+                        group_column='Group',
                         xic_quality_cutoff=0.0,
                         fill_missing_xic=True,
                         fill_method='global_min',
@@ -128,6 +130,8 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                 quantity_mat_fill = missing_value_imputation(quantity_mat_fill, 
                                                              sample_cols, 
                                                              sample_meta,
+                                                             sample_column, 
+                                                             group_column,
                                                              fill_method,
                                                              fill_factor)
         #
@@ -185,6 +189,8 @@ def quantify_from_xic(
         quantity_col="MS2.XIC.Quant.Adjusted",
         quality_col="MS2.XIC.Corr.Raw",
         annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
+        meta_sample_col="Sample",
+        meta_group_col="Group",
         out_dir="",
         xic_quality_cutoff=0.0, 
         fill_missing_xic=True,
@@ -214,6 +220,8 @@ def quantify_from_xic(
     quantity_mtx, quality_mtx = precursor_summarize(quantity_df, 
                                                     quality_df, 
                                                     sample_meta_df,
+                                                    meta_sample_col,
+                                                    meta_group_col,
                                                     xic_quality_cutoff,
                                                     fill_missing_xic, 
                                                     fill_method,
@@ -411,6 +419,56 @@ def quantify_proteins(prec_quantity_table,
     prot_quality_table = extra_names.join(prot_quality_table, on='Protein.Group', how="inner")  
     
     return prot_quantity_table, prot_quality_table
+
+
+def filter_one_hit_wonder(prot_prec_pep_info, 
+                          prot_quantity_table, 
+                          prot_quality_table, 
+                          sample_meta_file, 
+                          sample_column='Sample', 
+                          group_column='Group',
+                          min_1hitw_quality=0.35, 
+                          min_prec_count=2,
+                          min_pep_count=1):
+    # For one-hit wonder (protein with one precursor), filter based on quality
+    prot_1_prec = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] == 1]
+    prot_2more_precs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] >= 2]
+    logging.info(f"Found {len(prot_1_prec)} one-hit wonder proteins (i.e., proteins with one precursor)")
+    
+    # first filtering
+    prot_quality_1prec = prot_quality_table.filter(pl.col('Protein.Group').is_in(prot_1_prec)).to_pandas()
+    group_mean_cols = []
+    if sample_meta_file:
+        sample_meta_df = pd.read_csv(sample_meta_file)
+        group_dict = sample_meta_df.groupby(group_column)[sample_column].apply(list).to_dict()
+        for group_name, cols in group_dict.items():
+            mean_col_name = f'{group_name}_mean'
+            prot_quality_1prec[mean_col_name] = prot_quality_1prec[cols].mean(axis=1)
+            group_mean_cols.append(mean_col_name)
+    else:
+        prot_quality_1prec['row_mean'] = prot_quality_1prec.iloc[:, 3:].mean(axis=1)
+        
+    if min_1hitw_quality > 0.0:
+        if sample_meta_file:
+            is_high_quality = np.any(prot_quality_1prec[group_mean_cols] >= min_1hitw_quality, axis=1)
+            prot_1_prec_f = prot_quality_1prec.loc[is_high_quality, 'Protein.Group']
+        else:
+            is_high_quality = (prot_quality_1prec['row_mean'] >= min_1hitw_quality)
+            prot_1_prec_f = prot_quality_1prec.loc[is_high_quality, 'Protein.Group']
+    else:
+        prot_1_prec_f = prot_quality_1prec['Protein.Group']
+    
+    logging.info(f"{len(prot_1_prec) - len(prot_1_prec_f)} low quality (<{min_1hitw_quality}) one-hit wonders were removed")
+    prots_accept_1 = pd.concat([prot_2more_precs, prot_1_prec_f])
+    prot_quantity_table_1st_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(prots_accept_1))
+    
+    # Further filtering
+    logging.info(f"Filtering proteins based on the number of precursors (>={min_prec_count}) and peptides (>={min_pep_count})")
+    accepted = (prot_prec_pep_info['n.Precursors'] >= min_prec_count) & (prot_prec_pep_info['n.Peptides'] >= min_pep_count)
+    prots_accept_2 = prot_prec_pep_info['Protein.Group'][accepted]
+    prot_quantity_table_2nd_f = prot_quantity_table_1st_f.filter(pl.col('Protein.Group').is_in(prots_accept_2))
+    
+    return prot_quantity_table_1st_f, prot_quantity_table_2nd_f
 
 
 ############################ summarization methods  ###########################

@@ -73,7 +73,7 @@ class Arguments:
     # Protein quantification
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
-    min_1hitw_quality: float = 0.5
+    min_1hitw_quality: float = 0.35
     min_prec_count: int = 2
     min_pep_count: int = 1
     fastas: List[str] = field(default_factory=list)
@@ -83,7 +83,7 @@ class Arguments:
     predict_rt_im: int = 1
     min_runs_model: int = 0
     min_runs_cal: int = 0
-    max_qvalue_cal: float = 0.0001
+    max_qvalue_cal: float = 0.005
     max_mass_cal: int = 5000
     
     # timsTOF data preprocessing (hidden from users)

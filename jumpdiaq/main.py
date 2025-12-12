@@ -72,7 +72,8 @@ def main():
                                                 calculate_protein_coverage)
     from jumpdiaq.summarization import (quantify_precursors, 
                                         quantify_proteins, 
-                                        norm_dataframe)
+                                        norm_dataframe, 
+                                        filter_one_hit_wonder)
 
     # Input files
     MSFiles = args.ms_files
@@ -198,35 +199,23 @@ def main():
     prot_name_cols = ['Protein.Group', 'Protein.Names', 'Genes']
     remaining_cols = [col for col in prot_quantity_table.columns if col not in prot_name_cols]
     prot_quantity_table = prot_quantity_table.select(prot_name_cols + remaining_cols)
-    
-    # save file
-    prot_quantity_table.write_csv(out_pub_dir / "protein.group_quantity_matrix_all.csv")
-    prot_quality_table.write_csv(out_pub_dir / "protein.group_quality_matrix.csv")
-    
-    # For one-hit wonder (protein with one precursor), filter based on quality
-    prot_1_prec = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] == 1]
-    prot_2more_precs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] >= 2]
 
-    prot_quality_1prec = prot_quality_table.filter(pl.col('Protein.Group').is_in(prot_1_prec)).to_pandas()
-    prot_quality_1prec['row_median'] = prot_quality_1prec.iloc[:, 3:].median(axis=1)
-    if Min1HitWQuality > 0.0:
-        logging.info(f"Removing low quality (<={Min1HitWQuality}) one-hit wonders (proteins with one precursor)")
-        prot_1_prec_f = prot_quality_1prec['Protein.Group'][prot_quality_1prec['row_median'] >= Min1HitWQuality]
-    else:
-        prot_1_prec_f = prot_quality_1prec['Protein.Group']
+    prot_quantity_table.write_csv(out_pub_dir / "protein.group_quantity_matrix_all.csv")
+    prot_quality_table.write_csv(out_pub_dir / "protein.group_quality_matrix_all.csv")
     
-    prots_accept_1 = pd.concat([prot_2more_precs, prot_1_prec_f])
-    prot_quantity_table_1st_f = prot_quantity_table.filter(pl.col('Protein.Group').is_in(prots_accept_1))
+    # Filter one-hit wonder (protein with one precursor)
+    (prot_quantity_table_1st_f, 
+     prot_quantity_table_2nd_f) = filter_one_hit_wonder(prot_prec_pep_info, 
+                                                        prot_quantity_table, 
+                                                        prot_quality_table, 
+                                                        sample_meta_file, 
+                                                        min_1hitw_quality=Min1HitWQuality, 
+                                                        min_prec_count=MinPrecCount,
+                                                        min_pep_count=MinPepCount)
     prot_quantity_table_1st_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
+    prot_quantity_table_2nd_f.write_csv(out_pub_dir / "protein.group_quantity_matrix_rm1hitw.csv")
     
-    # Further filtering
-    logging.info(f"Filtering proteins based on the number of precursors (>={MinPrecCount}) and peptides (>={MinPepCount})")
-    accepted = (prot_prec_pep_info['n.Precursors'] >= MinPrecCount) & (prot_prec_pep_info['n.Peptides'] >= MinPepCount)
-    prots_accept_2 = prot_prec_pep_info['Protein.Group'][accepted]
-    prot_quantity_table_2nd_f = prot_quantity_table_1st_f.filter(pl.col('Protein.Group').is_in(prots_accept_2))
-    prot_quantity_table_2nd_f.write_csv(out_pub_dir / "protein.group_quantity_matrix_prec_filtering.csv")
-    
-    # Calculate protein coverage (mainly for GUI)
+    # Calculate protein coverage (mainly used for GUI)
     FastaFiles = args.fastas
     if len(FastaFiles):
         try:
