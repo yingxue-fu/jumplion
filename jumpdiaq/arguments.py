@@ -36,14 +36,14 @@ class Arguments:
     ## Mass calibration
     mass_calibration: int = 1    
     mass_cal_acc: float = 30.0   # calibration mass accuracy
-    fix_mass_acc: int = 0
+    fix_mass_acc: int = 1
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0
     individual_mass_acc: int = 0
     ## IM window settings
     im_window_cal: float = 0.03
-    fix_im_window: int = 0
-    im_window: float = 0.01
+    fix_im_window: int = 1
+    im_window: float = 0.012
     individual_im_window: int = 0
     ## Number of precursor and product ions
     max_prec_num: int = 5
