@@ -647,7 +647,7 @@ class Run:
     
         # optimizing mass accuracy for XIC extraction
         if self.acc_ms2_calibrated and not args.fix_mass_acc:
-            logging.info(f"Using XIC extraction mass accuracy calculated by 'Mean + 3*SD + 5': {self.MassAccuracyMS1*1e6}, {self.MassAccuracyMS2*1e6} ppm (MS1, MS2)")
+            logging.info(f"Using XIC extraction mass accuracy calculated by '(Mean + 3*SD) * 2': {self.MassAccuracyMS1*1e6}, {self.MassAccuracyMS2*1e6} ppm (MS1, MS2)")
             args.mass_acc_ms1 = self.MassAccuracyMS1 * 1000000.0
             args.mass_acc_ms2 = self.MassAccuracyMS2 * 1000000.0
             
@@ -742,7 +742,7 @@ class Run:
         mean = np.mean(b_r)
         sd = np.std(b_r)
         logging.info(f"Mean and SD of {level.upper()} mass error before calibration: {(mean * 1e6):2f} and {(sd * 1e6):2f} ppm")
-        acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 7) / 1e6
+        acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 * 2) / 1e6
         
         # Step 2: Build calibration model
         correction = build_mass_cali_model(
@@ -772,7 +772,7 @@ class Run:
         mean = np.mean(b_r)
         sd = np.std(b_r)
         logging.info(f"Mean and SD of {level.upper()} mass error after calibration: {(mean * 1e6):2f} and {(sd * 1e6):2f} ppm")
-        acc = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 5) / 1e6
+        acc = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 * 2) / 1e6
         setattr(self, f'MassAccuracy{level.upper()}', acc)
         setattr(self, f'acc_{level}_calibrated', True)
     
