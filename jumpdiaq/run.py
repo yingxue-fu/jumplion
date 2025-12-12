@@ -742,7 +742,7 @@ class Run:
         mean = np.mean(b_r)
         sd = np.std(b_r)
         logging.info(f"Mean and SD of {level.upper()} mass error before calibration: {(mean * 1e6):2f} and {(sd * 1e6):2f} ppm")
-        acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 5) / 1e6
+        acc_no_cal = np.round(max(abs(mean+3*sd), abs(mean-3*sd)) * 1e6 + 7) / 1e6
         
         # Step 2: Build calibration model
         correction = build_mass_cali_model(
@@ -813,7 +813,7 @@ class Run:
         sd = im_cali_data['im_delta'].std()
         logging.info(f"Mean and SD of ion mobility error: {mean:4g} and {sd:5g}")
         im_boundary = max(abs(mean+3*sd), abs(mean-3*sd)) * 2
-        self.IM_window = np.round(im_boundary, 4)
+        self.IM_window = np.round(im_boundary, 3)
 
         if save_cal_info:
             out_cal_dir = out_int_dir / 'mass_calibration'
