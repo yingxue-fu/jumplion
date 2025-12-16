@@ -43,7 +43,7 @@ class Arguments:
     ## IM window settings
     im_window_cal: float = 0.03
     fix_im_window: int = 1
-    im_window: float = 0.012
+    im_window: float = 0.01
     individual_im_window: int = 0
     ## Number of precursor and product ions
     max_prec_num: int = 5
@@ -73,7 +73,7 @@ class Arguments:
     # Protein quantification
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_quality: float = 0.0
-    min_1hitw_quality: float = 0.35
+    min_1hitw_quality: float = 0.5
     min_prec_count: int = 2
     min_pep_count: int = 1
     fastas: List[str] = field(default_factory=list)
@@ -312,11 +312,11 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
             arguments.ms_files.append(file_path)   
         
     if arguments.fix_mass_acc:
-        arguments.individual_mass_acc = False
+        arguments.individual_mass_acc = 0
         print(f"Using fixed mass accuracy for all runs: {arguments.mass_acc_ms1}, {arguments.mass_acc_ms2} ppm (MS1, MS2)")
     
     if arguments.individual_mass_acc:
-        arguments.fix_mass_acc = False
+        arguments.fix_mass_acc = 0
         print("Mass accuracy will be determined for each run individually")
     
     if len(arguments.out_dir):

@@ -1,5 +1,4 @@
 # builtin
-import ast
 from pathlib import Path
 from collections import defaultdict
 # external

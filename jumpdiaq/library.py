@@ -499,7 +499,7 @@ class Info:
         logging.info("Quantifying XICs")
         
         ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrecNum)]
-        ms2_intensity_cols = [f'ms2_intensity_fr{i}' for i in range(MaxProdNum)]
+        ms2_intensity_cols = [f'ms2_intensity_prod{i}' for i in range(MaxProdNum)]
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
         
         data_rows = []
