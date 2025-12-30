@@ -433,7 +433,7 @@ def filter_one_hit_wonder(prot_prec_pep_info,
     # For one-hit wonder (protein with one precursor), filter based on quality
     prot_1_prec = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] == 1]
     prot_2more_precs = prot_prec_pep_info['Protein.Group'][prot_prec_pep_info['n.Precursors'] >= 2]
-    logging.info(f"Found {len(prot_1_prec)} one-hit wonder proteins (i.e., proteins with one precursor)")
+    logging.info(f"Found {len(prot_1_prec)} one-hit wonder proteins (i.e., proteins with only one precursor)")
     
     # first filtering
     prot_quality_1prec = prot_quality_table.filter(pl.col('Protein.Group').is_in(prot_1_prec)).to_pandas()
@@ -450,7 +450,8 @@ def filter_one_hit_wonder(prot_prec_pep_info,
         
     if min_1hitw_quality > 0.0:
         if sample_meta_file:
-            is_high_quality = np.any(prot_quality_1prec[group_mean_cols] >= min_1hitw_quality, axis=1)
+            # require at least 2 group means to meet the quality threshold
+            is_high_quality = np.sum(prot_quality_1prec[group_mean_cols] >= min_1hitw_quality, axis=1) >= 2
             prot_1_prec_f = prot_quality_1prec.loc[is_high_quality, 'Protein.Group']
         else:
             is_high_quality = (prot_quality_1prec['row_mean'] >= min_1hitw_quality)

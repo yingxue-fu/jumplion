@@ -13,6 +13,8 @@ from importlib.metadata import version
 # local
 from jumpdiaq.utils import get_extension, MSFormatsExt
 
+VERSION = version('jumpdiaq')
+
 @dataclass
 class Arguments:
     # Singleton pattern: ensure it has only one instance throughout the program
@@ -30,19 +32,26 @@ class Arguments:
     use_saved_xic: int = 0
     use_xic_quant: int = 0
     
+    # ID results processing
+    min_runs_quant: int = 0
+    min_runs_model: int = 0
+    min_runs_cal: int = 0
+    max_qvalue_cal: float = 0.001
+    max_mass_cal: int = 5000
+    
     # XIC extraction
     ## Number of data points in a XIC
     n_xic_points: int = 21
     ## Mass calibration
     mass_calibration: int = 1    
     mass_cal_acc: float = 30.0   # calibration mass accuracy
-    fix_mass_acc: int = 1
+    fix_mass_acc: int = 0
     mass_acc_ms2: float = 15.0
     mass_acc_ms1: float = 15.0
     individual_mass_acc: int = 0
     ## IM window settings
     im_window_cal: float = 0.03
-    fix_im_window: int = 1
+    fix_im_window: int = 0
     im_window: float = 0.01
     individual_im_window: int = 0
     ## Number of precursor and product ions
@@ -79,12 +88,7 @@ class Arguments:
     fastas: List[str] = field(default_factory=list)
     
     # ID results processing (hidden from users)
-    min_runs_quant: int = 0
     predict_rt_im: int = 1
-    min_runs_model: int = 0
-    min_runs_cal: int = 0
-    max_qvalue_cal: float = 0.005
-    max_mass_cal: int = 5000
     
     # timsTOF data preprocessing (hidden from users)
     tims_centroid: int = 0
@@ -119,11 +123,12 @@ class Arguments:
         
     def generate_file(self, output_path="jumpdiaq.params"):
         with open(output_path, 'w') as f:
+            f.write(f"# JUMPdiaq (v{VERSION}) parameters\n\n")
             f.write("[required]\n")
             f.write("# Input runs: .raw/.mzML files for Thermo instruments or diaPASEF .d files for timsTOF instruments\n")
             f.write("# Leave the 'input_runs = ' row empty when there are multiple files. The same applies to the 'fastas = ' parameter.\n")
             for fdef in fields(self):
-                if fdef.name == "min_runs_quant":
+                if fdef.name == "predict_rt_im":
                     break
                 if fdef.name == "prec_ids":
                     f.write("\n# Precursor-level idetification table\n")
@@ -136,6 +141,8 @@ class Arguments:
                 if fdef.name == "skip_id_processing":
                     f.write("\n\n[optional]\n")
                     f.write("# Use existing results\n")
+                if fdef.name == "min_runs_quant":
+                    f.write("\n# ID results processing\n")
                 if fdef.name == "n_xic_points":
                     f.write("\n# XIC extraction\n")
                 if fdef.name == "optimal_xic_source":
@@ -156,7 +163,6 @@ class Arguments:
         print(f"Parameter file generated to: {Path(output_path).resolve()}")
         
 def create_parser() -> argparse.ArgumentParser:
-    VERSION = version('jumpdiaq')
     parser = argparse.ArgumentParser(
         description=f"JUMPdiaq (v{VERSION})",
         formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=120)
@@ -183,6 +189,13 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--skip-id-processing", type=int, help="")
     optional_group.add_argument("--use-saved-xic", type=int, help="")
     optional_group.add_argument("--use-xic-quant", type=int, help="")
+    
+    # ID results processing
+    optional_group.add_argument("--min-runs-quant", type=int, help="")
+    optional_group.add_argument("--min-runs-model", type=int, help="")
+    optional_group.add_argument("--min-runs-cal", type=int, help="")
+    optional_group.add_argument("--max-qvalue-cal", type=float, help="")
+    optional_group.add_argument("--max-mass-cal", type=int, help="")
     
     # XIC extraction
     optional_group.add_argument("--n-xic-points", type=int, help="")
@@ -231,12 +244,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
     # ID results processing
-    optional_group.add_argument("--min-runs-quant", type=int, help=argparse.SUPPRESS)
     optional_group.add_argument("--predict-rt-im", type=int, help=argparse.SUPPRESS)
-    optional_group.add_argument("--min-runs-model", type=int, help=argparse.SUPPRESS)
-    optional_group.add_argument("--min-runs-cal", type=int, help=argparse.SUPPRESS)
-    optional_group.add_argument("--max-qvalue-cal", type=float, help=argparse.SUPPRESS)
-    optional_group.add_argument("--max-mass-cal", type=int, help=argparse.SUPPRESS)
     
     # timsTOF data preprocessing
     parser.add_argument("--tims-centroid", type=int, help=argparse.SUPPRESS)
