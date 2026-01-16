@@ -309,8 +309,8 @@ def load_quant_table(n_clicks, outdir_path, meta_path):
     
     out_int_dir = Path(outdir_path) / 'intermediate'
     out_pub_dir = Path(outdir_path) / 'publication'
-    quant_csv_path = out_pub_dir / 'protein.group_quantity_matrix.csv'
-    quality_csv_path = out_pub_dir / "protein.group_quality_matrix.csv"
+    quant_csv_path = out_pub_dir / 'protein.group_quantity_matrix_all.csv'
+    quality_csv_path = out_pub_dir / "protein.group_quality_matrix_all.csv"
     prot_pep_info_path = out_int_dir / "prot_prec_pep_info.parquet"
     
     try:

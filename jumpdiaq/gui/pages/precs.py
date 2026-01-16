@@ -184,16 +184,25 @@ def read_precs_data(selected_precursor, outdir_path):
     if not selected_precursor or outdir_path is None:
         return None, None, None, None, None, None, None
     
+    out_pub_dir = Path(outdir_path) / 'publication'
     out_prec_dir = Path(outdir_path) / 'intermediate' / 'prec_quant'
     #
-    prec_quant_file = out_prec_dir / "precursor_quantity_ms1_ms2_summ_table.parquet"
-    prec_quality_file = out_prec_dir / "precursor_quality_ms1_ms2_summ_table.parquet"
+    prec_quant_file = out_pub_dir / "precursor_quantity_summ_table.parquet"
+    prec_quality_file = out_pub_dir / "precursor_quality_summ_table.parquet"
     #
-    ms1_quant_file = out_prec_dir / "Precursor.Id_MS1.XIC.Quant.Adjusted_mapping.parquet"
-    ms1_quality_file = out_prec_dir / "Precursor.Id_MS1.XIC.Corr.Raw_mapping.parquet"
+    ms1_exist = False
+    ms1_quant_file_list = list(out_prec_dir.glob("Precursor.Id_MS1.XIC.Quant.*_mapping.parquet"))
+    if len(ms1_quant_file_list):
+        ms1_exist = True
+        ms1_quant_file = ms1_quant_file_list[0]
+        ms1_quality_file = out_prec_dir / "Precursor.Id_MS1.XIC.Corr.Raw_mapping.parquet"
     #
-    ms2_quant_file = out_prec_dir / "Precursor.Id_MS2.XIC.Quant.Raw_mapping.parquet"
-    ms2_quality_file = out_prec_dir / "Precursor.Id_MS2.XIC.Corr.Raw_mapping.parquet"
+    ms2_exist = False
+    ms2_quant_file_list = list(out_prec_dir.glob("Precursor.Id_MS2.XIC.Quant.*_mapping.parquet"))
+    if len(ms2_quant_file_list):
+        ms2_exist = True
+        ms2_quant_file = ms2_quant_file_list[0]
+        ms2_quality_file = out_prec_dir / "Precursor.Id_MS2.XIC.Corr.Raw_mapping.parquet"
     
     precursor_id = selected_precursor
     title = html.Div([f"     {precursor_id}"])
@@ -201,24 +210,34 @@ def read_precs_data(selected_precursor, outdir_path):
         prec_quant_df = pd.read_parquet(prec_quant_file, filters=[('Precursor.Id', '==', precursor_id)])
         prec_quality_df = pd.read_parquet(prec_quality_file, filters=[('Precursor.Id', '==', precursor_id)])
         
-        ms1_quant_df = pd.read_parquet(ms1_quant_file, filters=[('target_id', '==', precursor_id)])
-        ms1_quant_df = ms1_quant_df[ms1_quant_df['source_quantity'] > 0]
-        ms1_quant_df['source_quantity'] = np.log2(ms1_quant_df['source_quantity'])
-        ms1_quant_df['samples'] = extract_unique_parts(ms1_quant_df['samples'].values.tolist())
+        if ms1_exist:
+            # quantity
+            ms1_quant_df = pd.read_parquet(ms1_quant_file, filters=[('target_id', '==', precursor_id)])
+            ms1_quant_df = ms1_quant_df[ms1_quant_df['source_quantity'] > 0]
+            ms1_quant_df['source_quantity'] = np.log2(ms1_quant_df['source_quantity'])
+            ms1_quant_df['samples'] = extract_unique_parts(ms1_quant_df['samples'].values.tolist())
+            # quality
+            ms1_quality_df = pd.read_parquet(ms1_quality_file, filters=[('target_id', '==', precursor_id)])
+            ms1_quality_df = ms1_quality_df[~(ms1_quality_df['source_quality'] == 0)]
+            ms1_quality_df['samples'] = extract_unique_parts(ms1_quality_df['samples'].values.tolist())
+        else:
+            ms1_quant_df = pd.DataFrame()
+            ms1_quality_df = pd.DataFrame()
         
-        ms1_quality_df = pd.read_parquet(ms1_quality_file, filters=[('target_id', '==', precursor_id)])
-        ms1_quality_df = ms1_quality_df[~(ms1_quality_df['source_quality'] == 0)]
-        ms1_quality_df['samples'] = extract_unique_parts(ms1_quality_df['samples'].values.tolist())
-        
-        ms2_quant_df = pd.read_parquet(ms2_quant_file, filters=[('target_id', '==', precursor_id)])
-        ms2_quant_df = ms2_quant_df[ms2_quant_df['source_quantity'] > 0]
-        ms2_quant_df['source_quantity'] = np.log2(ms2_quant_df['source_quantity'])
-        ms2_quant_df['samples'] = extract_unique_parts(ms2_quant_df['samples'].values.tolist())
-        
-        ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', precursor_id)])
-        ms2_quality_df = ms2_quality_df[~(ms2_quality_df['source_quality'] == 0)]
-        ms2_quality_df['samples'] = extract_unique_parts(ms2_quality_df['samples'].values.tolist())
-        
+        if ms2_exist:
+            # quantity
+            ms2_quant_df = pd.read_parquet(ms2_quant_file, filters=[('target_id', '==', precursor_id)])
+            ms2_quant_df = ms2_quant_df[ms2_quant_df['source_quantity'] > 0]
+            ms2_quant_df['source_quantity'] = np.log2(ms2_quant_df['source_quantity'])
+            ms2_quant_df['samples'] = extract_unique_parts(ms2_quant_df['samples'].values.tolist())
+            # quality
+            ms2_quality_df = pd.read_parquet(ms2_quality_file, filters=[('target_id', '==', precursor_id)])
+            ms2_quality_df = ms2_quality_df[~(ms2_quality_df['source_quality'] == 0)]
+            ms2_quality_df['samples'] = extract_unique_parts(ms2_quality_df['samples'].values.tolist())
+        else:
+            ms2_quant_df = pd.DataFrame()
+            ms2_quality_df = pd.DataFrame()
+                
         return (title, 
                 prec_quant_df.to_dict("records"), 
                 prec_quality_df.to_dict("records"), 

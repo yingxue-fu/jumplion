@@ -71,6 +71,8 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                         sample_meta: pd.DataFrame,
                         sample_column='Sample', 
                         group_column='Group',
+                        topN_rep=3, 
+                        rep_abundance='mean',
                         xic_quality_cutoff=0.0,
                         fill_missing_xic=True,
                         fill_method='global_min',
@@ -135,7 +137,7 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                                                              fill_method,
                                                              fill_factor)
         #
-        quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep=3)
+        quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep, rep_abundance)
         #
         quality_mat_new = quality_mat.copy()
         quality_mat_new[quality_mat == 0.0] = np.nan
@@ -192,6 +194,8 @@ def quantify_from_xic(
         meta_sample_col="Sample",
         meta_group_col="Group",
         out_dir="",
+        topN_rep=3, 
+        rep_abundance='mean',
         xic_quality_cutoff=0.0, 
         fill_missing_xic=True,
         fill_method='local_min',
@@ -222,6 +226,8 @@ def quantify_from_xic(
                                                     sample_meta_df,
                                                     meta_sample_col,
                                                     meta_group_col,
+                                                    topN_rep, 
+                                                    rep_abundance,
                                                     xic_quality_cutoff,
                                                     fill_missing_xic, 
                                                     fill_method,
@@ -267,6 +273,8 @@ def quantify_precursors(xic_quant_file,
                                                     quality_col="MS1.XIC.Corr.Raw",
                                                     annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
                                                     out_dir=out_dir,
+                                                    topN_rep=3,
+                                                    rep_abundance='sum',
                                                     xic_quality_cutoff=xic_quality_cutoff,
                                                     fill_missing_xic=fill_missing_xic, 
                                                     fill_method=fill_method,
@@ -302,6 +310,8 @@ def quantify_precursors(xic_quant_file,
                                                     quality_col="MS2.XIC.Corr.Raw",
                                                     annotation_cols=['Protein.Group', 'Protein.Names', 'Genes'],
                                                     out_dir=out_dir,
+                                                    topN_rep=3,
+                                                    rep_abundance='mean',
                                                     xic_quality_cutoff=xic_quality_cutoff,
                                                     fill_missing_xic=fill_missing_xic, 
                                                     fill_method=fill_method,
@@ -329,8 +339,8 @@ def quantify_precursors(xic_quant_file,
         ms1_ms2_quantity_table = pl.concat([ms1_quantity_table, ms2_quantity_table], how="vertical")
         
         # Save to files
-        ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
-        ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
+        #ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
+        #ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
         
         return ms1_ms2_quantity_table, ms1_ms2_quality_table
 
@@ -372,14 +382,14 @@ def protein_summarize(prec_quantity_table,
         quality_df_sub = quality_df_sub.filter(pl.col(prec_id_col).is_in(prec_ids)).sort(prec_id_col)
         
         # Summarization
-        if len(prec_ids) >= 2:
+        if len(prec_ids) >= 3:
             quantity_mat = quantity_df_sub.select(sample_cols).to_numpy()
             quality_mat = quality_df_sub.select(sample_cols).to_numpy()
             
             quantity_mat = quantity_mat[~np.all(np.isnan(quantity_mat), axis=1)]
             quality_mat = quality_mat[~np.all(np.isnan(quality_mat), axis=1)]
             
-            quantity_summed[i, :] = median_summ(quantity_mat, topN_rep=3)
+            quantity_summed[i, :] = median_summ(quantity_mat, topN_rep=3, rep_abundance='mean')
             quality_summed[i, :] = topN(quality_mat, N=3, method="mean")
         else:
             max_quality_prec = (quality_df_sub.filter(pl.col("Average") == pl.col("Average").max())
@@ -480,7 +490,7 @@ def log2_safe(mat):
     result[mask] = np.log2(mat[mask])
     return result
 
-def median_summ(mat, topN_rep=3):
+def median_summ(mat, topN_rep=3, rep_abundance='mean'):
     """
     Summarize replicate measurements using median after normalization
     
@@ -515,7 +525,11 @@ def median_summ(mat, topN_rep=3):
     
     # Calculate representative abundance from top N replicates
     topN_rep = min(topN_rep, len(valid_means))  # Handle case where fewer valid rows than topN_rep
-    repAbundance = np.mean(sorted(valid_means, reverse=True)[:topN_rep])
+    used_means = sorted(valid_means, reverse=True)[:topN_rep]
+    if rep_abundance == 'mean':
+        repAbundance = np.log2(np.mean(2 ** np.array(used_means)))
+    elif rep_abundance == 'sum':
+        repAbundance = np.log2(np.sum(2 ** np.array(used_means)))
     
     # Center each row by its mean
     mat = mat - rowMeans[:, np.newaxis]

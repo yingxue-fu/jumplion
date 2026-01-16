@@ -1,5 +1,5 @@
 __project__ = "jumpdiaq"
-__version__ = "0.7.5"
+__version__ = "0.7.6"
 __license__ = "Apache"
 __author__ = "Yingxue Fu"
 __github__ = "https://github.com/yingxue-fu/jumpdiaq"
