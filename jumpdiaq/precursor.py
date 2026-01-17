@@ -81,6 +81,10 @@ Modifications = [
 	MOD("Oxi", 15.994915),
 	MOD("+16", 15.994915),
 	MOD("+16.0", 15.994915),
+    MOD("UniMod:1", 42.010565),
+	MOD("Acetyl (Protein N-term)", 42.010565),
+	MOD("+42", 42.010565),
+	MOD("+42.0", 42.010565),
 ]
 
 OriginalModNames = False
