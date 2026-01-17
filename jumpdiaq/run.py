@@ -146,6 +146,7 @@ class RunEntry:
         if self.info.n_prods < min_prod:  # default: at least 3 products
             self.info.products.clear()
             self.info.prodi.clear()
+            self.info.n_prods = 0
     
     def build_index(self):
         window_index = self.run.get_window_index(self.prec.mz)
@@ -668,7 +669,7 @@ class Run:
     
     
     def do_mass_calibration(self, save_cal_info=True):
-        for entry in self.entries:   
+        for entry in progress_bar(self.entries, args.show_progress, args.inter_progress):
             if entry.mass_cal == 1:
                 entry.get_optimal_xic(stage=0, n_xic_points=nXICPoints)
         
