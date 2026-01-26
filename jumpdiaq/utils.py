@@ -249,17 +249,27 @@ def missing_value_imputation(
         sample_column, 
         group_column,
         fill_method='global_min',
-        fill_factor=1.5) -> np.ndarray:
+        fill_factor=1.0) -> np.ndarray:
     """
     Perform missing value imputation on a numpy array.
     For each row and each group, impute missing values with group minimum (across all rows)
-
     Parameters:
     -----------
     data : np.ndarray
         2D numpy array with missing values (NaN)
-    group_indices : List[List[int]]
-        List of lists, where each inner list contains column indices for a group
+    sample_names : array-like
+        Sample names corresponding to columns
+    sample_meta : DataFrame or dict
+        Metadata for samples
+    sample_column : str
+        Column name in sample_meta to match sample_names
+    group_column : str
+        Column name in sample_meta for grouping
+    fill_method : str, optional
+        Method for imputation: 'global_min', 'global_mean', 'local_min', or 'local_mean'
+        Default is 'global_min'
+    fill_factor : float, optional
+        Multiplication factor for fill value. Default is 1.0
         
     Returns:
     --------
@@ -269,22 +279,32 @@ def missing_value_imputation(
     # Create a copy to avoid modifying original data
     imputed_data = data.copy()
     
-    # Calculate global minimum
+    # Calculate global statistics
     global_min = np.nanmin(imputed_data)
+    global_mean = np.nanmean(imputed_data)
+    
     if fill_method == 'global_min':
         imputed_data = np.nan_to_num(imputed_data, nan=fill_factor*global_min)
-    elif fill_method == 'local_min':
+    
+    elif fill_method == 'global_mean':
+        imputed_data = np.nan_to_num(imputed_data, nan=fill_factor*global_mean)
+    
+    elif fill_method in ['local_min', 'local_mean']:
         group_indices = generate_group_indices(sample_names, sample_meta, sample_column, group_column)
-        # Calculate group minimums across all rows
-        group_mins = {}
+        
+        # Calculate group statistics across all rows
+        group_stats = {}
         for group_idx, col_indices in enumerate(group_indices):
             group_data = data[:, col_indices]
             if np.all(np.isnan(group_data)):
                 # Handle case where all values in group are NaN
-                group_mins[group_idx] = global_min 
+                group_stats[group_idx] = global_min 
             else:
-                # Get minimum value across all rows and columns in this group
-                group_mins[group_idx] = np.nanmin(group_data)
+                # Get minimum or mean value across all rows and columns in this group
+                if fill_method == 'local_min':
+                    group_stats[group_idx] = np.nanmin(group_data)
+                else:  # local_mean
+                    group_stats[group_idx] = np.nanmean(group_data)
         
         # Process each row
         for row_idx in range(data.shape[0]):
@@ -296,7 +316,7 @@ def missing_value_imputation(
                 missing_mask = np.isnan(group_values)
                 # Impute if there are missing values
                 if np.any(missing_mask):  
-                    fill_value = group_mins[group_idx]
+                    fill_value = group_stats[group_idx]
                     # Fill missing values
                     for i, col_idx in enumerate(col_indices):
                         if missing_mask[i]:
