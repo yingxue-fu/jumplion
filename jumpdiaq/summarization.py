@@ -74,6 +74,8 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                         topN_rep=3, 
                         rep_abundance='mean',
                         xic_quality_cutoff=0.0,
+                        allowed_xic_missing=0.5,
+                        min_n_xic=2,
                         fill_missing_xic=True,
                         fill_method='global_min',
                         fill_factor=1.5
@@ -123,10 +125,11 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                 missing_mask = quality_mat < xic_quality_cutoff
             missing_mask = missing_mask | (quantity_mat == 0.0)
             quantity_mat_fill[missing_mask] = np.nan
-            # remove rows that contain all NaNs
-            quantity_mat_fill = quantity_mat_fill[~np.all(np.isnan(quantity_mat_fill), axis=1)]
+            # remove rows with x% or more NaNs
+            row_nan_percentage = np.isnan(quantity_mat_fill).sum(axis=1) / quantity_mat_fill.shape[1]
+            quantity_mat_fill = quantity_mat_fill[row_nan_percentage < allowed_xic_missing]
             # fill missing value
-            if quantity_mat_fill.shape[0] == 0:
+            if quantity_mat_fill.shape[0] < min_n_xic:
                 continue
             else:
                 quantity_mat_fill = missing_value_imputation(quantity_mat_fill, 
@@ -197,6 +200,8 @@ def quantify_from_xic(
         topN_rep=3, 
         rep_abundance='mean',
         xic_quality_cutoff=0.0, 
+        allowed_xic_missing=0.5,
+        min_n_xic=2,
         fill_missing_xic=True,
         fill_method='local_min', # or 'local_mean'
         fill_factor=1.5
@@ -210,8 +215,8 @@ def quantify_from_xic(
         sample_meta_df = pd.read_csv(sample_meta_file)
     logging.info(f"ID column: {id_col}, Quantity column: {quantity_col}")
     
-    # 1. extract quantity and quality
-    quantity_df, quality_df = get_quantity_quality_dfs(xic_quant_df, 
+    # 1. extract XIC quantity and quality
+    xic_quantity_df, xic_quality_df = get_quantity_quality_dfs(xic_quant_df, 
                                                        id_col,
                                                        sample_col,
                                                        secondary_id_col,
@@ -220,27 +225,29 @@ def quantify_from_xic(
                                                        save_data=True,
                                                        out_dir=out_dir)
     
-    # 2. summarize
-    quantity_mtx, quality_mtx = precursor_summarize(quantity_df, 
-                                                    quality_df, 
-                                                    sample_meta_df,
-                                                    meta_sample_col,
-                                                    meta_group_col,
-                                                    topN_rep, 
-                                                    rep_abundance,
-                                                    xic_quality_cutoff,
-                                                    fill_missing_xic, 
-                                                    fill_method,
-                                                    fill_factor)
+    # 2. summarize to precursor quantity and quality
+    prec_quantity_mtx, prec_quality_mtx = precursor_summarize(xic_quantity_df, 
+                                                              xic_quality_df, 
+                                                              sample_meta_df,
+                                                              meta_sample_col,
+                                                              meta_group_col,
+                                                              topN_rep, 
+                                                              rep_abundance,
+                                                              xic_quality_cutoff,
+                                                              allowed_xic_missing,
+                                                              min_n_xic,
+                                                              fill_missing_xic, 
+                                                              fill_method,
+                                                              fill_factor)
 
     # 3. add annotation
-    extra_names = extract_annotation(quantity_mtx["Precursor.Id"].to_list(), 
+    extra_names = extract_annotation(prec_quantity_mtx["Precursor.Id"].to_list(), 
                                      xic_quant_df, 
                                      id_col,
                                      annotation_cols)
     
-    final_quantity_table = extra_names.join(quantity_mtx, on=id_col, how="inner")
-    final_quality_table = extra_names.join(quality_mtx, on=id_col, how="inner")  
+    final_quantity_table = extra_names.join(prec_quantity_mtx, on=id_col, how="inner")
+    final_quality_table = extra_names.join(prec_quality_mtx, on=id_col, how="inner")  
     
     return final_quantity_table, final_quality_table
     
@@ -249,6 +256,8 @@ def quantify_precursors(xic_quant_file,
                         use_raw_ms1=False,
                         use_raw_ms2=True,
                         xic_quality_cutoff=0.0, 
+                        allowed_xic_missing=0.5,
+                        min_n_xic=2,
                         fill_missing_xic=True,
                         fill_method='local_min',
                         fill_factor=1.5,
@@ -276,6 +285,8 @@ def quantify_precursors(xic_quant_file,
                                                     topN_rep=3,
                                                     rep_abundance='sum',
                                                     xic_quality_cutoff=xic_quality_cutoff,
+                                                    allowed_xic_missing=allowed_xic_missing,
+                                                    min_n_xic=min_n_xic,
                                                     fill_missing_xic=fill_missing_xic, 
                                                     fill_method=fill_method,
                                                     fill_factor=fill_factor
@@ -313,6 +324,8 @@ def quantify_precursors(xic_quant_file,
                                                     topN_rep=3,
                                                     rep_abundance='mean',
                                                     xic_quality_cutoff=xic_quality_cutoff,
+                                                    allowed_xic_missing=allowed_xic_missing,
+                                                    min_n_xic=min_n_xic,
                                                     fill_missing_xic=fill_missing_xic, 
                                                     fill_method=fill_method,
                                                     fill_factor=fill_factor

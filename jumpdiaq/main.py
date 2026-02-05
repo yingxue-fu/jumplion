@@ -89,6 +89,8 @@ def main():
     UseRawMS1 = args.use_raw_ms1
     UseRawMS2 = args.use_raw_ms2
     XicQualityCutoff = args.xic_quality_cutoff
+    AllowedXicMissing = args.allowed_xic_missing
+    MinNumXic = args.min_n_xic
     FillMissingXic = args.fill_missing_xic
     FillMethod = args.fill_method
     FillFactor = args.fill_factor
@@ -165,6 +167,8 @@ def main():
                                                   use_raw_ms1=UseRawMS1,
                                                   use_raw_ms2=UseRawMS2,
                                                   xic_quality_cutoff=XicQualityCutoff,
+                                                  allowed_xic_missing=AllowedXicMissing,
+                                                  min_n_xic=MinNumXic,
                                                   fill_missing_xic=FillMissingXic,
                                                   fill_method=FillMethod,
                                                   fill_factor=FillFactor,

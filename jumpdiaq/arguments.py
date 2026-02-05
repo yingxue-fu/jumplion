@@ -69,6 +69,8 @@ class Arguments:
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
     xic_quality_cutoff: float = 0.0
+    allowed_xic_missing: float = 0.5
+    min_n_xic: int = 2
     fill_missing_xic: int = 1
     fill_method: str = "local_min"
     fill_factor: float = 0.5
@@ -225,6 +227,8 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
     optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
+    optional_group.add_argument("--allowed-xic-missing", type=float, help="")
+    optional_group.add_argument("--min-n-xic", type=int, help="")
     optional_group.add_argument("--fill-missing-xic", type=int, help="")
     optional_group.add_argument("--fill-method", type=str, help="")
     optional_group.add_argument("--fill-factor", type=float, help="")

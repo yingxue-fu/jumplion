@@ -310,9 +310,7 @@ class Library:
                         "FWHM": qt[1].fwhm,
                         "RT.Apex": qt[1].RT,
                         "RT.Left": qt[1].RT_left,
-                        "RT.Right": qt[1].RT_right,
-                        "n.MS1.XICs": qt[1].n_isotopes,
-                        "n.MS2.XICs": qt[1].n_frs,
+                        "RT.Right": qt[1].RT_right
                     }
 
                     row_data.update({
@@ -378,8 +376,6 @@ class QuantEntry:
     xic_score = None
     optimal_xic: int = 0
     optimal_xic_type: int = 0
-    n_isotopes: int = 0
-    n_frs: int = 0
 
     RT: float = 0.0
     RT_left: float = 0.0
@@ -465,9 +461,6 @@ class Info:
                 qe.xic_score = score_row[ms1_cols+ms2_cols].to_numpy()[0]
                 qe.optimal_xic = int(index_row['ms1_rt'][0])
                 qe.optimal_xic_type = int(index_row['ms2_rt'][0])
-                
-                qe.n_isotopes = int(mz_row['ms1_rt'][0])
-                qe.n_frs = int(mz_row['ms2_rt'][0])
                 
                 qe.ms1 = xic_rows.select(ms1_cols).to_numpy()
                 qe.ms2 = xic_rows.select(ms2_cols).to_numpy()

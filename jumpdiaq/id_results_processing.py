@@ -370,11 +370,15 @@ def convert_ndarray(obj):
 # 
 def get_prec_prot_relation(lib_file, out_dir):
     prec_prot_df = pd.read_parquet(lib_file, columns=['Precursor.Id', 
-                                                        'Protein.Ids', 
-                                                        'Protein.Group',
-                                                        'Protein.Names', 
-                                                        'Genes'])
+                                                      'Protein.Ids', 
+                                                      'Protein.Group',
+                                                      'Protein.Names', 
+                                                      'Genes'])
     prec_prot_df = prec_prot_df.drop_duplicates(ignore_index=True)
+    n_duplicated = prec_prot_df['Precursor.Id'].duplicated().sum()
+    if n_duplicated > 0:
+        logging.info(f"Found cases in which one precursor was assigned to multiple proteins. Total number: {n_duplicated}")
+        prec_prot_df = prec_prot_df.drop_duplicates(subset=['Precursor.Id'], ignore_index=True)
     prec_prot_df.to_csv(Path(out_dir) / "prec_prot_relation.csv", index=False)
     
     return prec_prot_df
