@@ -153,9 +153,11 @@ def main():
                 gc.collect()
 
         ## XIC quantification across runs
-        prec_prot_relation = get_prec_prot_relation(LibFile, str(out_int_dir))
         lib.info.load(lib, MSFiles, str(out_int_dir))
         lib.info.quantify(MSFiles, str(out_int_dir))
+
+        ## Write report
+        prec_prot_relation = get_prec_prot_relation(LibFile, str(out_int_dir))
         lib.report(xic_quant_file, MSFiles, prec_prot_relation)
     
     # Precursor quantification

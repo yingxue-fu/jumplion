@@ -351,10 +351,6 @@ def quantify_precursors(xic_quant_file,
         ms1_ms2_quality_table = pl.concat([ms1_quality_table, ms2_quality_table], how="vertical")
         ms1_ms2_quantity_table = pl.concat([ms1_quantity_table, ms2_quantity_table], how="vertical")
         
-        # Save to files
-        #ms1_ms2_quantity_table.write_parquet(Path(out_dir) / "precursor_quantity_ms1_ms2_summ_table.parquet")
-        #ms1_ms2_quality_table.write_parquet(Path(out_dir) / "precursor_quality_ms1_ms2_summ_table.parquet")
-        
         return ms1_ms2_quantity_table, ms1_ms2_quality_table
 
 
@@ -364,7 +360,8 @@ def protein_summarize(prec_quantity_table,
                       min_prec_quality):
     # filtering based on average quality
     prec_quality_table = prec_quality_table.with_columns(pl.mean_horizontal(sample_cols).alias("Average"))
-    prec_quality_table = prec_quality_table.filter(pl.col("Average") >= min_prec_quality)
+    prec_quality_table = prec_quality_table.filter(
+        (pl.col("Average") >= min_prec_quality) & (pl.col("Average").is_not_nan()))
     
     # Group by protein group for fast lookup
     quantity_groups = prec_quantity_table.partition_by("Protein.Group", as_dict=True)
@@ -412,10 +409,12 @@ def protein_summarize(prec_quantity_table,
         
     quantity_table = pl.DataFrame(quantity_summed, schema=sample_cols)
     quantity_table = quantity_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
+    quantity_table = quantity_table.filter(~pl.all_horizontal(pl.col(quantity_table.columns[:-1]).is_nan()))
     
     quality_table = pl.DataFrame(quality_summed, schema=sample_cols)
     quality_table = quality_table.with_columns(pl.Series(name="Protein.Group", values=prot_ids))
-
+    quality_table = quality_table.filter(~pl.all_horizontal(pl.col(quality_table.columns[:-1]).is_nan()))
+    
     return quantity_table, quality_table
 
 def quantify_proteins(prec_quantity_table, 
