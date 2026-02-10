@@ -602,6 +602,7 @@ def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm
     mat = sub_df.select([
         pl.col(col).log(2).alias(col) for col in value_columns
     ])
+    mat = mat.select(pl.all().fill_nan(None))
     loadBias = get_loading_bias(mat, value_columns, data_type, trim_percentage, trim_percentage)
     medians_df = mat.median().to_pandas().T.reset_index(drop=False)
     medians_df.columns = ['Samples', 'Medians']
