@@ -207,12 +207,13 @@ def get_meta_bruker(bruker_d_folder_name,
     
     meta_data = dict(zip(global_meta_data.Key, global_meta_data.Value))
     ms1_frames_df = frames_df.loc[frames_df['MsMsType'] == 0, :]
-    ms2_frames_df = fragment_frames_df.copy()
     
     # calculate isolation windows
+    fragment_frames_df = fragment_frames_df.merge(frames_df[['Id', 'Time']], how='left', left_on='Frame', right_on='Id')
     fragment_frames_df['quad_low_mz'] = fragment_frames_df['IsolationMz'] - fragment_frames_df['IsolationWidth'] / 2
     fragment_frames_df['quad_high_mz'] = fragment_frames_df['IsolationMz'] + fragment_frames_df['IsolationWidth'] / 2
-    isolation_windows = fragment_frames_df.drop(columns=['Frame']).drop_duplicates(ignore_index=True)
+    ms2_frames_df = fragment_frames_df.copy()
+    isolation_windows = fragment_frames_df.drop(columns=['Frame', 'Id', 'Time']).drop_duplicates(ignore_index=True)
     
     # calculate cycle time
     cycle_times = ms1_frames_df['Time'].diff().reset_index(drop=True)

@@ -3,6 +3,9 @@ import logging
 from typing import Tuple
 # external
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import numba as nb
 from numba.typed import List
 from numba import njit, types
@@ -244,23 +247,182 @@ class timsSpectrum:
                 high = middle
         
         return (np.float32(0.0), np.float32(0.0), np.float32(0.0))
-    
 
-def get_cycle_time(ms_file):
+
+def calculate_cycle_time(df):
+    '''
+    Define cycles based on MS2 window pattern, and calculate cycle time.
+    '''
+    ms2_data = df[df['MS_type'] == 'MS2']
+    
+    # Group all MS2 scans by RT
+    ms2_groups = ms2_data.groupby('RT').agg({
+        'Window_low': lambda x: sorted(x.values),  # Sort windows
+        'Window_high': lambda x: sorted(x.values)
+    }).reset_index()
+    
+    # First window 
+    first_window_low = tuple(ms2_groups.iloc[0]['Window_low'])
+    
+    # Find all occurrences of this pattern
+    ms2_groups['window_pattern'] = ms2_groups['Window_low'].apply(tuple)
+    cycle_matches = ms2_groups[ms2_groups['window_pattern'] == first_window_low]
+    
+    # Calculate cycle times
+    cycle_rts = cycle_matches['RT'].values
+    cycle_time = np.mean(np.diff(cycle_rts[1:]))
+    cycle1_start = df[df['RT'] == cycle_rts[1]].index[0]
+    cycle2_start = df[df['RT'] == cycle_rts[2]].index[0]
+    
+    return cycle_time, cycle1_start, cycle2_start
+
+
+def draw_acquisition_plot(df, cycle_time, cycle1_start, cycle2_start, out_dir, save_fig=False, figsize=(10, 10)):
+    
+    # cycle start
+    if df.loc[cycle1_start-1]['MS_type'] == 'MS1':
+        cycle_start_idx = cycle1_start-1
+    else:
+        cycle_start_idx = cycle1_start
+    # cycle end
+    if df.loc[cycle2_start-1]['MS_type'] == 'MS1':
+        cycle_end_idx = cycle2_start-2
+    else:
+        cycle_end_idx = cycle2_start-1
+
+    one_cycle = df.loc[cycle_start_idx:cycle_end_idx].copy().reset_index(drop=True)
+    
+    ms1_count = len(one_cycle[one_cycle['MS_type'] == 'MS1'])
+    ms2_count = len(one_cycle[one_cycle['MS_type'] == 'MS2'])
+    
+    # Create the plot
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Calculate rectangle boundaries
+    # Each rectangle spans from its RT to the next scan's RT
+    rt_values = one_cycle['RT'].values
+    ms1_indices = one_cycle[one_cycle['MS_type'] == 'MS1'].index
+    ms2_indices = one_cycle[one_cycle['MS_type'] == 'MS2'].index
+
+    ms1_rt_width = np.median(rt_values[ms1_indices+1] - rt_values[ms1_indices])
+    ms2_rt_diffs = rt_values[ms2_indices[:-1]+1] - rt_values[ms2_indices[:-1]]
+    ms2_rt_width = np.median(ms2_rt_diffs[ms2_rt_diffs != 0])
+    
+    # Plot all rectangles
+    for i, (idx, row) in enumerate(one_cycle.iterrows()):
+        height = row['Window_high'] - row['Window_low']
+        
+        if row['MS_type'] == 'MS1':
+            # MS1 scan - blue
+            rect = Rectangle((rt_values[i], row['Window_low']), 
+                             ms1_rt_width, height,
+                             linewidth=1, edgecolor='darkblue', 
+                             facecolor='cornflowerblue', alpha=0.8)
+        else:
+            # MS2 scan - red
+            rect = Rectangle((rt_values[i], row['Window_low']), 
+                             ms2_rt_width, height,
+                             linewidth=0.5, edgecolor='darkred', 
+                             facecolor='salmon', alpha=0.7)
+        
+        ax.add_patch(rect)
+    
+    # Create custom legend
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='cornflowerblue', edgecolor='darkblue', alpha=0.8, label='MS1'),
+        Patch(facecolor='salmon', edgecolor='darkred', alpha=0.8, label='MS2')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.0, -0.2), fontsize=13, frameon=False)
+    
+    # Set axis labels and title
+    ax.set_xlabel('Retention Time', fontsize=13, fontweight='bold')
+    ax.set_ylabel('m/z', fontsize=13, fontweight='bold')
+    ax.set_title('Data Acquisition Cycle', 
+                 fontsize=15, fontweight='bold', pad=10)
+    
+    # Set axis limits
+    rt_min, rt_max = one_cycle['RT'].min(), one_cycle['RT'].max()
+    mz_min = one_cycle['Window_low'].min()
+    mz_max = one_cycle['Window_high'].max()
+    
+    ax.set_xlim(rt_min - cycle_time * 0.05, rt_max + ms2_rt_width + cycle_time * 0.05)
+    ax.set_ylim(mz_min - 50, mz_max + 50)
+    
+    # Add grid
+    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+    
+    # Add text annotation
+    ax.text(0.05, -0.2, 
+            f'Cycle time: {cycle_time*60:.2f} s\nTotal scans: {len(one_cycle)}\nMS1: {ms1_count}, MS2: {ms2_count}', 
+            transform=ax.transAxes, fontsize=13,
+            verticalalignment='top', bbox=dict(boxstyle='round', edgecolor=None, facecolor='white', alpha=0))
+    
+    plt.tight_layout()
+    if save_fig:
+        plt.savefig(out_dir / 'data_acquisition_cycle.png', dpi=300, bbox_inches='tight')
+
+
+def get_cycle_time(ms_file, save_supplements, out_dir):
     if ms_file.endswith('.d'):
-        meta_data, _, _, _ = get_meta_bruker(ms_file, False, False, False)
-        cycle_time = meta_data['cycle_time']
+        (meta_data, 
+         ms1_frames_df, 
+         ms2_frames_df, 
+         isolation_windows) = get_meta_bruker(ms_file, False, False, False)
+        # get ms2 scans
+        ms2_scans = ms2_frames_df.loc[0:1000, ['Time', 
+                                               'quad_low_mz', 
+                                               'quad_high_mz']]
+        ms2_scans.rename(columns={'Time': 'RT', 
+                                  'quad_low_mz': 'Window_low',
+                                  'quad_high_mz': 'Window_high'},
+                         inplace=True)
+        ms2_scans['MS_type'] = 'MS2'
+        # get ms1 scans
+        ms1_scans = pd.DataFrame({'RT': ms1_frames_df.loc[ms1_frames_df['Time'] < ms2_scans['RT'].max(), 'Time']})
+        ms1_scans['Window_low'] = ms2_scans['Window_low'].min()
+        ms1_scans['Window_high'] = ms2_scans['Window_high'].max()
+        ms1_scans['MS_type'] = 'MS1'
+        # combine ms1 and ms2
+        eg1000 = pd.concat([ms1_scans, ms2_scans])
+        eg1000['RT'] = eg1000['RT'] / 60
     elif ms_file.endswith('.raw'):
         rawfile = RawFileReader(ms_file)
         ms1_rts = []
-        for i in range(1, 1000):
+        ms2_rts = []
+        ms2_lows = []
+        ms2_highs = []
+        for i in range(1, 1001):
             if rawfile.GetMSOrderForScanNum(i) == 1:
                 ms1_rts.append(rawfile.RTFromScanNum(i))
-        rt_diffs = np.diff(np.array(ms1_rts))    
-        cycle_time = np.mean(rt_diffs[1:])
+            elif rawfile.GetMSOrderForScanNum(i) == 2:
+                scan_event = rawfile.GetScanEventForScanNum(i)
+                isolation_center = scan_event.GetReaction(0).PrecursorMass
+                isolation_width = scan_event.GetIsolationWidth(0)
+                ms2_rts.append(rawfile.RTFromScanNum(i))
+                ms2_lows.append(float(isolation_center - isolation_width / 2))
+                ms2_highs.append(float(isolation_center + isolation_width / 2))
+        # get ms2 scans
+        ms2_scans = pd.DataFrame({'RT': ms2_rts,
+                                  'Window_low': ms2_lows,
+                                  'Window_high': ms2_highs})
+        ms2_scans['MS_type'] = 'MS2'
+        # get ms1 scans
+        ms1_scans = pd.DataFrame({'RT': ms1_rts})
+        ms1_scans['Window_low'] = ms2_scans['Window_low'].min()
+        ms1_scans['Window_high'] = ms2_scans['Window_high'].max()
+        ms1_scans['MS_type'] = 'MS1'
+        # combine ms1 and ms2
+        eg1000 = pd.concat([ms1_scans, ms2_scans])
     elif ms_file.endswith('.mzML'):
         pass
-
+    
+    eg1000.sort_values('RT', inplace=True, ignore_index=True)
+    cycle_time, cycle1_start, cycle2_start = calculate_cycle_time(eg1000)
+    if save_supplements:
+        eg1000.to_csv(out_dir / "data_acquisition_first1000scans.csv", index=False)
+        draw_acquisition_plot(eg1000, cycle_time, cycle1_start, cycle2_start, save_fig=True, figsize=(4,5), out_dir=out_dir)
+    
     return cycle_time
 
 

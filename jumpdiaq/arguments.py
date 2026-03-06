@@ -73,7 +73,7 @@ class Arguments:
     min_n_xic: int = 2
     fill_missing_xic: int = 1
     fill_method: str = "local_min"
-    fill_factor: float = 0.5
+    local_min_scale: float = 1.0
     
     # Precursor normalization
     normalization: int = 1
@@ -231,7 +231,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--min-n-xic", type=int, help="")
     optional_group.add_argument("--fill-missing-xic", type=int, help="")
     optional_group.add_argument("--fill-method", type=str, help="")
-    optional_group.add_argument("--fill-factor", type=float, help="")
+    optional_group.add_argument("--local-min-scale", type=float, help="")
     
     # Precursor normalization
     optional_group.add_argument("--normalization", type=int, help="")

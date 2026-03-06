@@ -93,7 +93,7 @@ def main():
     MinNumXic = args.min_n_xic
     FillMissingXic = args.fill_missing_xic
     FillMethod = args.fill_method
-    FillFactor = args.fill_factor
+    LocalMinScale = args.local_min_scale
     ## Precursor normalization
     Normalization = args.normalization
     NormSpecies = args.norm_species
@@ -173,7 +173,7 @@ def main():
                                                   min_n_xic=MinNumXic,
                                                   fill_missing_xic=FillMissingXic,
                                                   fill_method=FillMethod,
-                                                  fill_factor=FillFactor,
+                                                  fill_factor=LocalMinScale,
                                                   prec_quant_level=PrecQuantLevel,
                                                   out_dir=str(out_prec_dir))
     prec_quantity_table.write_parquet(out_pub_dir / "precursor_quantity_summ_table.parquet")
