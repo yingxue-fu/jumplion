@@ -116,7 +116,7 @@ layout = html.Div(children=[
                                         'textAlign': 'left', 
                                         'padding': '5px'},
                             style_header={'fontWeight': 'bold'},
-                            page_size=10,
+                            page_size=15,
                         ), width=11, className="mx-auto"),
                     ], style={'margin-top': '15px', 'margin-bottom': '20px'}),
                     ], label_style=tab_label_style)
@@ -482,7 +482,7 @@ def update_run_options(selected_precursor: str, outdir_path: str) -> tuple:
         data_path = out_pub_dir / 'xic_quantification.parquet'
         required_cols = ['File.Name', 'Run', 'Precursor.Id', 'Precursor.Mz', 
                          'RT.Apex', 'RT.Left', 'RT.Right', 'Optimal.XIC', 'Optimal.XIC.Type', 
-                         'n.MS1.XICs', 'n.MS2.XICs', 'MS1.XIC.Info', 'MS2.XIC.Info', 
+                         'MS1.XIC.Info', 'MS2.XIC.Info', 
                          'MS2.XIC.Corr.Raw', 'MS2.XIC.Quant.Raw', 'MS2.XIC.Quant.Adjusted',
                          'MS1.XIC.Corr.Raw', 'MS1.XIC.Quant.Raw', 'MS1.XIC.Quant.Adjusted']
         #selected_precursor = selected_precursor.split("_")[0]
@@ -549,12 +549,10 @@ def update_XIC_plots_table(selected_precursor: str,
             raise ValueError("No data found for selected run")
         
         # Precursor info table
-        prec_info = prec_data[['n.MS1.XICs',
-                                 'MS1.XIC.Info', 
-                                 'MS1.XIC.Corr.Raw', 
-                                 'MS1.XIC.Quant.Raw', 
-                                 'MS1.XIC.Quant.Adjusted']].iloc[0]
-        n_ms1_xics = int(prec_info['n.MS1.XICs'])
+        prec_info = prec_data[['MS1.XIC.Info', 
+                               'MS1.XIC.Corr.Raw', 
+                               'MS1.XIC.Quant.Raw', 
+                               'MS1.XIC.Quant.Adjusted']].iloc[0]
         ms1_xics = prec_info['MS1.XIC.Info'].split(';')
         ms1_xic_names = []
         ms1_xic_mzs = []
@@ -573,12 +571,10 @@ def update_XIC_plots_table(selected_precursor: str,
         })
 
         # Fragment info table
-        frag_info = prec_data[['n.MS2.XICs',
-                                 'MS2.XIC.Info', 
-                                 'MS2.XIC.Corr.Raw', 
-                                 'MS2.XIC.Quant.Raw', 
-                                 'MS2.XIC.Quant.Adjusted']].iloc[0]
-        n_ms2_xics = int(frag_info['n.MS2.XICs'])
+        frag_info = prec_data[['MS2.XIC.Info', 
+                               'MS2.XIC.Corr.Raw', 
+                               'MS2.XIC.Quant.Raw', 
+                               'MS2.XIC.Quant.Adjusted']].iloc[0]
         ms2_xics = frag_info['MS2.XIC.Info'].split(';')
         ms2_xic_names = []
         ms2_xic_mzs = []
@@ -611,7 +607,7 @@ def update_XIC_plots_table(selected_precursor: str,
         
         ms1_traces = []
         ms1_rt = xic_data.loc[xic_mask, 'ms1_rt'].values
-        ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns[0:n_ms1_xics]
+        ms1_intensity_cols = xic_data.filter(like='ms1_intensity').columns
         for i, pr in enumerate(ms1_intensity_cols):
             ms1_intensity = xic_data.loc[xic_mask, pr].values
             ms1_traces.append(go.Scatter(
@@ -625,7 +621,7 @@ def update_XIC_plots_table(selected_precursor: str,
         
         ms2_traces = []
         ms2_rt = xic_data.loc[xic_mask, 'ms2_rt'].values
-        ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns[0:n_ms2_xics]
+        ms2_intensity_cols = xic_data.filter(like='ms2_intensity').columns#[0:n_ms2_xics]
         for i, fr in enumerate(ms2_intensity_cols):
             ms2_intensity = xic_data.loc[xic_mask, fr].values
             ms2_traces.append(go.Scatter(
@@ -638,7 +634,7 @@ def update_XIC_plots_table(selected_precursor: str,
             ))
         
         ms1_i_traces = []
-        ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns[0:n_ms1_xics]
+        ms1_interpol_cols = xic_data.filter(like='ms1_interpol').columns
         for i, pr in enumerate(ms1_interpol_cols):
             ms1_i_intensity = xic_data.loc[xic_mask, pr].values
             ms1_i_traces.append(go.Scatter(
@@ -783,7 +779,7 @@ def update_XIC_plots_table(selected_precursor: str,
             fig_ms1.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top right")
             fig_ms2.add_vline(x=rt, line=dict(color="gray", dash="dash"), annotation_text=rt_marks[i], annotation_position="top right")
 
-        xic_info_df = pd.concat([prec_info_df.iloc[0:n_ms1_xics, :], frag_info_df.iloc[0:n_ms2_xics, :]], axis=0)
+        xic_info_df = pd.concat([prec_info_df, frag_info_df], axis=0)
         xic_score = xic_data.loc[score_mask, ms1_intensity_cols.union(ms2_intensity_cols)].values
         xic_info_df.insert(3, 'XIC Rank Score', np.round(xic_score[0], 2))          
     except Exception as e:

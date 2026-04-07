@@ -65,6 +65,9 @@ sidebar = html.Div(
                 html.Label("Spectral library", style={"font-weight": "bold", "margin-top": "10px"}),
                 dbc.Input(id='speclib-path', type='text', placeholder='Path of a spectral library file', 
                           style={'width': '100%'}, persistence=True),
+                html.Label("Meta file path", style={"font-weight": "bold", "margin-top": "10px"}),
+                dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
+                          style={'width': '100%'}, persistence=True),
                 html.Label("FASTA files", style={"font-weight": "bold", "margin-top": "10px"}),
                 dbc.Input(id='fasta-path', type='text', 
                           placeholder='Path of FASTA files (.fasta, .fas)', 
@@ -289,21 +292,21 @@ sidebar = html.Div(
                             dbc.Col(html.Label("min_1hitw_quality"), width=8),  
                             dbc.Col(dbc.Input(id="min-1hitw-quality", 
                                               type="number", 
-                                              value=0.7, 
+                                              value=0.5, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("min_prec_num"), width=8),  
-                            dbc.Col(dbc.Input(id="min-prec-num", 
+                            dbc.Col(html.Label("min_prec_count"), width=8),  
+                            dbc.Col(dbc.Input(id="min-prec-count", 
                                               type="number", 
                                               value=2, 
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
-                            dbc.Col(html.Label("min_pep_num"), width=8),  
-                            dbc.Col(dbc.Input(id="min-pep-num", 
+                            dbc.Col(html.Label("min_pep_count"), width=8),  
+                            dbc.Col(dbc.Input(id="min-pep-count", 
                                               type="number", 
                                               value=1, 
                                               style={"width": "80px", "height": "20px"}), 
@@ -796,6 +799,7 @@ def update_process_state(log_value, n_intervals, process_state):
     State('selected-msfiles', 'data'),
     State('prec-ids-path', 'value'),
     State('speclib-path', 'value'),
+    State('meta-path', 'value'),
     State('fasta-path', 'value'), 
     State('fasta-selector', 'value'),
     State('outdir-path', 'value'),
@@ -816,8 +820,8 @@ def update_process_state(log_value, n_intervals, process_state):
     State('trim-percentage', 'value'),
     State('prec-quant-level', 'value'),
     State('min-1hitw-quality', 'value'),
-    State('min-prec-num', 'value'),
-    State('min-pep-num', 'value'),
+    State('min-prec-count', 'value'),
+    State('min-pep-count', 'value'),
     prevent_initial_call=True
 )
 def run_jumpdiaq(
@@ -827,6 +831,7 @@ def run_jumpdiaq(
         selected_msfiles,  
         prec_ids,
         speclib,
+        meta_path,
         fasta_path,
         fastas,
         outdir,
@@ -847,8 +852,8 @@ def run_jumpdiaq(
         trim_percentage,
         prec_quant_level,
         min_1hitw_quality,
-        min_prec_num,
-        min_pep_num
+        min_prec_count,
+        min_pep_count
         ):
     if n_clicks_run == 0 or not outdir:
         return no_msfile_open, None, dash.no_update
@@ -877,6 +882,10 @@ def run_jumpdiaq(
     if speclib:
         cmd_args.append("--spec-lib ")
         cmd_args.append(str(Path(speclib)))
+    
+    if meta_path:
+        cmd_args.append("--sample-meta ")
+        cmd_args.append(str(Path(meta_path)))
     
     if fastas and fasta_path:
         cmd_args.append("--fastas")
@@ -946,10 +955,10 @@ def run_jumpdiaq(
     cmd_args.append(prec_quant_level)
     cmd_args.append("--min-1hitw-quality")
     cmd_args.append(str(min_1hitw_quality))
-    cmd_args.append("--min-prec-num")
-    cmd_args.append(str(min_prec_num))
-    cmd_args.append("--min-pep-num") 
-    cmd_args.append(str(min_pep_num))
+    cmd_args.append("--min-prec-count")
+    cmd_args.append(str(min_prec_count))
+    cmd_args.append("--min-pep-count") 
+    cmd_args.append(str(min_pep_count))
     
     #
     cmd_args.append("--show-progress")

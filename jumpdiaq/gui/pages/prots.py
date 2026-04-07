@@ -32,22 +32,19 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(
             [
-                html.Label("Meta file path", style={"font-weight": "bold"}),
-                dbc.Input(id='meta-path', type='text', placeholder='Path of sample meta info', 
-                          style={'width': '100%'}, persistence=True),
                 dbc.Button('Load Quantification Table', 
                            id='load-prot-quant', n_clicks=0, color='info',
                            style={'margin-top': '10px', "textTransform": "none"}),
-                html.Div(id='show-cutoff', style={'marginTop': '10px', 'color': 'green'}),
                 html.Hr(),
-                html.Label("Protein Intensity/CV Distribution", style={"font-weight": "bold"}),
+                html.Label("Options for plots", style={"font-weight": "bold"}),
+                html.Br(),
+                html.Label("Intensity/CV Distribution plot", style={"font-weight": "bold"}),
                 dcc.Dropdown(
                     id='species-options',
-                    #options=[{'label': opt, 'value': opt} for opt in ['HUMAN', 'YEAST', 'ECOLI', 'MOUSE', 'SCHPO']],
                     placeholder="Select a species"
                 ),
                 html.Br(),
-                html.Label("Protein Ratio vs. Intensity", style={"font-weight": "bold"}),
+                html.Label("Ratio vs. Intensity plot", style={"font-weight": "bold"}),
                 dbc.Row([
                     dbc.Col(html.Label("Coefficient of variation <="), width=8),  
                     dbc.Col(html.Div([
@@ -72,12 +69,12 @@ sidebar = html.Div(
                     marks={i: str(i) for i in range(1, 6)}
                 ),
                 html.Br(),
-                html.Label("Protein Summarization", style={"font-weight": "bold", 'marginBottom': '5px'}),
-                dbc.Switch(label='Show raw precursor quantity', id='show-raw', value=False),
+                html.Label("Quantity/Quality Summarization plot", style={"font-weight": "bold", 'marginBottom': '5px'}),
+                dbc.Switch(label='Show raw precursor quantity (before normalization)', id='show-raw', value=False),
                 dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means', value=False),
                 dbc.Switch(label='Show summarized quantity/quality', id='show-summ', value=False),
                 html.Hr(),
-                html.Label("Other options", style={"font-weight": "bold", 'marginBottom': '5px'}),
+                html.Label("Other plot options", style={"font-weight": "bold", 'marginBottom': '5px'}),
                 html.Label("Point Size:", style={'marginTop': '5px'}),
                 dcc.Slider(
                     id='point-size',

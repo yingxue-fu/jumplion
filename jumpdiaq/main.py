@@ -218,8 +218,8 @@ def main():
                                                         min_1hitw_quality=Min1HitWQuality, 
                                                         min_prec_count=MinPrecCount,
                                                         min_pep_count=MinPepCount)
-    prot_quantity_table_1st_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
-    prot_quantity_table_2nd_f.write_csv(out_pub_dir / "protein.group_quantity_matrix_rm1hitw.csv")
+    # prot_quantity_table_1st_f.write_csv(out_pub_dir / "protein.group_quantity_matrix_filter1hitw.csv")
+    prot_quantity_table_2nd_f.write_csv(out_pub_dir / "protein.group_quantity_matrix.csv")
     
     # Calculate protein coverage (mainly used for GUI)
     FastaFiles = args.fastas

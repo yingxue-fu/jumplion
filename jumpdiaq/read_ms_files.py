@@ -363,7 +363,7 @@ def draw_acquisition_plot(df, cycle_time, cycle1_start, cycle2_start, out_dir, s
         plt.savefig(out_dir / 'data_acquisition_cycle.png', dpi=300, bbox_inches='tight')
 
 
-def get_cycle_time(ms_file, save_supplements, out_dir):
+def get_cycle_time(ms_file, save_supplements=True, out_dir=''):
     if ms_file.endswith('.d'):
         (meta_data, 
          ms1_frames_df, 
@@ -415,8 +415,35 @@ def get_cycle_time(ms_file, save_supplements, out_dir):
         # combine ms1 and ms2
         eg1000 = pd.concat([ms1_scans, ms2_scans])
     elif ms_file.endswith('.mzML'):
-        pass
-    
+        mzML = pyteomics.mzml.MzML(ms_file, use_index=True)
+        ms1_rts = []
+        ms2_rts = []
+        ms2_lows = []
+        ms2_highs = []
+        for i in range(0, 1000):
+            sp = mzML[i]
+            rt = np.float32(sp['scanList']['scan'][0]['scan start time'])
+            if sp["ms level"] == 1:
+                ms1_rts.append(rt)
+            elif sp["ms level"] == 2:
+                ms2_rts.append(rt)
+                isolation_center = sp['precursorList']['precursor'][0]['isolationWindow']['isolation window target m/z'].real
+                lower_offset = sp['precursorList']['precursor'][0]['isolationWindow']['isolation window lower offset'].real
+                upper_offset = sp['precursorList']['precursor'][0]['isolationWindow']['isolation window upper offset'].real
+                ms2_lows.append(float(isolation_center - lower_offset))
+                ms2_highs.append(float(isolation_center + upper_offset))
+        # get ms2 scans
+        ms2_scans = pd.DataFrame({'RT': ms2_rts,
+                                  'Window_low': ms2_lows,
+                                  'Window_high': ms2_highs})
+        ms2_scans['MS_type'] = 'MS2'
+        # get ms1 scans
+        ms1_scans = pd.DataFrame({'RT': ms1_rts})
+        ms1_scans['Window_low'] = ms2_scans['Window_low'].min()
+        ms1_scans['Window_high'] = ms2_scans['Window_high'].max()
+        ms1_scans['MS_type'] = 'MS1'
+        # combine ms1 and ms2
+        eg1000 = pd.concat([ms1_scans, ms2_scans])
     eg1000.sort_values('RT', inplace=True, ignore_index=True)
     cycle_time, cycle1_start, cycle2_start = calculate_cycle_time(eg1000)
     if save_supplements:

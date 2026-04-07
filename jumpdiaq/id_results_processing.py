@@ -177,7 +177,7 @@ def process_id_results(id_file,
     #########################################
     logging.info("Determining the number of data points to extract for an XIC")
     # 
-    cycle_time = get_cycle_time(ms_files[0])
+    cycle_time = get_cycle_time(ms_files[0], out_dir=out_int_dir)
     logging.info(f"Cycle time: {cycle_time} ({(cycle_time*60):3g} seconds)") 
     average_model_acc = np.mean(model_accs)
     average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))

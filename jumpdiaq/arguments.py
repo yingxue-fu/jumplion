@@ -68,12 +68,8 @@ class Arguments:
     # Precursor quantification
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
-    xic_quality_cutoff: float = 0.0
-    allowed_xic_missing: float = 0.5
-    min_n_xic: int = 2
-    fill_missing_xic: int = 1
-    fill_method: str = "local_min"
-    local_min_scale: float = 1.0
+    lion_inference: int = 1
+    lion_value_scale: float = 1.0
     
     # Precursor normalization
     normalization: int = 1
@@ -83,20 +79,26 @@ class Arguments:
     
     # Protein quantification
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
-    min_prec_quality: float = 0.0
-    min_1hitw_quality: float = 0.5
     min_prec_count: int = 2
     min_pep_count: int = 1
     fastas: List[str] = field(default_factory=list)
     
-    # ID results processing (hidden from users)
+    # Hidden parameters
+    ## ID results processing (hidden from users)
     predict_rt_im: int = 1
-    
-    # timsTOF data preprocessing (hidden from users)
+    ## timsTOF data preprocessing (hidden from users)
     tims_centroid: int = 0
     weighted_centroid: int = 1
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
+    ## Precursor quantification (hidden from users)
+    lion_value: str = "local_min"
+    xic_quality_cutoff: float = 0.0
+    allowed_xic_missing: float = 0.5
+    min_n_xic: int = 2
+    ## Protein quantification (hidden from users)
+    min_prec_quality: float = 0.0
+    min_1hitw_quality: float = 0.5
     
     # Other hidden parameters
     gen_params: str = ""
@@ -123,9 +125,9 @@ class Arguments:
             return
         self._initialized = True
         
-    def generate_file(self, output_path="jumpdiaq.params"):
+    def generate_file(self, output_path="jumplion.params"):
         with open(output_path, 'w') as f:
-            f.write(f"# JUMPdiaq (v{VERSION}) parameters\n\n")
+            f.write(f"# JUMPlion (v{VERSION}) parameters\n\n")
             f.write("[required]\n")
             f.write("# Input runs: .raw/.mzML files for Thermo instruments or diaPASEF .d files for timsTOF instruments\n")
             f.write("# Leave the 'input_runs = ' row empty when there are multiple files. The same applies to the 'fastas = ' parameter.\n")
@@ -166,14 +168,14 @@ class Arguments:
         
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=f"JUMPdiaq (v{VERSION})",
+        description=f"JUMPlion (v{VERSION})",
         formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=50, width=120)
     )
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     
     # Add positional argument for params file
     parser.add_argument("param_file", type=str, nargs='?', help="use a parameter file (.params)")
-    parser.add_argument("--gen-params", type=str, nargs='?', const="jumpdiaq.params", metavar="PARAM_FILE",
+    parser.add_argument("--gen-params", type=str, nargs='?', const="jumplion.params", metavar="PARAM_FILE",
                         help="generate a parameter file with default values (default: %(const)s)")
     
     # Create argument groups   
@@ -226,12 +228,8 @@ def create_parser() -> argparse.ArgumentParser:
     # Precursor quantification
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
-    optional_group.add_argument("--xic-quality-cutoff", type=float, help="")
-    optional_group.add_argument("--allowed-xic-missing", type=float, help="")
-    optional_group.add_argument("--min-n-xic", type=int, help="")
-    optional_group.add_argument("--fill-missing-xic", type=int, help="")
-    optional_group.add_argument("--fill-method", type=str, help="")
-    optional_group.add_argument("--local-min-scale", type=float, help="")
+    optional_group.add_argument("--lion-inference", type=int, help="")
+    optional_group.add_argument("--lion-value-scale", type=float, help="")
     
     # Precursor normalization
     optional_group.add_argument("--normalization", type=int, help="")
@@ -241,27 +239,33 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Protein quantification
     optional_group.add_argument("--prec-quant-level", type=str, help="")
-    optional_group.add_argument("--min-prec-quality", type=float, help="")
-    optional_group.add_argument("--min-1hitw-quality", type=float, help="")
     optional_group.add_argument("--min-prec-count", type=int, help="")
     optional_group.add_argument("--min-pep-count", type=int, help="")
     optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
-    # ID results processing
+    # Hidden parameters
+    ## ID results processing
     optional_group.add_argument("--predict-rt-im", type=int, help=argparse.SUPPRESS)
-    
-    # timsTOF data preprocessing
+    ## timsTOF data preprocessing
     parser.add_argument("--tims-centroid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--weighted-centroid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--mass-acc-centroid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--im-window-centroid", type=float, help=argparse.SUPPRESS)
+    ## Precursor quantification
+    optional_group.add_argument("--xic-quality-cutoff", type=float, help=argparse.SUPPRESS)
+    optional_group.add_argument("--allowed-xic-missing", type=float, help=argparse.SUPPRESS)
+    optional_group.add_argument("--min-n-xic", type=int, help=argparse.SUPPRESS)
+    optional_group.add_argument("--lion-value", type=str, help=argparse.SUPPRESS)
+    ## Protein quantification
+    optional_group.add_argument("--min-prec-quality", type=float, help=argparse.SUPPRESS)
+    optional_group.add_argument("--min-1hitw-quality", type=float, help=argparse.SUPPRESS)
     
     # Other hidden parameters
-    # Config file
+    ## Config file
     parser.add_argument("--config-file", type=str, help=argparse.SUPPRESS)
-    # Whether to save additional supplementary files
+    ## Whether to save additional supplementary files
     parser.add_argument("--save-supplements", type=int, help=argparse.SUPPRESS)
-    # Progress bar dispaly
+    ## Progress bar dispaly
     parser.add_argument("--show-progress", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--inter-progress", type=int, help=argparse.SUPPRESS)
     
@@ -303,7 +307,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
             config_args = parse_config_file(first_pass_args.config_file)
             args = config_args
     
-    command = 'jumpdiaq ' + ' '.join(args)
+    command = 'jumplion ' + ' '.join(args)
     parsed_args = parser.parse_args(args)
     
     # Update arguments from parsed arguments
@@ -417,7 +421,7 @@ def params_to_args(param_file):
     parser = create_parser()
     default_args = parser.parse_args([])
     
-    # param_file = "jumpdiaq.params"
+    # param_file = "jumplion.params"
     cleaned_params = preprocess_params(param_file)
     config = configparser.ConfigParser()
     config.read_string(cleaned_params)
@@ -467,7 +471,7 @@ def setup_logger(show_log_level, out_dir):
 
     # Create handlers
     console_handler = logging.StreamHandler()
-    log_file_name = "jumpdiaq_log_" + time.strftime("%Y%m%d_%H%M%S") + ".txt"
+    log_file_name = "jumplion_log_" + time.strftime("%Y%m%d_%H%M%S") + ".txt"
     file_handler = logging.FileHandler(Path(out_dir) / log_file_name, mode="w", encoding="utf-8")  # Overwrite mode
     
     # Set levels and formats

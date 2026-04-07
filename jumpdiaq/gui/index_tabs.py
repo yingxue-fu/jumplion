@@ -15,7 +15,7 @@ sidebar = html.Div(
         html.Div([
             html.Div([
                 html.Img(src="/assets/logo.png", style={"width": "3rem"}),
-                html.H5("JUMPdiaq", style={'color': '#40484E', 'margin-top': '10px'}),
+                html.H5("JUMPlion", style={'color': '#40484E', 'margin-top': '10px'}),
             ], className='image_title')
         ], className="sidebar-header"),
         html.Hr(),
@@ -112,7 +112,7 @@ def switch_tabs(n1, n2, n3, n4, n5, read_click, start_click, start_click_manual,
 
 
 def main():
-    logging.info(f"JUMPdiaq-GUI (v{version('jumpdiaq')})\n")
+    logging.info(f"JUMPlion-GUI (v{version('jumpdiaq')})\n")
     local_ip = get_local_ip()
     app.run(host=local_ip, port=8050, debug=True)
     
