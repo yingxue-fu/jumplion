@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numba import types, typed, njit
 # local
-from jumpdiaq.utils import proton, OH, fTypeB, fTypeY, Loss, loss_none, loss_N
+from jumplion.utils import proton, OH, fTypeB, fTypeY, Loss, loss_none, loss_N
 
 #
 GeneratorAccuracy = 5.0  # generator mass accuracy

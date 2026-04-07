@@ -10,8 +10,8 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html, Input, Output, State, dash_table#, callback_context
 from dash_bootstrap_templates import load_figure_template
 # local
-from jumpdiaq.utils import extract_unique_parts
-from jumpdiaq.gui.app import app, to_image_config, page_sidebar_style, logger
+from jumplion.utils import extract_unique_parts
+from jumplion.gui.app import app, to_image_config, page_sidebar_style, logger
 
 
 load_figure_template(["vizro", "vizro_dark"])

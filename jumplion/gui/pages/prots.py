@@ -13,9 +13,9 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 # local
-from jumpdiaq.utils import extract_unique_parts
-from jumpdiaq.gui.app import app, to_image_config, page_sidebar_style, logger
-from jumpdiaq.gui.utils import define_species, get_valid_ratios, lfqbench_plot
+from jumplion.utils import extract_unique_parts
+from jumplion.gui.app import app, to_image_config, page_sidebar_style, logger
+from jumplion.gui.utils import define_species, get_valid_ratios, lfqbench_plot
 
 load_figure_template(["vizro", "vizro_dark"])
 colors = {'ALL': '#1F77B4',

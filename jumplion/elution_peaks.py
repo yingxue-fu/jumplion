@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 # local
-from jumpdiaq.utils import E
+from jumplion.utils import E
 
 @njit
 def interpolate_ms1(ms1_rts: np.ndarray,

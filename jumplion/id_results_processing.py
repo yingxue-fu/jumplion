@@ -9,10 +9,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from Bio import SeqIO
 # local
-from jumpdiaq.arguments import Arguments
-from jumpdiaq.read_ms_files import get_cycle_time
-from jumpdiaq.utils import remove_extension, get_extension, get_file_name
-from jumpdiaq.calibration import (refine_spline, calc_spline_vectorized, 
+from jumplion.arguments import Arguments
+from jumplion.read_ms_files import get_cycle_time
+from jumplion.utils import remove_extension, get_extension, get_file_name
+from jumplion.calibration import (refine_spline, calc_spline_vectorized, 
                                   convert_to_arrays, check_model_accuracy, 
                                   spline_fitting_plot)
 

@@ -5,7 +5,7 @@ import pathlib
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 # local
-# from jumpdiaq.gui.app import page_sidebar_style
+# from jumplion.gui.app import page_sidebar_style
 
 page_sidebar_style = {
     "position": "fixed",

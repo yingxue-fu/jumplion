@@ -14,8 +14,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg') 
 # local
-from jumpdiaq.arguments import parse_arguments, setup_logger, close_logger
-from jumpdiaq.utils import remove_extension, get_file_name
+from jumplion.arguments import parse_arguments, setup_logger, close_logger
+from jumplion.utils import remove_extension, get_file_name
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     
     if len(sys.argv) < 2:
-        print("Type 'jumpdiaq -h' to show the help message.")
+        print("Type 'jumplion -h' to show the help message.")
         sys.exit(1)
     
     # os info
@@ -52,7 +52,7 @@ def main():
     
     logger = setup_logger(False, OutDir)
     logger.info("=====================================")
-    logger.info(f"     JUMPdiaq (v{version('jumpdiaq')})")
+    logger.info(f"     JUMPlion (v{version('jumplion')})")
     logger.info(" ")
     logger.info(f"   OS: {system} {release}, {architecture} ")
     logger.info(f"  CPU: {cores} Cores, {threads} Threads")
@@ -62,15 +62,15 @@ def main():
     
     # Copy the parameter file
     if os.path.isfile(sys.argv[1]):
-        shutil.copy(sys.argv[1], Path(OutDir) /'jumpdiaq.params')
+        shutil.copy(sys.argv[1], Path(OutDir) /'jumplion.params')
     
-    from jumpdiaq.library import Library
-    from jumpdiaq.run import Run
-    from jumpdiaq.id_results_processing import (process_id_results, 
+    from jumplion.library import Library
+    from jumplion.run import Run
+    from jumplion.id_results_processing import (process_id_results, 
                                                 get_prec_prot_relation, 
                                                 get_prot_prec_pep_info,
                                                 calculate_protein_coverage)
-    from jumpdiaq.summarization import (quantify_precursors, 
+    from jumplion.summarization import (quantify_precursors, 
                                         quantify_proteins, 
                                         norm_dataframe, 
                                         filter_one_hit_wonder)

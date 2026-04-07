@@ -11,9 +11,9 @@ from typing import List, Optional
 from dataclasses import dataclass, field, fields
 from importlib.metadata import version
 # local
-from jumpdiaq.utils import get_extension, MSFormatsExt
+from jumplion.utils import get_extension, MSFormatsExt
 
-VERSION = version('jumpdiaq')
+VERSION = version('jumplion')
 
 @dataclass
 class Arguments:

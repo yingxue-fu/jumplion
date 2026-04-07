@@ -1,2 +1,2 @@
-recursive-include jumpdiaq/gui/assets *
-recursive-include jumpdiaq/ext *
+recursive-include jumplion/gui/assets *
+recursive-include jumplion/ext *

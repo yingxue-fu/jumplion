@@ -8,21 +8,21 @@ import logging
 import numpy as np
 import polars as pl
 # local
-from jumpdiaq.arguments import Arguments, get_extension
-from jumpdiaq.utils import (CorrRadius, CorrMethod, WeightByShape, WeightByIntensity, 
+from jumplion.arguments import Arguments, get_extension
+from jumplion.utils import (CorrRadius, CorrMethod, WeightByShape, WeightByIntensity, 
                             CorrWeight, ShapeWeight, IntensityWeight, MinShapeScore,
                             MinXicIntensity, MinApexIntensity, MinApexEvidence,
                             MassCalBins, MassCalBinsMax, MassCalScore, C13delta, 
                             fExclude, E, INF, estimate_isotopes, consolidate_by_ms1, #weighted_average_mz,
                             remove_extension, get_file_name, progress_bar)
-from jumpdiaq.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
-from jumpdiaq.calibration import (split_into_rt_bins, 
+from jumplion.read_ms_files import load_thermo_raw, load_mzml, load_timsTOF_d
+from jumplion.calibration import (split_into_rt_bins, 
                                   predicted_mz, 
                                   predicted_mz_parallel, 
                                   build_mass_cali_model, 
                                   mass_calibration_plot, 
                                   im_error_plot)
-from jumpdiaq.elution_peaks import interpolate_ms1, identify_optimal_xic
+from jumplion.elution_peaks import interpolate_ms1, identify_optimal_xic
 
 args = Arguments()
 OutDir = args.out_dir

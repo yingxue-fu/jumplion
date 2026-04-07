@@ -1,5 +1,5 @@
 <p align="center" style="margin-bottom: 0px !important;">
-  <img src="jumpdiaq/gui/assets/logo.png" width="100" height="100">
+  <img src="jumplion/gui/assets/logo.png" width="100" height="100">
 </p>
 <h1 align="center" style="margin-top: -0px; font-size: 20px">JUMPlion</h1>
 

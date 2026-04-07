@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import seaborn as sns
 # local
-from jumpdiaq.utils import E
+from jumplion.utils import E
 
 def split_into_rt_bins(
         sorted_rt_values, 

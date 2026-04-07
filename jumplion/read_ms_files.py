@@ -14,10 +14,10 @@ import pyteomics.mzml
 import timsrust_pyo3
 from timsrust_pyo3 import MSLevel
 # local
-from jumpdiaq.arguments import Arguments
-from jumpdiaq.utils import progress_bar
-from jumpdiaq.ext.alpharaw_thermo import RawFileReader
-from jumpdiaq.ext.alphatims_bruker import get_meta_bruker, get_mobility_mz
+from jumplion.arguments import Arguments
+from jumplion.utils import progress_bar
+from jumplion.ext.alpharaw_thermo import RawFileReader
+from jumplion.ext.alphatims_bruker import get_meta_bruker, get_mobility_mz
 
 args = Arguments()
 ShowProgress = args.show_progress

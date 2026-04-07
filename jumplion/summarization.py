@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 # local
-from jumpdiaq.arguments import Arguments
-from jumpdiaq.utils import progress_bar, extract_unique_parts, missing_value_imputation
+from jumplion.arguments import Arguments
+from jumplion.utils import progress_bar, extract_unique_parts, missing_value_imputation
 
 args = Arguments()
 ShowProgress = args.show_progress

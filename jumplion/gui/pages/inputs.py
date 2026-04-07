@@ -11,7 +11,7 @@ import dash
 from dash import html, dcc, ctx, Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 # local
-from jumpdiaq.gui.app import app, page_sidebar_style, logger
+from jumplion.gui.app import app, page_sidebar_style, logger
 
 
 sidebar = html.Div(
@@ -515,7 +515,7 @@ log_queue = queue.Queue()
 process_running = False
 process_start_time = None
 
-def run_jumpdiaq_process(config_path):
+def run_jumplion_process(config_path):
     global log_queue, current_process, process_running, process_start_time
     
     process_running = True
@@ -523,7 +523,7 @@ def run_jumpdiaq_process(config_path):
     
     # Non-blocking I/O approach
     process = subprocess.Popen(
-        ['jumpdiaq', '--config-file', config_path], 
+        ['jumplion', '--config-file', config_path], 
         stdout=subprocess.PIPE, 
         stderr=subprocess.PIPE, 
         text=True, 
@@ -824,7 +824,7 @@ def update_process_state(log_value, n_intervals, process_state):
     State('min-pep-count', 'value'),
     prevent_initial_call=True
 )
-def run_jumpdiaq(
+def run_jumplion(
         n_clicks_run,
         no_msfile_open,
         msfile_path,
@@ -965,13 +965,13 @@ def run_jumpdiaq(
     cmd_args.append("0")
     
     # Write config to file
-    config_path = os.path.join(outdir, "jumpdiaq_config.txt")
+    config_path = os.path.join(outdir, "jumplion_config.txt")
     with open(config_path, 'w') as f:
         f.write('\n'.join(cmd_args))
     logger.info(f"Config file created at {config_path}")
     
     #
-    run_jumpdiaq_process(config_path)
+    run_jumplion_process(config_path)
     
     return no_msfile_open, outdir, {"auto_scroll": True, "user_scrolled": False}
 

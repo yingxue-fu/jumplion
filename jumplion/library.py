@@ -9,18 +9,18 @@ from collections import defaultdict
 import numpy as np
 import polars as pl
 # local
-from jumpdiaq.arguments import Arguments, get_extension
-from jumpdiaq.precursor import (Precursor, to_eg, to_canonical_with_charge, 
+from jumplion.arguments import Arguments, get_extension
+from jumplion.precursor import (Precursor, to_eg, to_canonical_with_charge, 
                                 pep_name, get_aas, get_sequence_masses, 
                                 peptide_length, Product, annotate_products_charges)
-from jumpdiaq.utils import (progress_bar, remove_extension, location_to_file_name, 
+from jumplion.utils import (progress_bar, remove_extension, location_to_file_name, 
                             get_file_name, MaxLibFrNum, fTypeB, fTypeY, fExclude, 
                             char_of_fType, name_of_loss, loss_none, loss_H2O, 
                             loss_NH3, loss_CO, loss_other, CorrRadius, CorrMethod, 
                             WeightByShape, WeightByIntensity, CorrWeight, 
                             ShapeWeight, IntensityWeight, MinShapeScore,
                             MinApexIntensity, MinApexEvidence)
-from jumpdiaq.elution_peaks import identify_optimal_xic, calculate_quantity
+from jumplion.elution_peaks import identify_optimal_xic, calculate_quantity
 
 args = Arguments()
 MaxPrecNum = args.max_prec_num

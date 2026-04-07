@@ -14,11 +14,11 @@ layout = dbc.Container([
                         html.H4("JUMPlion: ion-level recovery of missing values for DIA proteomics", 
                                 className="card-title"),
                         html.Div([
-                            html.Span(f"Version: {version('jumpdiaq')}", style={"marginRight": "20px"}),
+                            html.Span(f"Version: {version('jumplion')}", style={"marginRight": "20px"}),
                             html.Span([
                                 "Github: ",
-                                html.A("https://github.com/yingxue-fu/jumpdiaq", 
-                                       href="https://github.com/yingxue-fu/jumpdiaq", 
+                                html.A("https://github.com/yingxue-fu/jumplion", 
+                                       href="https://github.com/yingxue-fu/jumplion", 
                                        target="_blank")
                             ])
                         ], style={"display": "flex", "alignItems": "center"}),
