@@ -309,7 +309,7 @@ def modeling_and_prediction(data_dict,
     return mat_pred, model_accs
 
 
-def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""):
+def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir="", figsize=(9, 3)):
     # calculate reference RT deviation range from actual matrix
     ## medians of each row
     mat_stat = calculate_mat_stats(mat)
@@ -321,7 +321,7 @@ def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir=""
     diff_min = np.nanmin(median_diff)
     logging.info(f"Min and max RT differences across runs before RT prediction: {diff_min:.4g}, {diff_max:.4g}")
     
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=figsize, sharey=True)
     ax1.hist(mat_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
     ax1.set_ylabel("Frequency")
     ax1.set_title("Before prediction")

@@ -8,7 +8,7 @@ import pandas as pd
 import polars as pl
 # local
 from jumplion.arguments import Arguments
-from jumplion.utils import progress_bar, extract_unique_parts, missing_value_imputation
+from jumplion.utils import progress_bar, extract_unique_parts, perform_lion_inference
 
 args = Arguments()
 ShowProgress = args.show_progress
@@ -76,9 +76,9 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                         xic_quality_cutoff=0.0,
                         allowed_xic_missing=0.5,
                         min_n_xic=2,
-                        fill_missing_xic=True,
-                        fill_method='global_min',
-                        fill_factor=1.5
+                        use_lion_inference=True,
+                        lion_value_type='global_min',
+                        lion_value_scale=1.5
                         ):
 
     # Pivot input tables
@@ -118,7 +118,7 @@ def precursor_summarize(quantity_df: pl.DataFrame,
         quality_mat = quality_df_sub.select(sample_cols).to_numpy()
         
         quantity_mat_fill = quantity_mat.copy()
-        if fill_missing_xic:
+        if use_lion_inference:
             if xic_quality_cutoff <= 0.0:
                 missing_mask = (quality_mat < xic_quality_cutoff) | (quality_mat == 0.0)
             else:
@@ -128,17 +128,17 @@ def precursor_summarize(quantity_df: pl.DataFrame,
             # remove rows with x% or more NaNs
             row_nan_percentage = np.isnan(quantity_mat_fill).sum(axis=1) / quantity_mat_fill.shape[1]
             quantity_mat_fill = quantity_mat_fill[row_nan_percentage < allowed_xic_missing]
-            # fill missing value
+            # perform LION inference
             if quantity_mat_fill.shape[0] < min_n_xic:
                 continue
             else:
-                quantity_mat_fill = missing_value_imputation(quantity_mat_fill, 
-                                                             sample_cols, 
-                                                             sample_meta,
-                                                             sample_column, 
-                                                             group_column,
-                                                             fill_method,
-                                                             fill_factor)
+                quantity_mat_fill = perform_lion_inference(quantity_mat_fill, 
+                                                           sample_cols, 
+                                                           sample_meta,
+                                                           sample_column, 
+                                                           group_column,
+                                                           lion_value_type,
+                                                           lion_value_scale)
         #
         quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep, rep_abundance)
         #
@@ -202,16 +202,16 @@ def quantify_from_xic(
         xic_quality_cutoff=0.0, 
         allowed_xic_missing=0.5,
         min_n_xic=2,
-        fill_missing_xic=True,
-        fill_method='local_min', # or 'local_mean'
-        fill_factor=1.5
+        use_lion_inference=True,
+        lion_value_type='local_min', # or 'local_mean'
+        lion_value_scale=1.5
     ):
     
     columns = [sample_col, id_col, secondary_id_col, quality_col, quantity_col] + annotation_cols
     xic_quant_df = pl.read_parquet(Path(xic_quant_file), columns=columns)
     sample_meta_df = pd.DataFrame()
-    if fill_missing_xic and fill_method in ['local_mean', 'local_min']:
-        logging.info(f"Reading sample meta info from {sample_meta_file}")
+    if use_lion_inference and lion_value_type in ['local_mean', 'local_min']:
+        # logging.info(f"Reading sample meta info from {sample_meta_file}")
         sample_meta_df = pd.read_csv(sample_meta_file)
     logging.info(f"ID column: {id_col}, Quantity column: {quantity_col}")
     
@@ -226,6 +226,8 @@ def quantify_from_xic(
                                                        out_dir=out_dir)
     
     # 2. summarize to precursor quantity and quality
+    if use_lion_inference:
+        logging.info("Performing ion-level missingness inference using the LION method")
     prec_quantity_mtx, prec_quality_mtx = precursor_summarize(xic_quantity_df, 
                                                               xic_quality_df, 
                                                               sample_meta_df,
@@ -236,9 +238,9 @@ def quantify_from_xic(
                                                               xic_quality_cutoff,
                                                               allowed_xic_missing,
                                                               min_n_xic,
-                                                              fill_missing_xic, 
-                                                              fill_method,
-                                                              fill_factor)
+                                                              use_lion_inference, 
+                                                              lion_value_type,
+                                                              lion_value_scale)
 
     # 3. add annotation
     extra_names = extract_annotation(prec_quantity_mtx["Precursor.Id"].to_list(), 
@@ -258,9 +260,9 @@ def quantify_precursors(xic_quant_file,
                         xic_quality_cutoff=0.0, 
                         allowed_xic_missing=0.5,
                         min_n_xic=2,
-                        fill_missing_xic=True,
-                        fill_method='local_min',
-                        fill_factor=1.5,
+                        use_lion_inference=True,
+                        lion_value_type='local_min',
+                        lion_value_scale=1.5,
                         prec_quant_level='ms2',
                         out_dir=""):
     
@@ -287,9 +289,9 @@ def quantify_precursors(xic_quant_file,
                                                     xic_quality_cutoff=xic_quality_cutoff,
                                                     allowed_xic_missing=allowed_xic_missing,
                                                     min_n_xic=min_n_xic,
-                                                    fill_missing_xic=fill_missing_xic, 
-                                                    fill_method=fill_method,
-                                                    fill_factor=fill_factor
+                                                    use_lion_inference=use_lion_inference, 
+                                                    lion_value_type=lion_value_type,
+                                                    lion_value_scale=lion_value_scale
                                                     )
         ms1_quantity_table = ms1_quantity_table.with_columns(pl.lit('MS1').alias('MS_type'))
         ms1_quality_table = ms1_quality_table.with_columns(pl.lit('MS1').alias('MS_type'))
@@ -301,7 +303,6 @@ def quantify_precursors(xic_quant_file,
         ])
         
         if prec_quant_level == 'ms1':
-            logging.info("Using only MS1-level precursor quantity for further analysis")
             return ms1_quantity_table, ms1_quality_table
         
     if prec_quant_level in ['ms2', 'ms1_ms2']:
@@ -326,9 +327,9 @@ def quantify_precursors(xic_quant_file,
                                                     xic_quality_cutoff=xic_quality_cutoff,
                                                     allowed_xic_missing=allowed_xic_missing,
                                                     min_n_xic=min_n_xic,
-                                                    fill_missing_xic=fill_missing_xic, 
-                                                    fill_method=fill_method,
-                                                    fill_factor=fill_factor
+                                                    use_lion_inference=use_lion_inference, 
+                                                    lion_value_type=lion_value_type,
+                                                    lion_value_scale=lion_value_scale
                                                     )
         ms2_quantity_table = ms2_quantity_table.with_columns(pl.lit('MS2').alias('MS_type'))
         ms2_quality_table = ms2_quality_table.with_columns(pl.lit('MS2').alias('MS_type'))
@@ -340,11 +341,9 @@ def quantify_precursors(xic_quant_file,
         ])
         
         if prec_quant_level == 'ms2':
-            logging.info("Using only MS2-level precursor quantity for further analysis")
             return ms2_quantity_table, ms2_quality_table
         
     if prec_quant_level == 'ms1_ms2':
-        logging.info("Using a hybrid of MS1- and MS2-level quantity for further analysis")
         # Combine MS1 and MS2 quantification
         ms1_quality_table = ms1_quality_table.select(ms2_quality_table.columns)
         ms1_quantity_table = ms1_quantity_table.select(ms2_quantity_table.columns)
@@ -417,10 +416,17 @@ def protein_summarize(prec_quantity_table,
     
     return quantity_table, quality_table
 
-def quantify_proteins(prec_quantity_table, 
+def quantify_proteins(prec_quant_level,
+                      prec_quantity_table, 
                       prec_quality_table,
                       min_prec_quality):
-    logging.info("Quantifying proteins")
+    if prec_quant_level == 'ms1':
+        message = "using only MS1-level precursor quantity"
+    elif prec_quant_level == 'ms2':
+        message = "using only MS2-level precursor quantity"
+    elif prec_quant_level == 'ms1_ms2':
+        message = "using integrated MS1- and MS2-level precursor quantities"
+    logging.info("Quantifying proteins" + message)
     # Extract unique sample column names (excluding primary_id and id)
     other_cols = {'Precursor.Id',
                   'Protein.Group',

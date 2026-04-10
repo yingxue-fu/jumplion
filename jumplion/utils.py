@@ -242,17 +242,17 @@ def generate_group_indices(sample_names: List[str],
     return group_indices
 
 
-def missing_value_imputation(
+def perform_lion_inference(
         data: np.ndarray, 
         sample_names, 
         sample_meta,
         sample_column, 
         group_column,
-        fill_method='global_min',
-        fill_factor=1.0) -> np.ndarray:
+        lion_value_type='global_min',
+        lion_value_scale=1.0) -> np.ndarray:
     """
-    Perform missing value imputation on a numpy array.
-    For each row and each group, impute missing values with group minimum (across all rows)
+    Perform Local Inference of ion-level missingness using Neighborhood estimation (LION).
+    For each ion and each group, impute missing values with local/group minimum/mean.
     Parameters:
     -----------
     data : np.ndarray
@@ -265,10 +265,10 @@ def missing_value_imputation(
         Column name in sample_meta to match sample_names
     group_column : str
         Column name in sample_meta for grouping
-    fill_method : str, optional
+    lion_value_type : str, optional
         Method for imputation: 'global_min', 'global_mean', 'local_min', or 'local_mean'
         Default is 'global_min'
-    fill_factor : float, optional
+    lion_value_scale : float, optional
         Multiplication factor for fill value. Default is 1.0
         
     Returns:
@@ -283,13 +283,13 @@ def missing_value_imputation(
     global_min = np.nanmin(imputed_data)
     global_mean = np.nanmean(imputed_data)
     
-    if fill_method == 'global_min':
-        imputed_data = np.nan_to_num(imputed_data, nan=fill_factor*global_min)
+    if lion_value_type == 'global_min':
+        imputed_data = np.nan_to_num(imputed_data, nan=lion_value_scale*global_min)
     
-    elif fill_method == 'global_mean':
-        imputed_data = np.nan_to_num(imputed_data, nan=fill_factor*global_mean)
+    elif lion_value_type == 'global_mean':
+        imputed_data = np.nan_to_num(imputed_data, nan=lion_value_scale*global_mean)
     
-    elif fill_method in ['local_min', 'local_mean']:
+    elif lion_value_type in ['local_min', 'local_mean']:
         group_indices = generate_group_indices(sample_names, sample_meta, sample_column, group_column)
         
         # Calculate group statistics across all rows
@@ -301,7 +301,7 @@ def missing_value_imputation(
                 group_stats[group_idx] = global_min 
             else:
                 # Get minimum or mean value across all rows and columns in this group
-                if fill_method == 'local_min':
+                if lion_value_type == 'local_min':
                     group_stats[group_idx] = np.nanmin(group_data)
                 else:  # local_mean
                     group_stats[group_idx] = np.nanmean(group_data)
@@ -320,7 +320,7 @@ def missing_value_imputation(
                     # Fill missing values
                     for i, col_idx in enumerate(col_indices):
                         if missing_mask[i]:
-                            imputed_data[row_idx, col_idx] = fill_factor*fill_value
+                            imputed_data[row_idx, col_idx] = lion_value_scale*fill_value
     
     return imputed_data
 

@@ -73,26 +73,28 @@ sidebar = html.Div(
                 dbc.Switch(label='Show raw precursor quantity (before normalization)', id='show-raw', value=False),
                 dbc.Switch(label='Show relative ratio of quantity', id='sub-row-means', value=False),
                 dbc.Switch(label='Show summarized quantity/quality', id='show-summ', value=False),
-                html.Hr(),
-                html.Label("Other plot options", style={"font-weight": "bold", 'marginBottom': '5px'}),
-                html.Label("Point Size:", style={'marginTop': '5px'}),
-                dcc.Slider(
-                    id='point-size',
-                    min=0.1,
-                    max=1.0,
-                    step=0.1,
-                    value=0.5,
-                    marks={i/10: str(i/10) for i in range(1, 11)}
-                ),
-                html.Label("Point Opacity:", style={'marginTop': '5px'}),
-                dcc.Slider(
-                    id='point-opacity',
-                    min=0.1,
-                    max=1.0,
-                    step=0.1,
-                    value=0.2,
-                    marks={i/10: str(i/10) for i in range(1, 11)}
-                ),
+                html.Div([
+                    html.Hr(),
+                    html.Label("Other plot options", style={"font-weight": "bold", 'marginBottom': '5px'}),
+                    html.Label("Point Size:", style={'marginTop': '5px'}),
+                    dcc.Slider(
+                        id='point-size',
+                        min=0.1,
+                        max=1.0,
+                        step=0.1,
+                        value=0.5,
+                        marks={i/10: str(i/10) for i in range(1, 11)}
+                    ),
+                    html.Label("Point Opacity:", style={'marginTop': '5px'}),
+                    dcc.Slider(
+                        id='point-opacity',
+                        min=0.1,
+                        max=1.0,
+                        step=0.1,
+                        value=0.3,
+                        marks={i/10: str(i/10) for i in range(1, 11)}
+                    ),
+                ], style={'display': 'none'})
             ],
             vertical=True,
             pills=True,
@@ -102,13 +104,27 @@ sidebar = html.Div(
     style=page_sidebar_style,
 )
 
+tab_style = {
+    "flex": "1",
+    "textAlign": "center",
+    "display": "flex",
+    "alignItems": "stretch",  # Make inner <a> fill full height
+}
+
 tab_label_style = {
-    "textTransform": "none",  # Prevent all caps
-    "textAlign": "center"
+    "textTransform": "none",
+    "textAlign": "center",
+    "display": "flex",
+    "alignItems": "center",    # Vertically center text within tab
+    "justifyContent": "center",
+    "width": "100%",
+    "margin": "0",
 }
 
 tab_bar_style = {
     "flexWrap": "nowrap",  # Prevent line wrapping
+    "width": "100%",
+    "display": "flex",
 }
 
 layout = html.Div(children=[
@@ -182,19 +198,26 @@ layout = html.Div(children=[
                                 active_tab="tab-1",
                                 children=[
                                     dbc.Tab(label="Intensity Distribution", 
-                                            tab_id="tab-1", label_style=tab_label_style),
+                                            tab_id="tab-1", tab_style=tab_style, 
+                                            label_style=tab_label_style),
                                     dbc.Tab(label="CV Distribution", 
-                                            tab_id="tab-2", label_style=tab_label_style),
-                                    dbc.Tab(label="CV vs. Intensity", 
-                                            tab_id="tab-3", label_style=tab_label_style),
+                                            tab_id="tab-2", tab_style=tab_style, 
+                                            label_style=tab_label_style),
+                                    # dbc.Tab(label="CV vs. Intensity", 
+                                    #         tab_id="tab-3", tab_style=tab_style, 
+                                    #         label_style=tab_label_style),
                                     dbc.Tab(label="Ratio vs. Intensity", 
-                                            tab_id="tab-4", label_style=tab_label_style),
+                                            tab_id="tab-4", tab_style=tab_style, 
+                                            label_style=tab_label_style),
                                     dbc.Tab(label="Quantity Summarization", 
-                                            tab_id="tab-5", label_style=tab_label_style),
+                                            tab_id="tab-5", tab_style=tab_style, 
+                                            label_style=tab_label_style),
                                     dbc.Tab(label="Quality Summarization", 
-                                            tab_id="tab-6", label_style=tab_label_style),
+                                            tab_id="tab-6", tab_style=tab_style, 
+                                            label_style=tab_label_style),
                                     dbc.Tab(label="Coverage Information", 
-                                            tab_id="tab-7", label_style=tab_label_style),
+                                            tab_id="tab-7", tab_style=tab_style, 
+                                            label_style=tab_label_style),
                                 ],
                                 style=tab_bar_style
                             ),
@@ -220,13 +243,13 @@ layout = html.Div(children=[
                                         ],    
                                         id="tab-2-content",
                                     ),
-                                    # Tab 3:
-                                    html.Div(
-                                        [
-                                            dcc.Graph(id="cv-intensity-plot", style={'height': '500px'}),
-                                        ],    
-                                        id="tab-3-content",
-                                    ),
+                                    # # Tab 3:
+                                    # html.Div(
+                                    #     [
+                                    #         dcc.Graph(id="cv-intensity-plot", style={'height': '500px'}),
+                                    #     ],    
+                                    #     id="tab-3-content",
+                                    # ),
                                     # Tab 4:
                                     html.Div(
                                         [
@@ -678,7 +701,7 @@ def update_CV_intensity_plots(data, species_input, point_cex, opacity, meta_data
 @app.callback(
     Output("tab-1-content", "style"),
     Output("tab-2-content", "style"),
-    Output("tab-3-content", "style"),
+    #Output("tab-3-content", "style"),
     Output("tab-4-content", "style"),
     Output("tab-5-content", "style"),
     Output("tab-6-content", "style"),
@@ -688,19 +711,19 @@ def update_CV_intensity_plots(data, species_input, point_cex, opacity, meta_data
 def toggle_tab(tab):
     styles = {"display": "none"}
     if tab == "tab-1":
-        return {}, styles, styles, styles, styles, styles, styles
+        return {}, styles, styles, styles, styles, styles
     elif tab == "tab-2":
-        return styles, {}, styles, styles, styles, styles, styles
-    elif tab == "tab-3":
-        return styles, styles, {}, styles, styles, styles, styles
+        return styles, {}, styles, styles, styles, styles
+    # elif tab == "tab-3":
+    #     return styles, styles, {}, styles, styles, styles, styles
     elif tab == "tab-4":
-        return styles, styles, styles, {}, styles, styles, styles
+        return styles, styles, {}, styles, styles, styles
     elif tab == "tab-5":
-        return styles, styles, styles, styles, {}, styles, styles
+        return styles, styles, styles, {}, styles, styles
     elif tab == "tab-6":
-        return styles, styles, styles, styles, styles, {}, styles
+        return styles, styles, styles, styles, {}, styles
     else:
-        return styles, styles, styles, styles, styles, styles, {}
+        return styles, styles, styles, styles, styles, {}
 
 @app.callback(
     Output('group-A', 'options'),

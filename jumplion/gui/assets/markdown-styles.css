@@ -100,7 +100,7 @@
 }
 
 .markdown-container ul li::before {
-    content: '▶';
+    content: '●';
     color: #3498db;
     font-size: 0.8em;
     position: absolute;
@@ -114,7 +114,7 @@
 
 /* Nested lists */
 .markdown-container ul ul li::before {
-    content: '▸';
+    content: '▴';
     color: #e74c3c;
 }
 

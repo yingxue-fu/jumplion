@@ -342,8 +342,8 @@ def mass_calibration_plot(df, ms_level, bins=100, s=30, run_name="", save_plot=T
     
     # Save figure
     if save_plot:
-        output_file = out_dir / f"{run_name}_{ms_level}_calibration_plot.pdf"
-        fig.savefig(output_file, format='pdf', dpi=300, bbox_inches='tight')
+        output_file = out_dir / f"{run_name}_{ms_level}_calibration_plots.png"
+        fig.savefig(output_file, format='png', dpi=300, bbox_inches='tight')
         plt.close(fig)
     else:
         plt.show()
@@ -427,8 +427,8 @@ def im_error_plot(df, run_name="", bins=100, s=30, save_plot=True, out_dir=""):
     
     if save_plot:
         # Save figure
-        output_file = out_dir / f"{run_name}_im_error_plot.pdf"
-        fig.savefig(output_file, format='pdf', dpi=300, bbox_inches='tight')
+        output_file = out_dir / f"{run_name}_im_error_plots.png"
+        fig.savefig(output_file, format='png', dpi=300, bbox_inches='tight')
         plt.close(fig)
     else:
         plt.show()
@@ -638,7 +638,7 @@ def spline_fitting_plot(
         model,
         out_dir,
         run_name,
-        figsize=(8, 8),
+        figsize=(6, 6),
         save_plot=True
         ):
     
@@ -688,7 +688,7 @@ def spline_fitting_plot(
     plt.tight_layout()
     
     if save_plot:
-        plt.savefig(Path(out_dir) / f'{run_name}_{model}_fitting_plot.pdf')
+        plt.savefig(Path(out_dir) / f'{run_name}_{model}_fitting_plot.png')
         plt.close()
     else:
         plt.show()

@@ -1,5 +1,5 @@
 __project__ = "jumplion"
-__version__ = "0.8.2"
+__version__ = "0.8.5"
 __license__ = "Apache"
 __author__ = "Yingxue Fu"
 __github__ = "https://github.com/yingxue-fu/jumplion"

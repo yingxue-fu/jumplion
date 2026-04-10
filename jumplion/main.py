@@ -91,9 +91,9 @@ def main():
     XicQualityCutoff = args.xic_quality_cutoff
     AllowedXicMissing = args.allowed_xic_missing
     MinNumXic = args.min_n_xic
-    FillMissingXic = args.fill_missing_xic
-    FillMethod = args.fill_method
-    LocalMinScale = args.local_min_scale
+    UseLionInference = args.use_lion_inference
+    LionValueType = args.lion_value_type
+    LionValueScale = args.lion_value_scale
     ## Precursor normalization
     Normalization = args.normalization
     NormSpecies = args.norm_species
@@ -171,9 +171,9 @@ def main():
                                                   xic_quality_cutoff=XicQualityCutoff,
                                                   allowed_xic_missing=AllowedXicMissing,
                                                   min_n_xic=MinNumXic,
-                                                  fill_missing_xic=FillMissingXic,
-                                                  fill_method=FillMethod,
-                                                  fill_factor=LocalMinScale,
+                                                  use_lion_inference=UseLionInference,
+                                                  lion_value_type=LionValueType,
+                                                  lion_value_scale=LionValueScale,
                                                   prec_quant_level=PrecQuantLevel,
                                                   out_dir=str(out_prec_dir))
     prec_quantity_table.write_parquet(out_pub_dir / "precursor_quantity_summ_table.parquet")
@@ -194,7 +194,8 @@ def main():
     prec_quantity_table_norm.write_parquet(out_pub_dir / "precursor_quantity_summ_table_norm.parquet")
     
     # Protein quantification
-    prot_quantity_table, prot_quality_table = quantify_proteins(prec_quantity_table_norm, 
+    prot_quantity_table, prot_quality_table = quantify_proteins(PrecQuantLevel,
+                                                                prec_quantity_table_norm, 
                                                                 prec_quality_table,
                                                                 min_prec_quality=MinPrecQuality)
     # Calculate the number of peptides of a protein

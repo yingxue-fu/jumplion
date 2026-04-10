@@ -237,7 +237,48 @@ sidebar = html.Div(
                                                   inline=True), 
                                     width=4, style={"text-align": "right"}),  
                         ], className="mt-0 mb-1"),
+                        html.P('Precursor quantification', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("use_raw_ms1"), width=8),  
+                            dbc.Col(dbc.Switch(id="use-raw-ms1",
+                                               label="Yes",
+                                               value=False,
+                                               style={"width": "80px", "height": "20px"}),
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("use_raw_ms2"), width=8),  
+                            dbc.Col(dbc.Switch(id="use-raw-ms2",
+                                               label="Yes",
+                                               value=True,
+                                               style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("lion_inference"), width=8),  
+                            dbc.Col(dbc.Checklist(id="use-lion-inference",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["yes"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
+                        dbc.Row([
+                            dbc.Col(html.Label("lion_value_scale"), width=8),  
+                            dbc.Col(dbc.Input(id="lion-value-scale", 
+                                              type="number", 
+                                              value=1.0, 
+                                              style={"width": "80px", "height": "20px"}), 
+                                    width=4),  
+                        ], className="mt-0 mb-1"),
                         html.P('Precursor normalization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        dbc.Row([
+                            dbc.Col(html.Label("normalization"), width=8),  
+                            dbc.Col(dbc.Checklist(id="normalization",
+                                                  options=[{"label": "Enabled", "value": "yes"}],
+                                                  value=["yes"],
+                                                  inline=True), 
+                                    width=4, style={"text-align": "right"}),  
+                        ], className="mt-0 mb-1"),
                         dbc.Row([
                             dbc.Col(html.Label("norm_species"), width=8),  
                             dbc.Col(dbc.Input(id="norm-species", 
@@ -270,7 +311,7 @@ sidebar = html.Div(
                                               style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
-                        html.P('Protein summarization', style={"font-weight": "bold"}, className="mt-1 mb-0"),
+                        html.P('Protein quantification', style={"font-weight": "bold"}, className="mt-1 mb-0"),
                         dbc.Row([
                             dbc.Col(html.Label("prec_quant_level"), width=8),  
                             dbc.Col(dbc.Select(id="prec-quant-level", 
@@ -286,14 +327,6 @@ sidebar = html.Div(
                                                       "paddingLeft": "3px",
                                                       "backgroundPosition": "calc(100% - 2px) center",  # Arrow at very right
                                                       "backgroundSize": "10px"}), 
-                                    width=4),  
-                        ], className="mt-0 mb-1"),
-                        dbc.Row([
-                            dbc.Col(html.Label("min_1hitw_quality"), width=8),  
-                            dbc.Col(dbc.Input(id="min-1hitw-quality", 
-                                              type="number", 
-                                              value=0.5, 
-                                              style={"width": "80px", "height": "20px"}), 
                                     width=4),  
                         ], className="mt-0 mb-1"),
                         dbc.Row([
@@ -815,11 +848,15 @@ def update_process_state(log_value, n_intervals, process_state):
     State('mass-acc-ms1', 'value'),
     State('optimal-xic-source', 'value'),
     State('intf-removal', 'value'),
+    State('use-raw-ms1', 'value'),
+    State('use-raw-ms2', 'value'),
+    State('use-lion-inference', 'value'),
+    State('lion-value-scale', 'value'),
+    State('normalization', 'value'),
     State('norm-species', 'value'),
     State('norm-method', 'value'),
     State('trim-percentage', 'value'),
     State('prec-quant-level', 'value'),
-    State('min-1hitw-quality', 'value'),
     State('min-prec-count', 'value'),
     State('min-pep-count', 'value'),
     prevent_initial_call=True
@@ -847,11 +884,15 @@ def run_jumplion(
         mass_acc_ms1,
         optimal_xic_source,
         intf_removal,
+        use_raw_ms1,
+        use_raw_ms2,
+        use_lion_inference,
+        lion_value_scale,
+        normalization,
         norm_species,
         norm_method,
         trim_percentage,
         prec_quant_level,
-        min_1hitw_quality,
         min_prec_count,
         min_pep_count
         ):
@@ -916,6 +957,7 @@ def run_jumplion(
         cmd_args.append("--use-xic-quant")
         cmd_args.append("1")
     
+    #
     cmd_args.append("--min-runs-quant")
     cmd_args.append(str(min_runs_quant))
     cmd_args.append("--min-runs-model")
@@ -923,10 +965,10 @@ def run_jumplion(
     cmd_args.append("--min-runs-cal")
     cmd_args.append(str(min_runs_cal))
     
+    #
     if 'yes' not in mass_calibration:
         cmd_args.append("--mass-calibration")
         cmd_args.append("0")
-        
     if 'yes' in fix_mass_acc:
         cmd_args.append("--fix-mass-acc")
         cmd_args.append("1")
@@ -934,15 +976,27 @@ def run_jumplion(
         cmd_args.append(str(mass_acc_ms2))
         cmd_args.append("--mass-acc-ms1")
         cmd_args.append(str(mass_acc_ms1))
-        
     cmd_args.append("--optimal-xic-source")
     cmd_args.append(optimal_xic_source)
-    
-    # Add interference removal option
     if 'yes' not in intf_removal:
         cmd_args.append("--intf-removal") 
         cmd_args.append("0")
     
+    #
+    cmd_args.append("--use-raw-ms1")
+    cmd_args.append(str(int(use_raw_ms1)))
+    cmd_args.append("--use-raw-ms2")
+    cmd_args.append(str(int(use_raw_ms2)))
+    if 'yes' not in use_lion_inference:
+        cmd_args.append("--use-lion-inference") 
+        cmd_args.append("0")
+    cmd_args.append("--lion-value-scale") 
+    cmd_args.append(str(lion_value_scale))
+    
+    #
+    if 'yes' not in normalization:
+        cmd_args.append("--normalization") 
+        cmd_args.append("0")
     cmd_args.append("--norm-species")
     cmd_args.append(norm_species)
     cmd_args.append("--norm-method")
@@ -953,8 +1007,6 @@ def run_jumplion(
     # 
     cmd_args.append("--prec-quant-level")
     cmd_args.append(prec_quant_level)
-    cmd_args.append("--min-1hitw-quality")
-    cmd_args.append(str(min_1hitw_quality))
     cmd_args.append("--min-prec-count")
     cmd_args.append(str(min_prec_count))
     cmd_args.append("--min-pep-count") 

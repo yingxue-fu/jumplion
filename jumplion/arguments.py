@@ -68,7 +68,7 @@ class Arguments:
     # Precursor quantification
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
-    lion_inference: int = 1
+    use_lion_inference: int = 1
     lion_value_scale: float = 1.0
     
     # Precursor normalization
@@ -92,7 +92,7 @@ class Arguments:
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
     ## Precursor quantification (hidden from users)
-    lion_value: str = "local_min"
+    lion_value_type: str = "local_min"
     xic_quality_cutoff: float = 0.0
     allowed_xic_missing: float = 0.5
     min_n_xic: int = 2
@@ -228,7 +228,7 @@ def create_parser() -> argparse.ArgumentParser:
     # Precursor quantification
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
-    optional_group.add_argument("--lion-inference", type=int, help="")
+    optional_group.add_argument("--use-lion-inference", type=int, help="")
     optional_group.add_argument("--lion-value-scale", type=float, help="")
     
     # Precursor normalization
@@ -255,7 +255,7 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--xic-quality-cutoff", type=float, help=argparse.SUPPRESS)
     optional_group.add_argument("--allowed-xic-missing", type=float, help=argparse.SUPPRESS)
     optional_group.add_argument("--min-n-xic", type=int, help=argparse.SUPPRESS)
-    optional_group.add_argument("--lion-value", type=str, help=argparse.SUPPRESS)
+    optional_group.add_argument("--lion-value-type", type=str, help=argparse.SUPPRESS)
     ## Protein quantification
     optional_group.add_argument("--min-prec-quality", type=float, help=argparse.SUPPRESS)
     optional_group.add_argument("--min-1hitw-quality", type=float, help=argparse.SUPPRESS)

@@ -273,8 +273,7 @@ def update_summ_plot(sub_row_means_xic,
                      ms2_quant_data, 
                      ms2_quality_data,
                      meta):
-    #ctx = callback_context
-    if not prec_quant_data or not ms1_quant_data: # not ctx.triggered or
+    if not prec_quant_data:# or not ms1_quant_data or not ms2_quant_data: 
         return (go.Figure(layout=dict(title="Select a precursor to visualize its quantification data")),
                 go.Figure(layout=dict(title="Select a precursor to visualize its quality data")))
     
@@ -294,7 +293,6 @@ def update_summ_plot(sub_row_means_xic,
         # Retrieve selected row data
         ms1_quant_df = pd.DataFrame(ms1_quant_data)
         ms1_quality_df = pd.DataFrame(ms1_quality_data)
-        
         ms2_quant_df = pd.DataFrame(ms2_quant_data)
         ms2_quality_df = pd.DataFrame(ms2_quality_data)
         
@@ -322,72 +320,76 @@ def update_summ_plot(sub_row_means_xic,
         # Plot each tract as a connected scatter plot
         meta_samples = extract_unique_parts(meta_samples)
         
-        ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quantity', meta_samples)
-        for tract_id, group in ms1_quant_df.groupby("source_id"):
-            x=group["X"]
-            if sub_row_means_xic:
-                y=group["Y"]-np.nanmean(group["Y"].to_numpy())
-                opacity=0.7
-            else:
-                y=group["Y"]
-                opacity=1.0
-                
-            quant_fig.add_trace(go.Scatter(
-                x=x, 
-                y=y, 
-                mode="lines+markers",
-                name="MS1 XICs" if show_summ_value else tract_id,
-                line=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
-                marker=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
-                showlegend=not show_summ_value,
-                opacity=opacity
-            ))
-
-        ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quantity', meta_samples)
-        for i, (tract_id, group) in enumerate(ms2_quant_df.groupby("source_id")):
-            x=group["X"]
-            if sub_row_means_xic:
-                y=group["Y"]-np.nanmean(group["Y"].to_numpy())
-                opacity=0.7
-            else:
-                y=group["Y"]
-                opacity=1.0
-                
-            quant_fig.add_trace(go.Scatter(
-                x=x, 
-                y=y, 
-                mode="lines+markers",
-                name="MS2 XICs" if show_summ_value else tract_id,
-                line=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
-                marker=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
-                showlegend=not show_summ_value,
-                opacity=opacity
-            ))
+        # 
+        if not ms1_quant_df.empty:
+            ms1_quant_df = pivot_order_melt(ms1_quant_df, 'quantity', meta_samples)
+            for tract_id, group in ms1_quant_df.groupby("source_id"):
+                x=group["X"]
+                if sub_row_means_xic:
+                    y=group["Y"]-np.nanmean(group["Y"].to_numpy())
+                    opacity=0.7
+                else:
+                    y=group["Y"]
+                    opacity=1.0
+                quant_fig.add_trace(go.Scatter(
+                    x=x, 
+                    y=y, 
+                    mode="lines+markers",
+                    name="MS1 XICs" if show_summ_value else tract_id,
+                    line=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
+                    marker=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
+                    showlegend=not show_summ_value,
+                    opacity=opacity
+                ))
         
-        ms1_quality_df = pivot_order_melt(ms1_quality_df, 'quality', meta_samples)
-        for tract_id, group in ms1_quality_df.groupby("source_id"):
-            quality_fig.add_trace(go.Scatter(
-                x=group["X"], 
-                y=group["Y"], 
-                mode="lines+markers",
-                name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
-                marker=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
-                showlegend=not show_summ_value,
-                opacity=0.7 if show_summ_value else 1.0
-            ))
-        ms2_quality_df = pivot_order_melt(ms2_quality_df, 'quality', meta_samples)
-        for i, (tract_id, group) in enumerate(ms2_quality_df.groupby("source_id")):
-            quality_fig.add_trace(go.Scatter(
-                x=group["X"], 
-                y=group["Y"], 
-                mode="lines+markers",
-                name="Precursors" if show_summ_value else tract_id,
-                line=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
-                marker=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
-                showlegend=not show_summ_value,
-                opacity=0.7 if show_summ_value else 1.0
-            ))
+        if not ms2_quant_df.empty:
+            ms2_quant_df = pivot_order_melt(ms2_quant_df, 'quantity', meta_samples)
+            for i, (tract_id, group) in enumerate(ms2_quant_df.groupby("source_id")):
+                x=group["X"]
+                if sub_row_means_xic:
+                    y=group["Y"]-np.nanmean(group["Y"].to_numpy())
+                    opacity=0.7
+                else:
+                    y=group["Y"]
+                    opacity=1.0
+                quant_fig.add_trace(go.Scatter(
+                    x=x, 
+                    y=y, 
+                    mode="lines+markers",
+                    name="MS2 XICs" if show_summ_value else tract_id,
+                    line=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
+                    marker=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
+                    showlegend=not show_summ_value,
+                    opacity=opacity
+                ))
+        
+        if not ms1_quality_df.empty:
+            ms1_quality_df = pivot_order_melt(ms1_quality_df, 'quality', meta_samples)
+            for tract_id, group in ms1_quality_df.groupby("source_id"):
+                quality_fig.add_trace(go.Scatter(
+                    x=group["X"], 
+                    y=group["Y"], 
+                    mode="lines+markers",
+                    name="Precursors" if show_summ_value else tract_id,
+                    line=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
+                    marker=dict(color='#E7DDFF' if show_summ_value else ms1_colors[tract_id.split("/")[0]]),
+                    showlegend=not show_summ_value,
+                    opacity=0.7 if show_summ_value else 1.0
+                ))
+                
+        if not ms2_quality_df.empty:
+            ms2_quality_df = pivot_order_melt(ms2_quality_df, 'quality', meta_samples)
+            for i, (tract_id, group) in enumerate(ms2_quality_df.groupby("source_id")):
+                quality_fig.add_trace(go.Scatter(
+                    x=group["X"], 
+                    y=group["Y"], 
+                    mode="lines+markers",
+                    name="Precursors" if show_summ_value else tract_id,
+                    line=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
+                    marker=dict(color='#8fd3fe' if show_summ_value else ms2_colors[i]),
+                    showlegend=not show_summ_value,
+                    opacity=0.7 if show_summ_value else 1.0
+                ))
         
         color_map = {"MS1": "purple", "MS2": "blue"}
         if show_summ_value:
