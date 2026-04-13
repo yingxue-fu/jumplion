@@ -426,7 +426,7 @@ def quantify_proteins(prec_quant_level,
         message = "using only MS2-level precursor quantity"
     elif prec_quant_level == 'ms1_ms2':
         message = "using integrated MS1- and MS2-level precursor quantities"
-    logging.info("Quantifying proteins" + message)
+    logging.info("Quantifying proteins " + message)
     # Extract unique sample column names (excluding primary_id and id)
     other_cols = {'Precursor.Id',
                   'Protein.Group',
