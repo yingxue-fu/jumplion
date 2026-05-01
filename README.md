@@ -11,7 +11,7 @@ JUMPlion can be installed via `pip` and is compatible with both Windows and Linu
 conda create -n jumplion python=3.12
 conda activate jumplion
 conda install mono # Required on Linux for reading Thermo .raw files; skip this step on Windows
-pip install jumplion
+pip install "jumplion[gui] @ git+https://github.com/yingxue-fu/jumplion.git"
 ```
 
 ### Getting started
