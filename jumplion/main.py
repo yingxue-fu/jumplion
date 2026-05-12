@@ -6,8 +6,13 @@ import shutil
 import psutil    # cpu and memory info
 import platform  # os info
 import logging
+import warnings
 from pathlib import Path
 from importlib.metadata import version
+warnings.filterwarnings(
+    "ignore",
+    message="You may be importing Biopython from inside the source tree.*",
+)
 # external
 import polars as pl
 import pandas as pd
@@ -128,6 +133,12 @@ def main():
             raise Exception("Cannot load spectral library")
         lib.initialize()
         
+        ## Initialize lib.info for in-memory accumulation
+        lib.info.n_runs = len(MSFiles)
+        lib.info.lib = lib
+        lib.info.clear()
+        saved_xic_runs = []  # (run_index, xic_file) for skipped runs
+
         ## XIC extraction in each run
         for i, file in enumerate(MSFiles):
             logging.info(f"Analyzing run {i+1} of {len(MSFiles)}")
@@ -137,14 +148,15 @@ def main():
                 if xic_file.exists():
                     logging.info(f"Using existing xic file {xic_file}")
                     logging.info("Skipping analysis\n")
+                    saved_xic_runs.append((i, xic_file))
                     continue
-            
+
             run = Run(i)
             if not run.load(file):
                 logging.info(f"ERROR: cannot load the file {file}, skipping")
             run.load_library(lib)
             run.load_prec_rts(prec_rts)
-            run.process()
+            run.process(info=lib.info)
             run.free()
             del run
             # determine if performing garbage collection
@@ -152,8 +164,18 @@ def main():
                 logging.info("Available RAM less than 32 GB, performing garbage collection")
                 gc.collect()
 
+        ## Load parquet only for runs that were skipped via --use-saved-xic
+        if saved_xic_runs:
+            lib_n = len(lib.entries)
+            for run_index, xic_file in saved_xic_runs:
+                logging.info(f"Loading XIC data from {xic_file}")
+                df = pl.read_parquet(xic_file)
+                lib.info._load_xic_dataframe(df, run_index, lib_n)
+
+        lib.info.n_entries = len(lib.info.map)
+        lib.info.index(MSFiles)
+
         ## XIC quantification across runs
-        lib.info.load(lib, MSFiles, str(out_int_dir))
         lib.info.quantify(MSFiles, str(out_int_dir))
 
         ## Write report

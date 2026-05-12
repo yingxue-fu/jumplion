@@ -8,7 +8,12 @@ import pandas as pd
 import polars as pl
 # local
 from jumplion.arguments import Arguments
-from jumplion.utils import progress_bar, extract_unique_parts, perform_lion_inference
+from jumplion.utils import (
+    progress_bar,
+    extract_unique_parts,
+    generate_group_indices,
+    perform_lion_inference,
+)
 
 args = Arguments()
 ShowProgress = args.show_progress
@@ -97,6 +102,14 @@ def precursor_summarize(quantity_df: pl.DataFrame,
 
     sample_cols = [col for col in quantity_pivoted.columns if col not in {"target_id", "source_id"}]
     prec_ids = quantity_pivoted["target_id"].unique().to_list()
+    lion_group_indices = None
+    if use_lion_inference and lion_value_type in ['local_min', 'local_mean']:
+        lion_group_indices = generate_group_indices(
+            sample_cols,
+            sample_meta,
+            sample_column,
+            group_column,
+        )
 
     # Group by precursor for fast lookup
     quantity_groups = quantity_pivoted.partition_by("target_id", as_dict=True)
@@ -138,7 +151,8 @@ def precursor_summarize(quantity_df: pl.DataFrame,
                                                            sample_column, 
                                                            group_column,
                                                            lion_value_type,
-                                                           lion_value_scale)
+                                                           lion_value_scale,
+                                                           lion_group_indices)
         #
         quantity_summed[i, :] = median_summ(quantity_mat_fill, topN_rep, rep_abundance)
         #

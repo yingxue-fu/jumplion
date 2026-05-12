@@ -537,93 +537,81 @@ def load_mzml(file_name):
     
     return ms1_spectra, ms2_spectra
 
+
 def load_timsTOF_d(bruker_d_folder_name):
     meta_data, ms1_frames_df, ms2_frames_df, _ = get_meta_bruker(bruker_d_folder_name, False, False)
     mobility_scan_max_index = int(ms1_frames_df['NumScans'].max())
-    mobility_values, mz_values = get_mobility_mz(bruker_d_folder_name, 
+    mobility_values, mz_values = get_mobility_mz(bruker_d_folder_name,
                                                  meta_data,
                                                  mobility_scan_max_index)
-    
-    reader = timsrust_pyo3.FrameReader(bruker_d_folder_name)
-    frames = reader.read_all_frames()
-    del reader
-    
+
+    frames = timsrust_pyo3.FrameReader(bruker_d_folder_name)
+
     ms1_spectra = np.empty(len(ms1_frames_df), dtype=object)
     ms2_spectra = np.empty(len(ms2_frames_df), dtype=object)
-    
+
     ms1_idx = 0
     ms2_idx = 0
     rt_conversion = 1.0 / 60.0
-    for i, frame in enumerate(progress_bar(frames, ShowProgress, InterProgress)):
-        mzs = mz_values[frame.tof_indices].astype(PeakMzDtype)
-        ims = np.repeat(mobility_values, np.diff(frame.scan_offsets)).astype(PeakIMDtype)
-        intensities = np.array(frame.intensities, dtype=PeakIntensityDtype)
-        rt = np.float32(frame.rt * rt_conversion)
-        
-        if frame.ms_level == MSLevel.MS1:  # MS1 spectra
-            spec = timsSpectrum()
-            spec.type = np.int8(1)
-            spec.RT = rt
-            
+
+    for frame in progress_bar(frames, ShowProgress, InterProgress):
+        rt              = np.float32(frame.rt * rt_conversion)
+        tof_indices     = np.asarray(frame.tof_indices,  dtype=np.uint32)
+        scan_offsets    = np.asarray(frame.scan_offsets, dtype=np.intp)
+        intensities_raw = np.asarray(frame.intensities,  dtype=np.uint32)
+
+        mzs         = mz_values[tof_indices].astype(PeakMzDtype)
+        ims         = np.repeat(mobility_values, np.diff(scan_offsets)).astype(PeakIMDtype)
+        intensities = intensities_raw.astype(PeakIntensityDtype)
+
+        if frame.ms_level == MSLevel.MS1:
             mzs_cen, ims_cen, intensities_cen = centroid_and_sort(
-                mzs, ims, intensities, 
-                centroid=TimsCentroid,
-                use_weighted_mean=WeightedCentroid,
-                mz_rel_threshold=MassAccCentroid, 
-                im_abs_threshold=IMWindowCentroid)
-            
-            spec.n = len(mzs_cen)
-            spec.peaks_mz = mzs_cen
-            spec.peaks_im = ims_cen
+                mzs, ims, intensities,
+                centroid=TimsCentroid, use_weighted_mean=WeightedCentroid,
+                mz_rel_threshold=MassAccCentroid, im_abs_threshold=IMWindowCentroid,
+            )
+            spec = timsSpectrum()
+            spec.type            = np.int8(1)
+            spec.RT              = rt
+            spec.n               = len(mzs_cen)
+            spec.peaks_mz        = mzs_cen
+            spec.peaks_im        = ims_cen
             spec.peaks_intensity = intensities_cen
-            
+            spec.window_low      = np.float32(0.0)
+            spec.window_high     = np.float32(0.0)
             ms1_spectra[ms1_idx] = spec
             ms1_idx += 1
-        elif frame.ms_level == MSLevel.MS2:  # MS2 spectra
-            quad_settings = frame.quadrupole_settings
-            scan_offsets = np.asarray(frame.scan_offsets)
-            starts = scan_offsets[quad_settings.scan_starts]
-            ends = scan_offsets[quad_settings.scan_ends]
-            #
+
+        elif frame.ms_level == MSLevel.MS2:
+            quad_settings        = frame.quadrupole_settings
+            starts               = scan_offsets[quad_settings.scan_starts].astype(np.intp)
+            ends                 = scan_offsets[quad_settings.scan_ends].astype(np.intp)
             isolation_width_half = np.array(quad_settings.isolation_width) * 0.5
-            mz_window_low = quad_settings.isolation_mz - isolation_width_half
-            mz_window_high = quad_settings.isolation_mz + isolation_width_half
+            mz_window_low        = quad_settings.isolation_mz - isolation_width_half
+            mz_window_high       = quad_settings.isolation_mz + isolation_width_half
 
             for j in range(len(starts)):
-                spec = timsSpectrum()
-                spec.type = np.int8(2)
-                spec.RT = rt
-                
-                start_idx, end_idx = starts[j], ends[j]
+                start_idx, end_idx = int(starts[j]), int(ends[j])
                 mzs_sub = mzs[start_idx:end_idx]
-                ims_sub = ims[start_idx:end_idx]
-                intensities_sub = intensities[start_idx:end_idx]
-                
-                # Skip empty spectra
                 if len(mzs_sub) == 0:
                     continue
-                
                 mzs_cen, ims_cen, intensities_cen = centroid_and_sort(
-                    mzs_sub, 
-                    ims_sub, 
-                    intensities_sub, 
-                    centroid=TimsCentroid,
-                    use_weighted_mean=WeightedCentroid,
-                    mz_rel_threshold=MassAccCentroid, 
-                    im_abs_threshold=IMWindowCentroid)
-                
-                spec.n = len(mzs_cen)
-                spec.peaks_mz = mzs_cen
-                spec.peaks_im = ims_cen
+                    mzs_sub, ims[start_idx:end_idx], intensities[start_idx:end_idx],
+                    centroid=TimsCentroid, use_weighted_mean=WeightedCentroid,
+                    mz_rel_threshold=MassAccCentroid, im_abs_threshold=IMWindowCentroid,
+                )
+                spec = timsSpectrum()
+                spec.type            = np.int8(2)
+                spec.RT              = rt
+                spec.n               = len(mzs_cen)
+                spec.peaks_mz        = mzs_cen
+                spec.peaks_im        = ims_cen
                 spec.peaks_intensity = intensities_cen
-                
-                spec.window_low = float(mz_window_low[j])
-                spec.window_high = float(mz_window_high[j])
+                spec.window_low      = float(mz_window_low[j])
+                spec.window_high     = float(mz_window_high[j])
                 ms2_spectra[ms2_idx] = spec
                 ms2_idx += 1
-    
-        frames[i] = None
-    frames.clear()
+
     del frames
     return ms1_spectra[:ms1_idx], ms2_spectra[:ms2_idx]
 

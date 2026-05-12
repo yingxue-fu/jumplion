@@ -249,7 +249,8 @@ def perform_lion_inference(
         sample_column, 
         group_column,
         lion_value_type='global_min',
-        lion_value_scale=1.0) -> np.ndarray:
+        lion_value_scale=1.0,
+        group_indices=None) -> np.ndarray:
     """
     Perform Local Inference of ion-level missingness using Neighborhood estimation (LION).
     For each ion and each group, impute missing values with local/group minimum/mean.
@@ -290,37 +291,27 @@ def perform_lion_inference(
         imputed_data = np.nan_to_num(imputed_data, nan=lion_value_scale*global_mean)
     
     elif lion_value_type in ['local_min', 'local_mean']:
-        group_indices = generate_group_indices(sample_names, sample_meta, sample_column, group_column)
+        if group_indices is None:
+            group_indices = generate_group_indices(sample_names, sample_meta, sample_column, group_column)
         
         # Calculate group statistics across all rows
-        group_stats = {}
-        for group_idx, col_indices in enumerate(group_indices):
+        for col_indices in group_indices:
             group_data = data[:, col_indices]
             if np.all(np.isnan(group_data)):
                 # Handle case where all values in group are NaN
-                group_stats[group_idx] = global_min 
+                fill_value = global_min
             else:
                 # Get minimum or mean value across all rows and columns in this group
                 if lion_value_type == 'local_min':
-                    group_stats[group_idx] = np.nanmin(group_data)
+                    fill_value = np.nanmin(group_data)
                 else:  # local_mean
-                    group_stats[group_idx] = np.nanmean(group_data)
-        
-        # Process each row
-        for row_idx in range(data.shape[0]):
-            # Process each group
-            for group_idx, col_indices in enumerate(group_indices):
-                # Get values for this group in current row
-                group_values = data[row_idx, col_indices]
-                # Find missing value positions
-                missing_mask = np.isnan(group_values)
-                # Impute if there are missing values
-                if np.any(missing_mask):  
-                    fill_value = group_stats[group_idx]
-                    # Fill missing values
-                    for i, col_idx in enumerate(col_indices):
-                        if missing_mask[i]:
-                            imputed_data[row_idx, col_idx] = lion_value_scale*fill_value
+                    fill_value = np.nanmean(group_data)
+
+            group_imputed = imputed_data[:, col_indices]
+            group_missing = np.isnan(group_imputed)
+            if np.any(group_missing):
+                group_imputed[group_missing] = lion_value_scale * fill_value
+                imputed_data[:, col_indices] = group_imputed
     
     return imputed_data
 

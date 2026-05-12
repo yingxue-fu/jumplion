@@ -125,6 +125,7 @@ class RunEntry:
         self.ms1 = None
         self.ms1_i = None
         self.ms2 = None
+        
 
     def init(self, run, prec):
         self.run = run           # Run class
@@ -155,55 +156,52 @@ class RunEntry:
     
     def extract_xic(self, from_idx: int, to_idx: int, report_mz_im: int):
         l = to_idx - from_idx
-        
-        ms1_rts = np.zeros(l)
-        ms2_rts = np.zeros(l)
-        
-        # extracted intensities
-        self.ms1 = np.zeros((l, MaxPrecNum))   # of isotopic peaks
-        self.ms2 = np.zeros((l, MaxProdNum))
-        
-        # extracted mzs
+
+        indices_i  = self.target_ms2_index[from_idx:to_idx]
+        ms2_rts    = self.run.ms2_RT[indices_i]
+        ms1_lefts  = np.searchsorted(self.run.ms1_RT, ms2_rts) - 1
+        ms1_rts    = self.run.ms1_RT[ms1_lefts]
+
+        self.ms1    = np.zeros((l, MaxPrecNum))
+        self.ms2    = np.zeros((l, MaxProdNum))
         exp_ms1_mzs = np.zeros((l, MaxPrecNum))
         exp_ms2_mzs = np.zeros((l, MaxProdNum))
-        exp_ims = np.zeros((l, MaxPrecNum))
-                
-        for k in range(from_idx, to_idx):
-            
-            i = self.target_ms2_index[k]
-            rt = self.run.ms2_RT[i]
-            ind = k - from_idx
-            
-            ms1_left = np.searchsorted(self.run.ms1_RT, rt) - 1
-            ms1_rts[ind] = self.run.ms1_RT[ms1_left]
+        exp_ims     = np.zeros((l, MaxPrecNum))
 
-            n_precs = min(MaxPrecNum, self.info.n_precs)
-            for j in range(n_precs):
-                query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j], ms1_rts[ind], 
-                                        self.run.MassCalCenter, MassCalBins)
-                if self.run.tims: # return mobility
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1sp[ms1_left].level(report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
-                else:
-                    self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1sp[ms1_left].level(query_mz, self.run.MassAccuracyMS1)
-            
-            for fr in range(self.info.n_prods):
-                ms2_rts[ind] = rt
-                query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz, ms2_rts[ind], 
-                                        self.run.MassCalCenter, MassCalBins)
-                if self.run.tims: # return mobility
-                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2sp[i].level(report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
-                else:             
-                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr] = self.run.ms2sp[i].level(query_mz, self.run.MassAccuracyMS2)
-                if self.ms2[ind, fr] < MinXicIntensity:
-                    self.ms2[ind, fr] = 0.0
-        
+        n_precs = min(MaxPrecNum, self.info.n_precs)
+        n_prods = self.info.n_prods
+
+        for ind in range(l):
+                ms1_left = ms1_lefts[ind]
+                for j in range(n_precs):
+                    query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j],
+                                            ms1_rts[ind], self.run.MassCalCenter, MassCalBins)
+                    if self.run.tims:
+                        self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1sp[ms1_left].level(
+                            report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
+                    else:
+                        self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1sp[ms1_left].level(
+                            query_mz, self.run.MassAccuracyMS1)
+                i = indices_i[ind]
+                for fr in range(n_prods):
+                    query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz,
+                                            ms2_rts[ind], self.run.MassCalCenter, MassCalBins)
+                    if self.run.tims:
+                        self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2sp[i].level(
+                            report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
+                    else:
+                        self.ms2[ind, fr], exp_ms2_mzs[ind, fr] = self.run.ms2sp[i].level(
+                            query_mz, self.run.MassAccuracyMS2)
+                    if self.ms2[ind, fr] < MinXicIntensity:
+                        self.ms2[ind, fr] = 0.0
+
         self.ms1_rts, self.ms2_rts = consolidate_by_ms1(ms1_rts, ms2_rts, method='first')
-        _, self.ms1 = consolidate_by_ms1(ms1_rts, self.ms1, method='first')
-        _, self.ms2 = consolidate_by_ms1(ms1_rts, self.ms2, method='sum')
-        _, exp_ms1_mzs = consolidate_by_ms1(ms1_rts, exp_ms1_mzs, method='first')
-        _, exp_ms2_mzs = consolidate_by_ms1(ms1_rts, exp_ms2_mzs, method='max')
-        _, exp_ims = consolidate_by_ms1(ms1_rts, exp_ims, method='first')
-        
+        _, self.ms1     = consolidate_by_ms1(ms1_rts, self.ms1,     method='first')
+        _, self.ms2     = consolidate_by_ms1(ms1_rts, self.ms2,     method='sum')
+        _, exp_ms1_mzs  = consolidate_by_ms1(ms1_rts, exp_ms1_mzs,  method='first')
+        _, exp_ms2_mzs  = consolidate_by_ms1(ms1_rts, exp_ms2_mzs,  method='max')
+        _, exp_ims      = consolidate_by_ms1(ms1_rts, exp_ims,       method='first')
+
         return exp_ms1_mzs, exp_ms2_mzs, exp_ims
     
 
@@ -260,7 +258,7 @@ class RunEntry:
         # extract chromatograms
         report_mz_im = 1 if stage == 0 else 0
         exp_ms1_mzs, exp_ms2_mzs, exp_ims = self.extract_xic(start, stop + 1, report_mz_im)
-        self.ms1_i = interpolate_ms1(self.ms1_rts, self.ms1, self.ms2_rts) # MS1 data interpolation
+        self.ms1_i = interpolate_ms1(self.ms1_rts, self.ms1, self.ms2_rts)
         
         # find optimal xic
         (corr_scores, 
@@ -356,6 +354,12 @@ class Run:
         # 
         self.ms1sp = None
         self.ms2sp = None
+        self.ms1_flat_mz = None
+        self.ms1_flat_intensity = None
+        self.ms1_offsets = None
+        self.ms2_flat_mz = None
+        self.ms2_flat_intensity = None
+        self.ms2_offsets = None
         
         self.ms1_RT = None
         self.ms2_RT = None
@@ -399,6 +403,12 @@ class Run:
         self.ms2sp[:] = None
         self.ms1_RT[:] = None
         self.ms2_RT[:] = None
+        self.ms1_flat_mz = None
+        self.ms1_flat_intensity = None
+        self.ms1_offsets = None
+        self.ms2_flat_mz = None
+        self.ms2_flat_intensity = None
+        self.ms2_offsets = None
         # for lib
         self.lib = None
         # for lists
@@ -430,10 +440,10 @@ class Run:
 
         # derive window settings and cycle information
         self.init()
-        
         logging.info(f"Data loaded: {ms1_cnt} MS1 spectra and {ms2_cnt} MS2 spectra in {self.n_cycle} cycles")
         
         return True
+
     
 
     def init(self):
@@ -609,12 +619,12 @@ class Run:
                     entry.IM = run_IM
     
     
-    def process(self):
+    def process(self, info=None):
         self.calibrate_mass()
         logging.info("Identifying the optimal XIC for each precursor")
-        for entry in progress_bar(self.entries, args.show_progress, args.inter_progress):   
+        for entry in progress_bar(self.entries, args.show_progress, args.inter_progress):
             entry.get_optimal_xic(stage=1, n_xic_points=nXICPoints)
-        self.export_xics()
+        self.export_xics(info=info)
 
 
     def calibrate_mass(self): 
@@ -709,10 +719,12 @@ class Run:
         mass_cali_data = mass_cali_data.sort("experimental_rt")
         
         # setup for mass calibration bins
-        (MassCalBins, 
-         self.MassCalSplit, 
-         self.MassCalCenter) = split_into_rt_bins(mass_cali_data['experimental_rt'].to_numpy(), 
-                                                  max_num_bins=MassCalBinsMax) 
+        (MassCalBins,
+         self.MassCalSplit,
+         self.MassCalCenter) = split_into_rt_bins(mass_cali_data['experimental_rt'].to_numpy(),
+                                                  max_num_bins=MassCalBinsMax)
+        self.MassCalSplit  = np.asarray(self.MassCalSplit,  dtype=np.float64)
+        self.MassCalCenter = np.asarray(self.MassCalCenter, dtype=np.float64)
         
         # calibration       
         logging.info(f"{len(mass_cali_data)} MS1 m/z and MS2 m/z are used for mass calibration") 
@@ -823,7 +835,7 @@ class Run:
             im_error_plot(im_cali_data, run_name=self.run_name, out_dir=out_cal_dir)
         
         
-    def export_xics(self):
+    def export_xics(self, info=None):
         ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrecNum)]
         ms2_intensity_cols = [f'ms2_intensity_prod{i}' for i in range(MaxProdNum)]
         ms1_interpol_cols = [f'ms1_interpol_M{i}' for i in range(MaxPrecNum)]
@@ -880,6 +892,9 @@ class Run:
             except IOError:
                 logging.error(f"ERROR: cannot save the .parquet file to {fallback_file}. Check if the destination folder is write-protected or the file is in use.\n")
     
+        if info is not None:
+            info.accumulate_from_xic_list(self.XIC_list, self.run_index)
+
         self.XIC_list.clear()
 
-            
+

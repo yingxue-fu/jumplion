@@ -194,8 +194,8 @@ def calculate_shape_score(xic, corr_method):
     return shape_score
 
 
-def calculate_xic_score(xics_region, n_ms1, n_ms2, corr_method=0, 
-                        shape_weighted=1, intensity_weighted=1):
+def _calculate_xic_score_python(xics_region, n_ms1, n_ms2, corr_method=0,
+                                shape_weighted=1, intensity_weighted=1):
     # Get correlation matrix between ions
     corr_matrix = get_corr_matrix(xics_region, corr_method)
     corr_matrix[corr_matrix < 0] = E
@@ -244,6 +244,17 @@ def calculate_xic_score(xics_region, n_ms1, n_ms2, corr_method=0,
         intensity_scores = np.ones(xics_region.shape[1])
     
     return corr_scores, shape_scores, intensity_scores
+
+
+def calculate_xic_score(xics_region, n_ms1, n_ms2, corr_method=0,
+                        shape_weighted=1, intensity_weighted=1):
+    return _calculate_xic_score_python(
+        xics_region,
+        n_ms1,
+        n_ms2,
+        corr_method,
+        shape_weighted,
+        intensity_weighted)
 
 
 def identify_optimal_xic(ms1, ms2, 
@@ -373,14 +384,14 @@ def identify_optimal_xic(ms1, ms2,
             fwhm)
 
 
-def calculate_quantity(ms1, ms2, 
-                       begin, end, apex, 
-                       optimal_xic, 
-                       optimal_xic_type, 
-                       corr_method=0, 
-                       intf_removal=True, 
-                       intf_factor_ms1=1.2,
-                       intf_factor_ms2=1.5):
+def _calculate_quantity_python(ms1, ms2,
+                               begin, end, apex,
+                               optimal_xic,
+                               optimal_xic_type,
+                               corr_method=0,
+                               intf_removal=True,
+                               intf_factor_ms1=1.2,
+                               intf_factor_ms2=1.5):
     
     ms1_ms2 = np.concatenate((ms1, ms2), axis=1)
     n_ms1 = ms1.shape[1]
@@ -456,6 +467,28 @@ def calculate_quantity(ms1, ms2,
     ms1_ms2_filtered = ms1_ms2_filtered[begin:end+1, :]
     
     return ms1_ms2_filtered, elution, quant_corr, quant_quantity
+
+
+def calculate_quantity(ms1, ms2,
+                       begin, end, apex,
+                       optimal_xic,
+                       optimal_xic_type,
+                       corr_method=0,
+                       intf_removal=True,
+                       intf_factor_ms1=1.2,
+                       intf_factor_ms2=1.5):
+    return _calculate_quantity_python(
+        ms1,
+        ms2,
+        begin,
+        end,
+        apex,
+        optimal_xic,
+        optimal_xic_type,
+        corr_method,
+        intf_removal,
+        intf_factor_ms1,
+        intf_factor_ms2)
 
 
 def extract_ms1_ms2_from_xic_file(xic_file, precursor_id):

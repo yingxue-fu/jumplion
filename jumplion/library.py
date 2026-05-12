@@ -411,6 +411,37 @@ class Info:
             for run_index, qe in value:
                 self.runs[run_index].append(qe)
 
+    def accumulate_from_xic_list(self, xic_list, run_index: int):
+        for xg in xic_list:
+            qe = QuantEntry()
+            qe.index = xg.pr
+            qe.run_index = run_index
+            qe.apex = xg.info.apex
+            qe.fwhm = xg.info.fwhm
+            qe.xic_score = np.array(xg.info.scores['score']).copy()
+            qe.optimal_xic = xg.info.optimal_xic
+            qe.optimal_xic_type = xg.info.optimal_xic_type
+
+            # xg.xics columns: [ms1_rt, ms2_rt, ms1(MaxPrecNum), ms2(MaxProdNum), ms1_i(MaxPrecNum)]
+            qe.ms1_rt = xg.xics[:, 0].copy()
+            qe.ms2_rt = xg.xics[:, 1].copy()
+            qe.ms1   = xg.xics[:, 2:2 + MaxPrecNum].copy()
+            qe.ms2   = xg.xics[:, 2 + MaxPrecNum:2 + MaxPrecNum + MaxProdNum].copy()
+            qe.ms1_i = xg.xics[:, 2 + MaxPrecNum + MaxProdNum:].copy()
+
+            qe.RT  = float(qe.ms2_rt[qe.apex])
+            qe.IM  = 0.0
+
+            for prec_idx, mz in enumerate(xg.info.ms1_mzs):
+                qe.ms1_quant[prec_idx].index = prec_idx
+                qe.ms1_quant[prec_idx].mz   = float(mz)
+
+            for fr_idx in range(xg.info.n_prods):
+                qe.ms2_quant[fr_idx].index = xg.info.prodi[fr_idx]
+                qe.ms2_quant[fr_idx].mz    = xg.info.products[fr_idx].mz
+
+            self.map[qe.index].append((run_index, qe))
+
     def load(self, parent: Library, ms_files: List[str], out_dir):
         self.n_runs = len(ms_files)
         self.lib = parent
@@ -429,63 +460,104 @@ class Info:
             except FileNotFoundError:
                 alt_path = location_to_file_name(file) + ".xic.parquet"
                 df = pl.read_parquet(alt_path)
-    
-            ms1_cols = [col for col in df.columns if col.startswith("ms1_intensity")]
-            ms2_cols = [col for col in df.columns if col.startswith("ms2_intensity")]
-            ms1_i_cols = [col for col in df.columns if col.startswith("ms1_interpol")]
-    
-            precursor_ids = df.select("Precursor.Id").unique().to_series()
-            if len(precursor_ids) != lib_n:
-                logging.warning("Number of precursors doesn't match between library and XIC parquet file.")
-    
-            precursor_groups = df.partition_by("Precursor.Id", as_dict=True)
-    
-            for precursor_id, subdf in progress_bar(precursor_groups.items(), ShowProgress, InterProgress):
-                row_type_map = subdf.partition_by("row_type", as_dict=True)
-                xic_rows = row_type_map.get(("xic_row",), pl.DataFrame())
-                mz_row = row_type_map.get(("mz_row",), pl.DataFrame())
-                index_row = row_type_map.get(("index_row",), pl.DataFrame())
-                score_row = row_type_map.get(("score_row",), pl.DataFrame())
-    
-                if xic_rows.is_empty() or mz_row.is_empty() or index_row.is_empty() or score_row.is_empty():
-                    logging.warning(f"Missing required rows for precursor {precursor_id}")
-                    continue
-    
-                qe = QuantEntry()
-                qe.index = int(index_row[ms1_cols].to_numpy()[0][0])
-                qe.run_index = run_index
-                
-                qe.apex = int(score_row['ms1_rt'][0])
-                qe.fwhm = int(score_row['ms2_rt'][0])
-                
-                qe.xic_score = score_row[ms1_cols+ms2_cols].to_numpy()[0]
-                qe.optimal_xic = int(index_row['ms1_rt'][0])
-                qe.optimal_xic_type = int(index_row['ms2_rt'][0])
-                
-                qe.ms1 = xic_rows.select(ms1_cols).to_numpy()
-                qe.ms2 = xic_rows.select(ms2_cols).to_numpy()
-                qe.ms1_i = xic_rows.select(ms1_i_cols).to_numpy()
-                qe.ms1_rt = xic_rows['ms1_rt'].to_numpy()
-                qe.ms2_rt = xic_rows['ms2_rt'].to_numpy()
-                
-                qe.RT = qe.ms2_rt[qe.apex]
-                qe.IM = 0.0 # todo 
-                
-                ms1_mzs = mz_row.select(ms1_cols).to_numpy()[0]
-                for prec, mz in enumerate(ms1_mzs):
-                    qe.ms1_quant[prec].index = prec
-                    qe.ms1_quant[prec].mz = mz
-                
-                ms2_mzs = mz_row.select(ms2_cols).to_numpy()[0]
-                ms2_indices = index_row.select(ms2_cols).to_numpy()[0]
-                for fr, (idx, mz) in enumerate(zip(ms2_indices, ms2_mzs)):                   
-                    qe.ms2_quant[fr].index = int(idx)
-                    qe.ms2_quant[fr].mz = mz
-                
-                self.map[qe.index].append((run_index, qe))
+            
+            self._load_xic_dataframe(df, run_index, lib_n)
         
         self.n_entries = len(self.map)
         self.index(ms_files)
+
+    def _load_xic_dataframe(self, df: pl.DataFrame, run_index: int, lib_n: int):
+        ms1_cols = [col for col in df.columns if col.startswith("ms1_intensity")]
+        ms2_cols = [col for col in df.columns if col.startswith("ms2_intensity")]
+        ms1_i_cols = [col for col in df.columns if col.startswith("ms1_interpol")]
+
+        precursor_count = df["Precursor.Id"].n_unique()
+        if precursor_count != lib_n:
+            logging.warning("Number of precursors doesn't match between library and XIC parquet file.")
+
+        row_types = df["row_type"].to_list()
+        precursor_ids = df["Precursor.Id"].to_list()
+        ms1_values = df.select(ms1_cols).to_numpy()
+        ms2_values = df.select(ms2_cols).to_numpy()
+        ms1_i_values = df.select(ms1_i_cols).to_numpy()
+        rt_values = df.select(["ms1_rt", "ms2_rt"]).to_numpy()
+        score_values = df.select(ms1_cols + ms2_cols).to_numpy()
+
+        n_rows = len(row_types)
+        row = 0
+        loaded = 0
+        while row < n_rows:
+            if row_types[row] != "index_row":
+                row += 1
+                continue
+
+            precursor_id = precursor_ids[row]
+            index_row = row
+            mz_row = row + 1
+            score_row = row + 2
+            xic_start = row + 3
+
+            if (
+                score_row >= n_rows
+                or row_types[mz_row] != "mz_row"
+                or row_types[score_row] != "score_row"
+                or precursor_ids[mz_row] != precursor_id
+                or precursor_ids[score_row] != precursor_id
+            ):
+                logging.warning(f"Missing required rows for precursor {precursor_id}")
+                row += 1
+                continue
+
+            xic_end = xic_start
+            while (
+                xic_end < n_rows
+                and row_types[xic_end] == "xic_row"
+                and precursor_ids[xic_end] == precursor_id
+            ):
+                xic_end += 1
+
+            if xic_end == xic_start:
+                logging.warning(f"Missing required rows for precursor {precursor_id}")
+                row = xic_end
+                continue
+
+            qe = QuantEntry()
+            qe.index = int(ms1_values[index_row, 0])
+            qe.run_index = run_index
+
+            qe.apex = int(rt_values[score_row, 0])
+            qe.fwhm = int(rt_values[score_row, 1])
+
+            qe.xic_score = score_values[score_row].copy()
+            qe.optimal_xic = int(rt_values[index_row, 0])
+            qe.optimal_xic_type = int(rt_values[index_row, 1])
+
+            qe.ms1 = ms1_values[xic_start:xic_end].copy()
+            qe.ms2 = ms2_values[xic_start:xic_end].copy()
+            qe.ms1_i = ms1_i_values[xic_start:xic_end].copy()
+            qe.ms1_rt = rt_values[xic_start:xic_end, 0].copy()
+            qe.ms2_rt = rt_values[xic_start:xic_end, 1].copy()
+
+            qe.RT = qe.ms2_rt[qe.apex]
+            qe.IM = 0.0 # todo
+
+            ms1_mzs = ms1_values[mz_row]
+            for prec, mz in enumerate(ms1_mzs):
+                qe.ms1_quant[prec].index = prec
+                qe.ms1_quant[prec].mz = mz
+
+            ms2_mzs = ms2_values[mz_row]
+            ms2_indices = ms2_values[index_row]
+            for fr, (idx, mz) in enumerate(zip(ms2_indices, ms2_mzs)):
+                qe.ms2_quant[fr].index = int(idx)
+                qe.ms2_quant[fr].mz = mz
+
+            self.map[qe.index].append((run_index, qe))
+            loaded += 1
+            row = xic_end
+
+        if ShowProgress and loaded:
+            logging.info(f"Assembled {loaded} precursor XIC groups")
 
     
     def quantify(self, ms_files, out_dir):
@@ -494,11 +566,15 @@ class Info:
         ms1_intensity_cols = [f'ms1_intensity_M{i}' for i in range(MaxPrecNum)]
         ms2_intensity_cols = [f'ms2_intensity_prod{i}' for i in range(MaxProdNum)]
         column_names = ['Run', 'Precursor.Id', 'ms1_rt', 'ms2_rt'] + ms1_intensity_cols + ms2_intensity_cols + ['elution']
+        run_names = [remove_extension(get_file_name(file)) for file in ms_files]
         
-        data_rows = []
+        out_runs = []
+        out_precursors = []
+        out_blocks = []
         for pr_index, v in progress_bar(self.map.items(), ShowProgress, InterProgress):
+            entries = [qt[1] for qt in v]
             # for each precursor, check overall optimal xic type
-            optimal_xic_types = [qt[1].optimal_xic_type for qt in v]
+            optimal_xic_types = [entry.optimal_xic_type for entry in entries]
             n_ms1 = optimal_xic_types.count(1)
             n_ms2 = optimal_xic_types.count(2)
             if n_ms2 > n_ms1:
@@ -506,24 +582,22 @@ class Info:
             elif n_ms2 < n_ms1:
                 global_optimal_xic_type = 1
             elif n_ms2 == n_ms1:
-                cross_run_scores = [qt[1].xic_score.reshape(-1, 1) for qt in v]
-                cross_run_scores = np.hstack(cross_run_scores)
-                scores_sum = np.sum(cross_run_scores, axis=1)
+                scores_sum = np.sum([entry.xic_score for entry in entries], axis=0)
                 global_optimal_xic_type = 2 if np.argmax(scores_sum) >= len(ms1_intensity_cols) else 1
                 
             precursor_id = self.lib.entries[pr_index].name
-            fwhms = [qt[1].fwhm for qt in v]
+            fwhms = [entry.fwhm for entry in entries]
             global_fwhm = int(np.ceil(np.mean(fwhms)))
             
             # quantify
             for j in range(self.n_runs):
-                run_name = remove_extension(get_file_name(ms_files[j]))
-                qt = v[j]
-                ms1 = qt[1].ms1_i
-                ms2 = qt[1].ms2
-                optimal_xic = int(qt[1].optimal_xic)
-                optimal_xic_type = int(qt[1].optimal_xic_type)
-                elution_apex = qt[1].apex
+                run_name = run_names[j]
+                entry = entries[j]
+                ms1 = entry.ms1_i
+                ms2 = entry.ms2
+                optimal_xic = int(entry.optimal_xic)
+                optimal_xic_type = int(entry.optimal_xic_type)
+                elution_apex = entry.apex
 
                 # re-define optimal xic
                 if optimal_xic_type != global_optimal_xic_type:
@@ -546,20 +620,20 @@ class Info:
                                                min_apex_intensity=MinApexIntensity,
                                                min_apex_evidence=MinApexEvidence
                                            )
-                    qt[1].xic_score = scores
-                    qt[1].optimal_xic_type = optimal_xic_type
-                    qt[1].optimal_xic = optimal_xic
-                    qt[1].apex = elution_apex
-                    qt[1].fwhm = fwhm
+                    entry.xic_score = scores
+                    entry.optimal_xic_type = optimal_xic_type
+                    entry.optimal_xic = optimal_xic
+                    entry.apex = elution_apex
+                    entry.fwhm = fwhm
                 
                 begin = max(0, int(elution_apex - global_fwhm))
                 end = min(ms2.shape[0] - 1, int(elution_apex + global_fwhm))
-                qt[1].begin = begin
-                qt[1].end = end
+                entry.begin = begin
+                entry.end = end
                 
-                qt[1].RT = qt[1].ms2_rt[elution_apex]
-                qt[1].RT_left = qt[1].ms2_rt[begin]
-                qt[1].RT_right = qt[1].ms2_rt[end]
+                entry.RT = entry.ms2_rt[elution_apex]
+                entry.RT_left = entry.ms2_rt[begin]
+                entry.RT_right = entry.ms2_rt[end]
                 #
                 (ms1_ms2_filtered, 
                  elution, 
@@ -574,24 +648,36 @@ class Info:
                                                       intf_factor_ms1=IntfFactorMS1,
                                                       intf_factor_ms2=IntfFactorMS2)
                 
-                n_ms1 = len(qt[1].ms1_quant)
+                n_ms1 = len(entry.ms1_quant)
                 for prec in range(n_ms1):
-                    qt[1].ms1_quant[prec].corr = quant_corr[prec]
-                    qt[1].ms1_quant[prec].quantity = quant_quantity[prec]
+                    entry.ms1_quant[prec].corr = quant_corr[prec]
+                    entry.ms1_quant[prec].quantity = quant_quantity[prec]
                                                       
-                for fr in range(len(qt[1].ms2_quant)):                   
-                    qt[1].ms2_quant[fr].corr = quant_corr[fr+n_ms1]
-                    qt[1].ms2_quant[fr].quantity = quant_quantity[fr+n_ms1]
+                for fr in range(len(entry.ms2_quant)):                   
+                    entry.ms2_quant[fr].corr = quant_corr[fr+n_ms1]
+                    entry.ms2_quant[fr].quantity = quant_quantity[fr+n_ms1]
                 
-                xics_filtered = np.concat((qt[1].ms1_rt[begin:end+1].reshape(-1, 1), 
-                                     qt[1].ms2_rt[begin:end+1].reshape(-1, 1), 
+                xics_filtered = np.concat((entry.ms1_rt[begin:end+1].reshape(-1, 1), 
+                                     entry.ms2_rt[begin:end+1].reshape(-1, 1), 
                                      ms1_ms2_filtered, 
                                      elution[begin:end+1].reshape(-1, 1)), axis=1)
-          
-                data_rows.extend([[run_name, precursor_id] + list(row) for row in xics_filtered])
+
+                out_runs.extend([run_name] * xics_filtered.shape[0])
+                out_precursors.extend([precursor_id] * xics_filtered.shape[0])
+                out_blocks.append(xics_filtered)
 
         # Create Polars DataFrame
-        df = pl.DataFrame(data_rows, schema=column_names, orient="row")
+        xic_matrix = np.vstack(out_blocks) if out_blocks else np.empty((0, len(column_names) - 2))
+        df = pl.DataFrame(
+            {
+                "Run": out_runs,
+                "Precursor.Id": out_precursors,
+                **{
+                    column: xic_matrix[:, index]
+                    for index, column in enumerate(column_names[2:])
+                },
+            }
+        )
         out_xic = Path(out_dir) / "xic_files" / "xics.adjusted.parquet"
         df.write_parquet(out_xic)
         logging.info(f"Adjusted XIC data saved to {out_xic}")

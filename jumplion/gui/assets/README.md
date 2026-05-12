@@ -7,7 +7,7 @@ JUMPlion can be installed via `pip` and is compatible with both Windows and Linu
 conda create -n jumplion python=3.12
 conda activate jumplion
 conda install mono # Required on Linux for reading Thermo .raw files; skip this step on Windows
-pip install jumplion
+pip install "jumplion[gui] @ git+https://github.com/yingxue-fu/jumplion.git"
 ```
 
 ### Getting started
@@ -81,6 +81,16 @@ If provided, the FASTA file(s) will be used to calculate the protein coverage pe
 
 **6. Output directory**   
 Specify the directory where output results will be saved.
+
+### Demo
+To test run JUMPlion using demo data, you can download all required inputs from the following link:
+https://drive.google.com/drive/folders/1Ew8SVq0riDzyl5rywLWcTfUmfcPSglld?usp=drive_link
+
+The data are derived from the following published study:
+Wang, J., Huang, Y., Lu, F., et al. Benchmarking informatics workflows for data-independent acquisition single-cell proteomics. Nature Communications 16, 10276 (2025).
+https://doi.org/10.1038/s41467-025-65174-4
+
+The expected runtime for the demo on a standard desktop computer is approximately 15 minutes.
 
 ### Outputs
 The output is organized into two folders:  
