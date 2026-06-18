@@ -157,10 +157,34 @@ class RunEntry:
     def extract_xic(self, from_idx: int, to_idx: int, report_mz_im: int):
         l = to_idx - from_idx
 
-        indices_i  = self.target_ms2_index[from_idx:to_idx]
-        ms2_rts    = self.run.ms2_RT[indices_i]
-        ms1_lefts  = np.searchsorted(self.run.ms1_RT, ms2_rts) - 1
-        ms1_rts    = self.run.ms1_RT[ms1_lefts]
+        indices_i = self.target_ms2_index[from_idx:to_idx]
+        ms2_rts   = self.run.ms2_RT[indices_i]
+
+        # Fallback: single MS1 scan immediately left of each MS2 (used when no
+        # MS1 scans fall inside the cycle interval).
+        ms1_lefts = np.clip(
+            np.searchsorted(self.run.ms1_RT, ms2_rts) - 1,
+            0, len(self.run.ms1_RT) - 1
+        )
+
+        # Cycle boundaries: all MS1 scans in (prev_ms2_rt, this_ms2_rt] belong
+        # to the same DIA cycle as this MS2 scan.  For Astral data this captures
+        # all 3+ MS1 scans per cycle; for regular DIA it reduces to the single
+        # scan to the left (identical to the previous behaviour).
+        gap = (ms2_rts[1] - ms2_rts[0]) if l > 1 else ms2_rts[0]
+        prev_ms2_rts = np.empty(l, dtype=ms2_rts.dtype)
+        prev_ms2_rts[0]  = ms2_rts[0] - gap
+        prev_ms2_rts[1:] = ms2_rts[:-1]
+
+        ms1_cycle_starts = np.searchsorted(self.run.ms1_RT, prev_ms2_rts, side='right')
+        ms1_cycle_ends   = np.searchsorted(self.run.ms1_RT, ms2_rts,      side='right')
+
+        # Representative MS1 RT per cycle: mean of all MS1 RTs in the cycle.
+        ms1_rts = np.empty(l, dtype=np.float32)
+        for ind in range(l):
+            s, e = ms1_cycle_starts[ind], ms1_cycle_ends[ind]
+            ms1_rts[ind] = (self.run.ms1_RT[s:e].mean() if s < e
+                            else self.run.ms1_RT[ms1_lefts[ind]])
 
         self.ms1    = np.zeros((l, MaxPrecNum))
         self.ms2    = np.zeros((l, MaxProdNum))
@@ -172,28 +196,48 @@ class RunEntry:
         n_prods = self.info.n_prods
 
         for ind in range(l):
-                ms1_left = ms1_lefts[ind]
-                for j in range(n_precs):
+            s, e = ms1_cycle_starts[ind], ms1_cycle_ends[ind]
+            # Use all MS1 scans in the cycle; fall back to the single left scan.
+            ms1_scan_range = range(s, e) if s < e else range(ms1_lefts[ind], ms1_lefts[ind] + 1)
+
+            for j in range(n_precs):
+                total_intensity = 0.0
+                last_mz         = 0.0
+                total_im        = 0.0
+                n_scans         = 0
+                for ms1_idx in ms1_scan_range:
+                    scan_rt  = self.run.ms1_RT[ms1_idx]
                     query_mz = predicted_mz(self.run.MassCorrectionMS1, self.info.ms1_mzs[j],
-                                            ms1_rts[ind], self.run.MassCalCenter, MassCalBins)
+                                            scan_rt, self.run.MassCalCenter, MassCalBins)
                     if self.run.tims:
-                        self.ms1[ind, j], exp_ms1_mzs[ind, j], exp_ims[ind, j] = self.run.ms1sp[ms1_left].level(
-                            report_mz_im, query_mz, self.run.MassAccuracyMS1, self.IM, self.run.IM_window)
+                        inten, mz_obs, im_obs = self.run.ms1sp[ms1_idx].level(
+                            report_mz_im, query_mz, self.run.MassAccuracyMS1,
+                            self.IM, self.run.IM_window)
+                        total_im += im_obs
                     else:
-                        self.ms1[ind, j], exp_ms1_mzs[ind, j] = self.run.ms1sp[ms1_left].level(
+                        inten, mz_obs = self.run.ms1sp[ms1_idx].level(
                             query_mz, self.run.MassAccuracyMS1)
-                i = indices_i[ind]
-                for fr in range(n_prods):
-                    query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz,
-                                            ms2_rts[ind], self.run.MassCalCenter, MassCalBins)
-                    if self.run.tims:
-                        self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2sp[i].level(
-                            report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
-                    else:
-                        self.ms2[ind, fr], exp_ms2_mzs[ind, fr] = self.run.ms2sp[i].level(
-                            query_mz, self.run.MassAccuracyMS2)
-                    if self.ms2[ind, fr] < MinXicIntensity:
-                        self.ms2[ind, fr] = 0.0
+                    total_intensity += inten
+                    if inten > 0.0:
+                        last_mz = mz_obs  # keep the last observed m/z with signal
+                    n_scans += 1
+                self.ms1[ind, j]    = total_intensity
+                exp_ms1_mzs[ind, j] = last_mz
+                if self.run.tims and n_scans > 0:
+                    exp_ims[ind, j] = total_im / n_scans
+
+            i = indices_i[ind]
+            for fr in range(n_prods):
+                query_mz = predicted_mz(self.run.MassCorrectionMS2, self.info.products[fr].mz,
+                                        ms2_rts[ind], self.run.MassCalCenter, MassCalBins)
+                if self.run.tims:
+                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr], _ = self.run.ms2sp[i].level(
+                        report_mz_im, query_mz, self.run.MassAccuracyMS2, self.IM, self.run.IM_window)
+                else:
+                    self.ms2[ind, fr], exp_ms2_mzs[ind, fr] = self.run.ms2sp[i].level(
+                        query_mz, self.run.MassAccuracyMS2)
+                if self.ms2[ind, fr] < MinXicIntensity:
+                    self.ms2[ind, fr] = 0.0
 
         self.ms1_rts, self.ms2_rts = consolidate_by_ms1(ms1_rts, ms2_rts, method='first')
         _, self.ms1     = consolidate_by_ms1(ms1_rts, self.ms1,     method='first')
