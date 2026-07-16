@@ -52,6 +52,14 @@ loss_none, loss_H2O, loss_NH3, loss_CO, loss_N, loss_other = np.arange(6)
 Loss = np.array([0.0, 18.011113035, 17.026548, 27.994915, 0.0, 0.0], dtype=np.float32)
 
 
+# print out df in logs
+def indent_df(df, spaces=4, index=False):
+    """Return a DataFrame string with left indentation for logging."""
+    indent = " " * spaces
+    df_str = df.to_string(index=index)
+    return "\n".join(indent + line for line in df_str.splitlines())
+
+
 def estimate_isotopes(peptide_mass, threshold=0.1):
     """
     Estimate number of observable isotopic peaks (>= threshold relative intensity).

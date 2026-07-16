@@ -10,6 +10,7 @@ import polars as pl
 from jumplion.arguments import Arguments
 from jumplion.utils import (
     progress_bar,
+    indent_df, 
     extract_unique_parts,
     generate_group_indices,
     perform_lion_inference,
@@ -626,13 +627,6 @@ def norm_dataframe(df, data_type, tag_column, value_columns, normalization, norm
     loadBias = get_loading_bias(mat, value_columns, data_type, trim_percentage, trim_percentage)
     medians_df = mat.median().to_pandas().T.reset_index(drop=False)
     medians_df.columns = ['Samples', 'Medians']
-    
-    # print out info
-    def indent_df(df, spaces=4, index=False):
-        """Return a DataFrame string with left indentation for logging."""
-        indent = " " * spaces
-        df_str = df.to_string(index=index)
-        return "\n".join(indent + line for line in df_str.splitlines())
     
     logging.info("Loading bias before normalization:\n%s", 
                  indent_df(loadBias, spaces=4, index=False))

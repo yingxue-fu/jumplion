@@ -11,7 +11,7 @@ from Bio import SeqIO
 # local
 from jumplion.arguments import Arguments
 from jumplion.read_ms_files import get_cycle_time
-from jumplion.utils import remove_extension, get_file_name
+from jumplion.utils import remove_extension, get_file_name, indent_df
 from jumplion.calibration import (refine_spline, calc_spline_vectorized, 
                                   convert_to_arrays, check_model_accuracy, 
                                   spline_fitting_plot)
@@ -48,11 +48,11 @@ def process_id_results(id_file,
     if is_tims:
         required_columns = required_columns + ['IM']
     
-    logging.info(f"Reading columns {', '.join(required_columns)} from identification report file: {id_file}")
+    logging.info(f"Reading identification report file: {id_file}")
     id_df = pd.read_parquet(id_file, columns=required_columns)
-    logging.info(f"Loaded {id_df.shape[0]} rows and {id_df.shape[1]} columns")
-    print(id_df.head(5))
-    print(id_df[['Precursor.Id','Run','RT']].dtypes)
+    logging.info(f"Loaded {id_df.shape[0]} rows and {id_df.shape[1]} columns, e.g.,", 
+                 indent_df(id_df.head(5).rename(columns=lambda c: f"{c} ({id_df[c].dtype})"), 
+                           spaces=4, index=False))
     if id_df['RT'].isna().sum():
         logging.warn("NA found in the RT column.")
     run_names = [remove_extension(get_file_name(ms_file)) for ms_file in ms_files]
@@ -85,14 +85,14 @@ def process_id_results(id_file,
     ###########################################
     if min_runs_quant == 0:
         min_runs_quant = 3
-    logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
+    logging.info("Distribution of the number of runs a precursor is detected in:")
     # get rt and im matrix
     rt_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='RT')
     n_runs_detected = rt_mat.shape[1] - rt_mat.isna().sum(axis=1)
     counts, bin_edges = np.histogram(n_runs_detected, bins=10)
     for i in range(len(counts)):
-        bar = '#' * counts[i]
-        print(f"{bin_edges[i]:6.2f} to {bin_edges[i+1]:6.2f} | {bar}")
+        bar = '#' * int(counts[i] / len(n_runs_detected)) * 10
+        logging.info(f"{bin_edges[i]:6.2f} to {bin_edges[i+1]:6.2f} | {bar}")
     logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
     rt_mat = rt_mat[n_runs_detected >= min_runs_quant]
     if save_supplements:
