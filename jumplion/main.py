@@ -20,7 +20,7 @@ import matplotlib
 matplotlib.use('Agg') 
 # local
 from jumplion.arguments import parse_arguments, setup_logger, close_logger
-from jumplion.utils import remove_extension, get_file_name
+from jumplion.utils import get_extension, remove_extension, get_file_name
 
 
 def main():
@@ -117,6 +117,17 @@ def main():
         logging.info(f"Using existing XIC quantification result: {xic_quant_file}") 
     else:
         logging.info(f"{len(MSFiles)} runs will be analyzed")
+        MSFileType = get_extension(MSFiles[0])
+        if MSFileType == 'd':
+            vendor = 'Bruker'
+        elif MSFileType == 'raw':
+            vendor = 'Thermo Fisher'
+        elif MSFileType == 'mzML':
+            vendor = 'open format'
+        else:
+            logging.info(f"MS file format .{MSFileType} not supported!")
+            sys.exit(1)
+        logging.info(f"MS file format recognized as {vendor} .{MSFileType}")
         
         ## Skip ID results processing
         if SkipIDProcessing:
@@ -125,7 +136,7 @@ def main():
             prec_rts = pd.read_csv(prec_rt_file)
             prec_rts.set_index('Precursor.Id', inplace=True)
         else:
-            prec_rts = process_id_results(IdFile, LibFile, MSFiles, OutDir)
+            prec_rts = process_id_results(IdFile, LibFile, MSFiles, MSFileType, OutDir)
         
         ## Load library
         lib = Library()

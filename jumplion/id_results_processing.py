@@ -11,7 +11,7 @@ from Bio import SeqIO
 # local
 from jumplion.arguments import Arguments
 from jumplion.read_ms_files import get_cycle_time
-from jumplion.utils import remove_extension, get_extension, get_file_name
+from jumplion.utils import remove_extension, get_file_name
 from jumplion.calibration import (refine_spline, calc_spline_vectorized, 
                                   convert_to_arrays, check_model_accuracy, 
                                   spline_fitting_plot)
@@ -28,6 +28,7 @@ MaxMassCal = args.max_mass_cal
 def process_id_results(id_file, 
                        lib_file, 
                        ms_files,
+                       ms_file_type,
                        out_dir,
                        save_supplements=SaveSupplements,
                        min_runs_quant=MinRunsQuant,
@@ -42,16 +43,25 @@ def process_id_results(id_file,
     # 0. read id report and spectral library files #
     ################################################
     # read id report file
-    logging.info(f"Reading identification report file: {id_file}")
     required_columns = ['Run', 'Precursor.Id', 'RT', 'Q.Value']
-    is_tims = False
-    if get_extension(ms_files[0]) == 'd':
-        is_tims = True
+    is_tims = ms_file_type == 'd'
+    if is_tims:
         required_columns = required_columns + ['IM']
-        
+    
+    logging.info(f"Reading columns {', '.join(required_columns)} from identification report file: {id_file}")
     id_df = pd.read_parquet(id_file, columns=required_columns)
+    logging.info(f"Loaded {id_df.shape[0]} rows and {id_df.shape[1]} columns")
+    print(id_df.head(5))
+    print(id_df[['Precursor.Id','Run','RT']].dtypes)
+    if id_df['RT'].isna().sum():
+        logging.warn("NA found in the RT column.")
     run_names = [remove_extension(get_file_name(ms_file)) for ms_file in ms_files]
+    logging.info("Filtering report based on input runs")
     id_df = id_df[id_df['Run'].isin(run_names)]
+    logging.info(f"Result in {id_df.shape[0]} rows and {id_df.shape[1]} columns")
+    n_unique_prec = id_df["Precursor.Id"].nunique()
+    n_unique_run = id_df["Run"].nunique()
+    logging.info(f"ID report contains {n_unique_prec} unique precursors in {n_unique_run} runs")
     
     # read library file
     logging.info(f"Reading spectral library: {lib_file}")
@@ -78,7 +88,13 @@ def process_id_results(id_file,
     logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
     # get rt and im matrix
     rt_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='RT')
-    rt_mat = rt_mat[(rt_mat.shape[1] - rt_mat.isna().sum(axis=1)) >= min_runs_quant]
+    n_runs_detected = rt_mat.shape[1] - rt_mat.isna().sum(axis=1)
+    counts, bin_edges = np.histogram(n_runs_detected, bins=10)
+    for i in range(len(counts)):
+        bar = '#' * counts[i]
+        print(f"{bin_edges[i]:6.2f} to {bin_edges[i+1]:6.2f} | {bar}")
+    logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
+    rt_mat = rt_mat[n_runs_detected >= min_runs_quant]
     if save_supplements:
         out_rt_dir = out_int_dir / 'rt_prediction'
         out_rt_dir.mkdir(parents=True, exist_ok=True)
