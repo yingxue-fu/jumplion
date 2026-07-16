@@ -39,9 +39,9 @@ def process_id_results(id_file,
                        max_mass_cal=MaxMassCal):
     out_int_dir = Path(out_dir) / 'intermediate'
     
-    ################################################
-    # 0. read id report and spectral library files #
-    ################################################
+    #################################
+    # 0. read id report file        #
+    #################################
     # read id report file
     required_columns = ['Run', 'Precursor.Id', 'RT', 'Q.Value']
     is_tims = ms_file_type == 'd'
@@ -58,28 +58,11 @@ def process_id_results(id_file,
     run_names = [remove_extension(get_file_name(ms_file)) for ms_file in ms_files]
     logging.info("Filtering report based on input runs")
     id_df = id_df[id_df['Run'].isin(run_names)]
-    logging.info(f"Result in {id_df.shape[0]} rows and {id_df.shape[1]} columns")
+    logging.info(f"Resulting in {id_df.shape[0]} rows and {id_df.shape[1]} columns")
     n_unique_prec = id_df["Precursor.Id"].nunique()
     n_unique_run = id_df["Run"].nunique()
     logging.info(f"ID report contains {n_unique_prec} unique precursors in {n_unique_run} runs")
     
-    # read library file
-    logging.info(f"Reading spectral library: {lib_file}")
-    lib_df = pd.read_parquet(lib_file)
-    # Remove decoys
-    for col_index, header in enumerate(lib_df.columns):
-        if re.sub(r"[\s\._-]", "", header.lower()) in [h.lower() for h in ("Decoy", "isDecoy")]:
-            decoy_col_name = header
-            decoy_values = ['1', 't', 'T']
-            decoy_mask = lib_df[decoy_col_name].astype(str).isin(decoy_values)
-            n_decoys = decoy_mask.sum()
-            logging.warning(f"WARNING: the library contains {n_decoys} decoy precursors, which will be removed")
-            lib_df = lib_df[~decoy_mask].copy()
-            break
-    if "Precursor.Id" in lib_df.columns:
-        n_unique = lib_df["Precursor.Id"].nunique()
-        logging.info(f"Library contains {n_unique} unique precursors")
-        
     ###########################################
     # 1. Choose precursors for quantification #
     ###########################################
@@ -112,9 +95,27 @@ def process_id_results(id_file,
             im_mat.to_csv(out_im_dir / "im_mat_before_prediction.csv")
     else:
         im_mat = None
-    logging.info(f"{len(rt_mat)} precursors are included for quantification")
+    logging.info(f"{len(rt_mat)} precursors are included for quantification\n")
     
-    
+    #######################################
+    # 2. load and filter spectral library #
+    #######################################
+    # read library file
+    logging.info(f"Reading spectral library: {lib_file}")
+    lib_df = pd.read_parquet(lib_file)
+    # Remove decoys
+    for col_index, header in enumerate(lib_df.columns):
+        if re.sub(r"[\s\._-]", "", header.lower()) in [h.lower() for h in ("Decoy", "isDecoy")]:
+            decoy_col_name = header
+            decoy_values = ['1', 't', 'T']
+            decoy_mask = lib_df[decoy_col_name].astype(str).isin(decoy_values)
+            n_decoys = decoy_mask.sum()
+            logging.warning(f"WARNING: the library contains {n_decoys} decoy precursors, which will be removed")
+            lib_df = lib_df[~decoy_mask].copy()
+            break
+    if "Precursor.Id" in lib_df.columns:
+        n_unique = lib_df["Precursor.Id"].nunique()
+        logging.info(f"Library contains {n_unique} unique precursors")
     # filter and save new library for re-quantification
     lib_df = lib_df[lib_df['Precursor.Id'].isin(rt_mat.index.values)]
     if is_tims:
@@ -128,7 +129,7 @@ def process_id_results(id_file,
     logging.info(f"Filtered spectral library saved to {lib_file_filtered}\n")
     
     #######################
-    # 2. RT/IM prediction #
+    # 3. RT/IM prediction #
     #######################
     if PredictRTIM:
         logging.info("Predicting precursor RTs (and IMs)") 
@@ -174,7 +175,7 @@ def process_id_results(id_file,
             prec_rt_info = pd.concat([prec_rt_info, im_mat.add_suffix('_IM')], axis=1) 
     
     #############################################
-    # 3. Choose precursors for mass calibration #
+    # 4. Choose precursors for mass calibration #
     #############################################
     if min_runs_cal == 0:
         min_runs_cal = len(ms_files)
@@ -194,7 +195,7 @@ def process_id_results(id_file,
     prec_rt_info.to_csv(out_int_dir / "prec_rt_info.csv")
     
     #########################################
-    # 4. determine the number of XIC points #
+    # 5. determine the number of XIC points #
     #########################################
     logging.info("Determining the number of data points to extract for an XIC")
     # 
