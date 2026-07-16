@@ -50,7 +50,7 @@ def process_id_results(id_file,
     
     logging.info(f"Reading identification report file: {id_file}")
     id_df = pd.read_parquet(id_file, columns=required_columns)
-    logging.info(f"Loaded {id_df.shape[0]} rows and {id_df.shape[1]} columns, e.g.,", 
+    logging.info(f"Loaded {id_df.shape[0]} rows and {id_df.shape[1]} columns, e.g.,\n%s", 
                  indent_df(id_df.head(5).rename(columns=lambda c: f"{c} ({id_df[c].dtype})"), 
                            spaces=4, index=False))
     if id_df['RT'].isna().sum():
@@ -89,10 +89,14 @@ def process_id_results(id_file,
     # get rt and im matrix
     rt_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='RT')
     n_runs_detected = rt_mat.shape[1] - rt_mat.isna().sum(axis=1)
-    counts, bin_edges = np.histogram(n_runs_detected, bins=10)
+    counts, bin_edges = np.histogram(n_runs_detected, bins=10 if rt_mat.shape[1] > 10 else rt_mat.shape[1] - 1)
+    max_bar_width = 20
+    max_count = counts.max()
     for i in range(len(counts)):
-        bar = '#' * int(counts[i] / len(n_runs_detected)) * 10
-        logging.info(f"{bin_edges[i]:6.2f} to {bin_edges[i+1]:6.2f} | {bar}")
+        bar_len = int((counts[i] / max_count) * max_bar_width) if max_count > 0 else 0
+        bar = '#' * bar_len
+        right_bracket = ']' if i == len(counts) - 1 else ')'
+        logging.info(f"[{bin_edges[i]:5.1f}, {bin_edges[i+1]:5.1f}{right_bracket} | {bar} ({counts[i]})")
     logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
     rt_mat = rt_mat[n_runs_detected >= min_runs_quant]
     if save_supplements:
@@ -109,6 +113,7 @@ def process_id_results(id_file,
     else:
         im_mat = None
     logging.info(f"{len(rt_mat)} precursors are included for quantification")
+    
     
     # filter and save new library for re-quantification
     lib_df = lib_df[lib_df['Precursor.Id'].isin(rt_mat.index.values)]
