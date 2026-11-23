@@ -1,2 +1,4 @@
 recursive-include jumplion/gui/assets *
 recursive-include jumplion/ext *
+recursive-include jumplion/_iq_native *
+global-exclude __pycache__ *.py[cod]
