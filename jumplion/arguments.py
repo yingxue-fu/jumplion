@@ -24,8 +24,7 @@ class Arguments:
     input_runs: List[str] = field(default_factory=list)
     prec_ids: str = ""
     spec_lib: str = ""
-    sample_meta: str = ""
-    out_dir: str = ""
+    out_dir: str = "jumplion_results"
     
     # Use existing results
     skip_id_processing: int = 0
@@ -34,14 +33,14 @@ class Arguments:
     
     # ID results processing
     min_runs_quant: int = 0
-    min_runs_model: int = 0
-    min_runs_cal: int = 0
-    max_qvalue_cal: float = 0.001
+    min_runs_model_frac: float = 0.5
+    min_runs_cal_frac: float = 0.8
+    max_qvalue_cal: float = 0.01
     max_mass_cal: int = 5000
     
     # XIC extraction
     ## Number of data points in a XIC
-    n_xic_points: int = 21
+    min_xic_points_half: int = 15
     ## Mass calibration
     mass_calibration: int = 1    
     mass_cal_acc: float = 30.0   # calibration mass accuracy
@@ -57,7 +56,7 @@ class Arguments:
     ## Number of precursor and product ions
     max_prec_num: int = 5
     min_prod_num: int = 3
-    max_prod_num: int = 6
+    max_prod_num: int = 12
     
     # XIC quantification
     optimal_xic_source: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
@@ -68,8 +67,6 @@ class Arguments:
     # Precursor quantification
     use_raw_ms1: int = 0
     use_raw_ms2: int = 1
-    use_lion_inference: int = 1
-    lion_value_scale: float = 1.0
     
     # Precursor normalization
     normalization: int = 1
@@ -81,7 +78,6 @@ class Arguments:
     prec_quant_level: str = "ms1_ms2" # Other options: 'ms1', 'ms2'
     min_prec_count: int = 2
     min_pep_count: int = 1
-    fastas: List[str] = field(default_factory=list)
     
     # Hidden parameters
     ## ID results processing (hidden from users)
@@ -91,14 +87,10 @@ class Arguments:
     weighted_centroid: int = 1
     mass_acc_centroid: int = 5
     im_window_centroid: float = 0.005
-    ## Precursor quantification (hidden from users)
-    lion_value_type: str = "local_min"
-    xic_quality_cutoff: float = 0.0
-    allowed_xic_missing: float = 0.5
-    min_n_xic: int = 2
-    ## Protein quantification (hidden from users)
-    min_prec_quality: float = 0.0
-    min_1hitw_quality: float = 0.5
+    ##
+    corr_weight: float = 0.4
+    shape_weight: float = 0.2
+    intensity_weight: float = 0.4
     
     # Other hidden parameters
     gen_params: str = ""
@@ -130,7 +122,7 @@ class Arguments:
             f.write(f"# JUMPlion (v{VERSION}) parameters\n\n")
             f.write("[required]\n")
             f.write("# Input runs: .raw/.mzML files for Thermo instruments or diaPASEF .d files for timsTOF instruments\n")
-            f.write("# Leave the 'input_runs = ' row empty when there are multiple files. The same applies to the 'fastas = ' parameter.\n")
+            f.write("# Leave the 'input_runs = ' row empty when there are multiple files.\n")
             for fdef in fields(self):
                 if fdef.name == "predict_rt_im":
                     break
@@ -138,16 +130,14 @@ class Arguments:
                     f.write("\n# Precursor-level idetification table\n")
                 if fdef.name == "spec_lib":
                     f.write("\n# Spectral library (support .tsv/.csv/.parquet format)\n") 
-                if fdef.name == "sample_meta":
-                    f.write("\n# Sample meta info (support .csv format)\n") 
                 if fdef.name == "out_dir":
-                    f.write("\n# Output directory name\n")
-                if fdef.name == "skip_id_processing":
                     f.write("\n\n[optional]\n")
-                    f.write("# Use existing results\n")
+                    f.write("# Output directory (a relative path is relative to the folder of this file)\n")
+                if fdef.name == "skip_id_processing":
+                    f.write("\n# Use existing results\n")
                 if fdef.name == "min_runs_quant":
                     f.write("\n# ID results processing\n")
-                if fdef.name == "n_xic_points":
+                if fdef.name == "min_xic_points_half":
                     f.write("\n# XIC extraction\n")
                 if fdef.name == "optimal_xic_source":
                     f.write("\n# XIC quantification\n")
@@ -186,8 +176,7 @@ def create_parser() -> argparse.ArgumentParser:
     required_group.add_argument("--input-runs", help="paths of raw files", nargs='*', default=[])
     required_group.add_argument("--prec-ids", type=str, help="path to precursor identification table")
     required_group.add_argument("--spec-lib", type=str, help="path to spectral library")
-    required_group.add_argument("--sample-meta", type=str, help="path to sample meta info")
-    required_group.add_argument("--out-dir", type=str, help="output directory name")
+    optional_group.add_argument("--out-dir", type=str, help="output directory name (default: jumplion_results)")
     
     # Use existing results
     optional_group.add_argument("--skip-id-processing", type=int, help="")
@@ -196,13 +185,13 @@ def create_parser() -> argparse.ArgumentParser:
     
     # ID results processing
     optional_group.add_argument("--min-runs-quant", type=int, help="")
-    optional_group.add_argument("--min-runs-model", type=int, help="")
-    optional_group.add_argument("--min-runs-cal", type=int, help="")
+    optional_group.add_argument("--min-runs-model-frac", type=float, help="")
+    optional_group.add_argument("--min-runs-cal-frac", type=float, help="")
     optional_group.add_argument("--max-qvalue-cal", type=float, help="")
     optional_group.add_argument("--max-mass-cal", type=int, help="")
     
     # XIC extraction
-    optional_group.add_argument("--n-xic-points", type=int, help="")
+    optional_group.add_argument("--min-xic-points-half", type=int, help="")
     ## Mass calibration
     optional_group.add_argument("--mass-calibration", type=int, help="") 
     optional_group.add_argument("--mass-cal-acc", type=float, help="")  # calibration mass accuracy
@@ -228,8 +217,6 @@ def create_parser() -> argparse.ArgumentParser:
     # Precursor quantification
     optional_group.add_argument("--use-raw-ms1", type=float, help="")
     optional_group.add_argument("--use-raw-ms2", type=int, help="")
-    optional_group.add_argument("--use-lion-inference", type=int, help="")
-    optional_group.add_argument("--lion-value-scale", type=float, help="")
     
     # Precursor normalization
     optional_group.add_argument("--normalization", type=int, help="")
@@ -241,7 +228,6 @@ def create_parser() -> argparse.ArgumentParser:
     optional_group.add_argument("--prec-quant-level", type=str, help="")
     optional_group.add_argument("--min-prec-count", type=int, help="")
     optional_group.add_argument("--min-pep-count", type=int, help="")
-    optional_group.add_argument("--fastas", help="", nargs='*', default=[])
     
     # Hidden parameters
     ## ID results processing
@@ -251,14 +237,10 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weighted-centroid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--mass-acc-centroid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--im-window-centroid", type=float, help=argparse.SUPPRESS)
-    ## Precursor quantification
-    optional_group.add_argument("--xic-quality-cutoff", type=float, help=argparse.SUPPRESS)
-    optional_group.add_argument("--allowed-xic-missing", type=float, help=argparse.SUPPRESS)
-    optional_group.add_argument("--min-n-xic", type=int, help=argparse.SUPPRESS)
-    optional_group.add_argument("--lion-value-type", type=str, help=argparse.SUPPRESS)
-    ## Protein quantification
-    optional_group.add_argument("--min-prec-quality", type=float, help=argparse.SUPPRESS)
-    optional_group.add_argument("--min-1hitw-quality", type=float, help=argparse.SUPPRESS)
+    ##
+    optional_group.add_argument("--corr-weight", type=float, help=argparse.SUPPRESS)
+    optional_group.add_argument("--intensity-weight", type=float, help=argparse.SUPPRESS)
+    optional_group.add_argument("--shape-weight", type=float, help=argparse.SUPPRESS)
     
     # Other hidden parameters
     ## Config file
@@ -335,6 +317,9 @@ def parse_arguments(args: Optional[List[str]] = None) -> Arguments:
         arguments.fix_mass_acc = 0
         print("Mass accuracy will be determined for each run individually")
     
+    if not arguments.out_dir:
+        arguments.out_dir = "jumplion_results"
+    arguments.out_dir = str(Path(arguments.out_dir).resolve())
     if len(arguments.out_dir):
         out_dir = Path(arguments.out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)  # Create directory if missing
@@ -447,12 +432,18 @@ def params_to_args(param_file):
             else:
                 # Compare simple values (as strings for safety)
                 if str(value) != str(default_value):
+                    if key == 'out_dir' and not value:
+                        continue  # empty: use the default output directory
                     if key == 'out_dir':
                         value = str(Path(param_file).resolve().parent / value)
                     commands.append(f"--{key.replace('_', '-')}")
                     commands.append(value)
-    
-    return commands 
+
+    # No output directory given: use the default one next to the parameter file
+    if '--out-dir' not in commands:
+        commands += ['--out-dir', str(Path(param_file).resolve().parent / 'jumplion_results')]
+
+    return commands
     
 
 def setup_logger(show_log_level, out_dir):

@@ -2,6 +2,7 @@
 import os
 import re
 import math
+import logging
 from typing import List
 # external
 from tqdm import tqdm
@@ -16,20 +17,16 @@ MaxLibFrNum = 20
 # Mass calibration
 MassCalBins = 1
 MassCalBinsMax = 1
-MassCalScore = 0.9
+MassCalScore = 0.8
 
-# Optimal XIC
-CorrRadius = 5
+# XIC evaluation
+InitialRadius = 4
 CorrMethod = 0
-WeightByShape = 1
-WeightByIntensity = 1
-CorrWeight = 0.5
-ShapeWeight = 0.2
-IntensityWeight = 0.3
-MinShapeScore = 0.3
+#MinShapeScore = 0.5
+MinMs1Ms2Corr = 0.8
 MinXicIntensity = 10
 MinApexIntensity = 30
-MinApexEvidence = 0.99
+#MinApexEvidence = 0.99
 
 #
 E = np.float64(0.000000001)
@@ -52,6 +49,19 @@ loss_none, loss_H2O, loss_NH3, loss_CO, loss_N, loss_other = np.arange(6)
 Loss = np.array([0.0, 18.011113035, 17.026548, 27.994915, 0.0, 0.0], dtype=np.float32)
 
 
+def define_species(prot_names):
+    if pd.isna(prot_names) or not prot_names.strip():
+        return None
+
+    species = set()
+    for prot_name in prot_names.split(';'):
+        parts = prot_name.strip().split('_')
+        if len(parts) > 1:
+            species.add(parts[1].strip())
+
+    return ";".join(sorted(species)) if species else None
+
+
 # print out df in logs
 def indent_df(df, spaces=4, index=False):
     """Return a DataFrame string with left indentation for logging."""
@@ -60,41 +70,92 @@ def indent_df(df, spaces=4, index=False):
     return "\n".join(indent + line for line in df_str.splitlines())
 
 
+def logging_histogram(count_data, max_count, n_bins=20, max_bar_width=20):
+    n_bins = n_bins if max_count > n_bins else max_count - 1
+    n_bins = max(n_bins, 1)
+
+    data_min, data_max = int(np.min(count_data)), int(np.max(count_data))
+    bin_edges = np.linspace(data_min, data_max + 1, n_bins + 1)
+    bin_edges = np.unique(np.round(bin_edges).astype(int))
+
+    counts, bin_edges = np.histogram(count_data, bins=bin_edges)
+    max_count = counts.max()
+
+    for i in range(len(counts)):
+        bar_len = int((counts[i] / max_count) * max_bar_width) if max_count > 0 else 0
+        bar = '#' * bar_len
+        right_bracket = ']' if i == len(counts) - 1 else ')'
+        logging.info(f"[{bin_edges[i]:5d}, {bin_edges[i+1]:5d}{right_bracket} | {bar} ({counts[i]})")
+
+
 def estimate_isotopes(peptide_mass, threshold=0.1):
     """
-    Estimate number of observable isotopic peaks (>= threshold relative intensity).
-    
+    Estimate the isotopic envelope of a peptide using a Poisson/
+    averagine approximation.
+
     Parameters
     ----------
     peptide_mass : float
         Peptide mass in Da.
     threshold : float
-        Relative intensity cutoff (default 0.1 = 10%).
-    
+        Relative intensity cutoff relative to the most intense
+        isotope peak. Default = 0.1 (10%).
+
     Returns
     -------
     n_peaks : int
-        Number of observable peaks (M to M+n).
+        Number of peaks from M through the last isotope peak
+        above the threshold.
+
+    rel_intensities : list of float
+        Relative intensities of M, M+1, ..., normalized so that
+        the most intense isotope peak = 1.0.
     """
-    # Mean heavy isotopes using averagine model (C/N contributions)
+    if peptide_mass <= 0:
+        raise ValueError("peptide_mass must be > 0")
+
+    if not 0 < threshold <= 1:
+        raise ValueError("threshold must be > 0 and <= 1")
+
+    # Mean heavy-isotope count from averagine approximation
     lam = 0.00052 * peptide_mass
-    
-    # Poisson mode (most probable isotope count)
-    mode = int(lam)
-    max_prob = math.exp(-lam) * lam**mode / math.factorial(mode)
-    
-    # Always include mono isotopic peak
-    n_peaks = 1
-    k = 1
+
+    # Poisson mode
+    mode = int(math.floor(lam))
+
+    # log(P(k)) except for the constant -lambda, which cancels
+    # when calculating relative probabilities.
+    def log_prob(k):
+        if lam == 0:
+            return 0.0 if k == 0 else -math.inf
+        return k * math.log(lam) - math.lgamma(k + 1)
+
+    # Most intense isotope
+    log_pmax = log_prob(mode)
+
+    rel_intensities = []
+
+    k = 0
+
     while True:
-        prob = math.exp(-lam) * lam**k / math.factorial(k)
-        rel_intensity = prob / max_prob
-        if rel_intensity >= threshold:
-            n_peaks = k + 1  # count peaks from M to M+k
-            k += 1
-        else:
+        # Relative intensity compared with the Poisson mode
+        log_rel = log_prob(k) - log_pmax
+        rel = math.exp(log_rel)
+
+        rel_intensities.append(rel)
+
+        # We can only stop AFTER passing the mode.
+        # Before the mode, intensities may still be increasing.
+        if k > mode and rel < threshold:
+            # Remove first peak below threshold
+            rel_intensities.pop()
             break
-    return n_peaks
+
+        k += 1
+
+    n_peaks = len(rel_intensities)
+
+    return n_peaks, rel_intensities
 
 
 def consolidate_by_ms1(indices, data, method='sum'):
@@ -200,128 +261,6 @@ def weighted_average_mz(mzs, intensities):
         return 0.0, 0.0
     
     return total_intensities, weighted_sum / total_intensities
-
-
-def generate_group_indices(sample_names: List[str], 
-                           sample_meta: pd.DataFrame, 
-                           sample_column: str = 'Sample', 
-                           group_column: str = 'Group') -> List[List[int]]:
-    """
-    Generate group indices from sample names and sample meta.
-    
-    Parameters:
-    -----------
-    sample_names : List[str]
-        List of sample names in the order they appear in the matrix
-    sample_meta : pd.DataFrame
-        DataFrame with sample names and their corresponding groups
-    sample_column : str
-        Name of the column in sample_meta that contains sample names
-    group_column : str
-        Name of the column in sample_meta that contains group assignments
-        
-    Returns:
-    --------
-    List[List[int]]
-        List of lists, where each inner list contains column indices for a group
-    """
-    # Create a mapping from column name to its index in the matrix
-    col_name_to_index = {name: idx for idx, name in enumerate(sample_names)}
-    
-    # Create a dictionary to store groups
-    group_dict = {}
-    
-    # Process each row in the group DataFrame
-    for _, row in sample_meta.iterrows():
-        col_name = row[sample_column]
-        group = row[group_column]
-        
-        # Check if column name exists in our matrix
-        if col_name in col_name_to_index:
-            if group not in group_dict:
-                group_dict[group] = []
-            group_dict[group].append(col_name_to_index[col_name])
-        else:
-            print(f"Warning: Column '{col_name}' not found in matrix columns")
-    
-    # Convert to list of lists (sorted by group keys for consistency)
-    group_indices = [group_dict[group] for group in sorted(group_dict.keys())]
-    
-    return group_indices
-
-
-def perform_lion_inference(
-        data: np.ndarray, 
-        sample_names, 
-        sample_meta,
-        sample_column, 
-        group_column,
-        lion_value_type='global_min',
-        lion_value_scale=1.0,
-        group_indices=None) -> np.ndarray:
-    """
-    Perform Local Inference of ion-level missingness using Neighborhood estimation (LION).
-    For each ion and each group, impute missing values with local/group minimum/mean.
-    Parameters:
-    -----------
-    data : np.ndarray
-        2D numpy array with missing values (NaN)
-    sample_names : array-like
-        Sample names corresponding to columns
-    sample_meta : DataFrame or dict
-        Metadata for samples
-    sample_column : str
-        Column name in sample_meta to match sample_names
-    group_column : str
-        Column name in sample_meta for grouping
-    lion_value_type : str, optional
-        Method for imputation: 'global_min', 'global_mean', 'local_min', or 'local_mean'
-        Default is 'global_min'
-    lion_value_scale : float, optional
-        Multiplication factor for fill value. Default is 1.0
-        
-    Returns:
-    --------
-    np.ndarray
-        Imputed array
-    """
-    # Create a copy to avoid modifying original data
-    imputed_data = data.copy()
-    
-    # Calculate global statistics
-    global_min = np.nanmin(imputed_data)
-    global_mean = np.nanmean(imputed_data)
-    
-    if lion_value_type == 'global_min':
-        imputed_data = np.nan_to_num(imputed_data, nan=lion_value_scale*global_min)
-    
-    elif lion_value_type == 'global_mean':
-        imputed_data = np.nan_to_num(imputed_data, nan=lion_value_scale*global_mean)
-    
-    elif lion_value_type in ['local_min', 'local_mean']:
-        if group_indices is None:
-            group_indices = generate_group_indices(sample_names, sample_meta, sample_column, group_column)
-        
-        # Calculate group statistics across all rows
-        for col_indices in group_indices:
-            group_data = data[:, col_indices]
-            if np.all(np.isnan(group_data)):
-                # Handle case where all values in group are NaN
-                fill_value = global_min
-            else:
-                # Get minimum or mean value across all rows and columns in this group
-                if lion_value_type == 'local_min':
-                    fill_value = np.nanmin(group_data)
-                else:  # local_mean
-                    fill_value = np.nanmean(group_data)
-
-            group_imputed = imputed_data[:, col_indices]
-            group_missing = np.isnan(group_imputed)
-            if np.any(group_missing):
-                group_imputed[group_missing] = lion_value_scale * fill_value
-                imputed_data[:, col_indices] = group_imputed
-    
-    return imputed_data
 
 
 def progress_bar(iterable, show=True, intermittent=False):

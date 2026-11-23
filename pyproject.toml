@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "pybind11>=2.11"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -19,7 +19,7 @@ classifiers = [
 
 [project.scripts]
 jumplion = "jumplion.main:main"
-jumplion-gui = "jumplion.gui.index_tabs:main"
+jumplion-viewer = "jumplion.gui.index_tabs:main"
 
 [project.urls]
 "Homepage" = "https://github.com/yingxue-fu/jumplion"

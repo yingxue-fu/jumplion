@@ -1,3 +1,6 @@
+# This file is adapted from AlphaTims (https://github.com/MannLabs/alphatims),
+# Copyright (c) MannLabs, licensed under the Apache License, Version 2.0
+# (http://www.apache.org/licenses/LICENSE-2.0). It has been modified for use in JUMPlion.
 # builtin
 import os
 import sys

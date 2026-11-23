@@ -1,27 +1,27 @@
 # builtin
 import re
-import json
 import logging
 from pathlib import Path
 # external
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from Bio import SeqIO
+#from Bio import SeqIO
 # local
 from jumplion.arguments import Arguments
-from jumplion.read_ms_files import get_cycle_time
-from jumplion.utils import remove_extension, get_file_name, indent_df
-from jumplion.calibration import (refine_spline, calc_spline_vectorized, 
-                                  convert_to_arrays, check_model_accuracy, 
-                                  spline_fitting_plot)
+from jumplion.precursor import get_aas
+from jumplion.utils import remove_extension, get_file_name, indent_df, logging_histogram
+from jumplion.calibration import refine_spline, calc_spline_vectorized
+from jumplion.coordinate_validation import (ModelConfig, 
+                                            run_rt_prediction,
+                                            run_im_prediction)
 
 args = Arguments()
 SaveSupplements = args.save_supplements
 MinRunsQuant = args.min_runs_quant
 PredictRTIM = args.predict_rt_im
-MinRunsModel = args.min_runs_model
-MinRunsCal = args.min_runs_cal
+ValidateRTIM = False
+MinRunsModelFrac = args.min_runs_model_frac
+MinRunsCalFrac = args.min_runs_cal_frac
 MaxQvalueCal = args.max_qvalue_cal
 MaxMassCal = args.max_mass_cal
 
@@ -33,73 +33,76 @@ def process_id_results(id_file,
                        save_supplements=SaveSupplements,
                        min_runs_quant=MinRunsQuant,
                        predict_rt_im=PredictRTIM,
-                       min_runs_model=MinRunsModel,
-                       min_runs_cal=MinRunsCal,
+                       validate_rt_im=ValidateRTIM,
+                       min_runs_model_frac=MinRunsModelFrac,
+                       min_runs_cal_frac=MinRunsCalFrac,
                        max_qvalue_cal=MaxQvalueCal,
                        max_mass_cal=MaxMassCal):
+    
     out_int_dir = Path(out_dir) / 'intermediate'
+    out_pub_dir = Path(out_dir) / 'publication'
     
     #################################
     # 0. read id report file        #
     #################################
-    # read id report file
-    required_columns = ['Run', 'Precursor.Id', 'RT', 'Q.Value']
+    required_columns = ['Run', 'Precursor.Id', 'RT', 'Q.Value', 'Precursor.Quantity']
     is_tims = ms_file_type == 'd'
     if is_tims:
         required_columns = required_columns + ['IM']
     
     logging.info(f"Reading identification report file: {id_file}")
+    id_df_top1000 = pd.read_parquet(id_file).head(1000)
+    id_df_top1000.to_csv(out_int_dir / "diann_report_top1000.tsv", sep = '\t', index = False)
     id_df = pd.read_parquet(id_file, columns=required_columns)
+    id_df_top5 = id_df.head(5).copy()
+    id_df_top5.loc[:,'Run'] = id_df_top5['Run'].str[0:10] + '...' + id_df_top5['Run'].str[-10:]
     logging.info(f"Loaded {id_df.shape[0]} rows and {id_df.shape[1]} columns, e.g.,\n%s", 
-                 indent_df(id_df.head(5).rename(columns=lambda c: f"{c} ({id_df[c].dtype})"), 
+                 indent_df(id_df_top5.rename(columns=lambda c: f"{c} ({id_df[c].dtype})"), 
                            spaces=4, index=False))
-    if id_df['RT'].isna().sum():
-        logging.warn("NA found in the RT column.")
-    run_names = [remove_extension(get_file_name(ms_file)) for ms_file in ms_files]
-    logging.info("Filtering report based on input runs")
-    id_df = id_df[id_df['Run'].isin(run_names)]
-    logging.info(f"Resulting in {id_df.shape[0]} rows and {id_df.shape[1]} columns")
     n_unique_prec = id_df["Precursor.Id"].nunique()
     n_unique_run = id_df["Run"].nunique()
     logging.info(f"ID report contains {n_unique_prec} unique precursors in {n_unique_run} runs")
+    if id_df['RT'].isna().sum():
+        logging.warn("NA found in the RT column.")
     
-    ###########################################
-    # 1. Choose precursors for quantification #
-    ###########################################
-    if min_runs_quant == 0:
-        min_runs_quant = 3
-    logging.info("Distribution of the number of runs a precursor is detected in:")
-    # get rt and im matrix
+    logging.info(f"Filtering report based on input runs (n = {len(ms_files)})")
+    run_names = [remove_extension(get_file_name(ms_file)) for ms_file in ms_files]
+    id_df = id_df[id_df['Run'].isin(run_names)]
+    logging.info(f"Resulting in {id_df.shape[0]} rows and {id_df.shape[1]} columns")
+
+    ############################
+    # 1. get rt and im matrix  #
+    ############################
     rt_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='RT')
+    # check missing value percentage
+    logging.info("Distribution of the number of runs a precursor is detected in:")
     n_runs_detected = rt_mat.shape[1] - rt_mat.isna().sum(axis=1)
-    counts, bin_edges = np.histogram(n_runs_detected, bins=10 if rt_mat.shape[1] > 10 else rt_mat.shape[1] - 1)
-    max_bar_width = 20
-    max_count = counts.max()
-    for i in range(len(counts)):
-        bar_len = int((counts[i] / max_count) * max_bar_width) if max_count > 0 else 0
-        bar = '#' * bar_len
-        right_bracket = ']' if i == len(counts) - 1 else ')'
-        logging.info(f"[{bin_edges[i]:5.1f}, {bin_edges[i+1]:5.1f}{right_bracket} | {bar} ({counts[i]})")
-    logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs for quantification")
-    rt_mat = rt_mat[n_runs_detected >= min_runs_quant]
+    logging_histogram(n_runs_detected, rt_mat.shape[1])
+    # 
+    missing_status = pd.DataFrame(
+        np.where(rt_mat.isna(), "missing", "reported"),
+        index=rt_mat.index,
+        columns=rt_mat.columns
+    )
+    missing_status.to_csv(out_int_dir / "missing_status.tsv", sep = '\t')
+    
     if save_supplements:
         out_rt_dir = out_int_dir / 'rt_prediction'
         out_rt_dir.mkdir(parents=True, exist_ok=True)
-        rt_mat.to_csv(out_rt_dir / "rt_mat_before_prediction.csv")
+        rt_mat.to_csv(out_rt_dir / "rt_mat_before_prediction.tsv", sep = '\t')
     if is_tims:
         im_mat = id_df.pivot(index='Precursor.Id', columns='Run', values='IM')
         im_mat = im_mat.loc[rt_mat.index, :]
         if save_supplements:
             out_im_dir = out_int_dir / 'im_prediction'
             out_im_dir.mkdir(parents=True, exist_ok=True)
-            im_mat.to_csv(out_im_dir / "im_mat_before_prediction.csv")
+            im_mat.to_csv(out_im_dir / "im_mat_before_prediction.tsv", sep = '\t')
     else:
         im_mat = None
-    logging.info(f"{len(rt_mat)} precursors are included for quantification\n")
     
-    #######################################
-    # 2. load and filter spectral library #
-    #######################################
+    ############################
+    # 2. load spectral library #
+    ############################
     # read library file
     logging.info(f"Reading spectral library: {lib_file}")
     lib_df = pd.read_parquet(lib_file)
@@ -116,52 +119,105 @@ def process_id_results(id_file,
     if "Precursor.Id" in lib_df.columns:
         n_unique = lib_df["Precursor.Id"].nunique()
         logging.info(f"Library contains {n_unique} unique precursors")
-    # filter and save new library for re-quantification
-    lib_df = lib_df[lib_df['Precursor.Id'].isin(rt_mat.index.values)]
-    if is_tims:
-        lib_df_uniq_prec = lib_df[['Precursor.Id', 'RT', 'IM', 'Precursor.Mz']].copy()
+        lib_n_frags = lib_df.groupby('Precursor.Id').size().reset_index(name='n_frags')
+        n_frags_dist = pd.DataFrame(lib_n_frags['n_frags'].value_counts()).reset_index(names='# Fragments')
+        logging.info("Distribution of the number of fragments for a precursor\n%s", 
+                     indent_df(n_frags_dist, spaces=4, index=False))
     else:
-        lib_df_uniq_prec = lib_df[['Precursor.Id', 'RT', 'Precursor.Mz']].copy()
-    lib_df_uniq_prec.drop_duplicates(subset=['Precursor.Id'], inplace=True, ignore_index=True)
+        raise ValueError("The library dose not contain the Precursor.Id column.")
     
-    lib_file_filtered = out_int_dir / 'speclib_filtered.parquet'
-    lib_df.to_parquet(lib_file_filtered, index=False)
-    logging.info(f"Filtered spectral library saved to {lib_file_filtered}\n")
+    # extract library RT and IM
+    prec_cols = ['Precursor.Id', 'Modified.Sequence', 'RT', 'Precursor.Mz']
+    if is_tims:
+        lib_df_uniq_prec = lib_df[prec_cols + ['IM']].copy()
+    else:
+        lib_df_uniq_prec = lib_df[prec_cols].copy()
+    lib_df_uniq_prec.drop_duplicates(subset=['Precursor.Id'], inplace=True, ignore_index=True)
+    lib_df_uniq_prec = lib_df_uniq_prec.merge(lib_n_frags)
+    
+    # extract protein info 
+    prot_cols = ['Protein.Group', 'Protein.Ids', 'Protein.Names', 'Genes']
+    prec_prot_cols = ['Precursor.Id'] + prot_cols
+    #
+    prot_df = lib_df[prot_cols].copy()
+    prot_df = prot_df.drop_duplicates(ignore_index=True)
+    prot_df.to_csv(out_int_dir / "prot_info.tsv", sep='\t', index=False)
+    #
+    prec_prot_df = lib_df[prec_prot_cols].copy()
+    prec_prot_df = prec_prot_df.drop_duplicates(ignore_index=True)
+    n_duplicated = prec_prot_df['Precursor.Id'].duplicated().sum()
+    if n_duplicated > 0:
+        logging.info(f"Found cases in which one precursor was assigned to multiple proteins. Total number: {n_duplicated}")
+        dups = prec_prot_df[prec_prot_df['Precursor.Id'].duplicated(keep=False), ['Precursor.Id', 'Protein.Names', 'Genes']]
+        logging.info(indent_df(dups, spaces=4, index=False))
+        prec_prot_df = prec_prot_df.drop_duplicates(subset=['Precursor.Id'], ignore_index=True)
+    prec_prot_df.to_csv(out_int_dir / "prec_prot_relation.tsv", sep='\t', index=False)
+    
+    #######################
+    # 3. extract DIA-NN precursor/protein quantities #
+    #######################
+    # extract precursor quantities
+    quant_df = pd.read_parquet(id_file, columns=['Run', 
+                                                 'Precursor.Id', 'Precursor.Quantity', 'Precursor.Normalised',
+                                                 'Protein.Group', 'PG.MaxLFQ'])
+    quant_df = quant_df[quant_df['Run'].isin(run_names)]
+    #
+    prec_quant_mat = quant_df.pivot(index='Precursor.Id', columns='Run', values='Precursor.Quantity')
+    prec_quant_mat = prec_prot_df.merge(prec_quant_mat, on='Precursor.Id', how='inner')
+    prec_quant_mat.to_csv(out_pub_dir / "prec_matrix_diann.tsv", sep = '\t', index=False)
+    #
+    prec_quant_norm_mat = quant_df.pivot(index='Precursor.Id', columns='Run', values='Precursor.Normalised')
+    prec_quant_norm_mat = prec_prot_df.merge(prec_quant_norm_mat, on='Precursor.Id', how='inner')
+    prec_quant_norm_mat.to_csv(out_pub_dir / "prec_matrix_diann_norm.tsv", sep = '\t', index=False)
+    #
+    prot_quant_df = quant_df[['Run', 'Protein.Group', 'PG.MaxLFQ']].drop_duplicates()
+    prot_quant_mat = prot_quant_df.pivot(index='Protein.Group', columns='Run', values='PG.MaxLFQ')
+    prot_quant_mat = prot_df.drop(columns='Protein.Ids').drop_duplicates().merge(prot_quant_mat, on='Protein.Group', how='inner')
+    prot_quant_mat.to_csv(out_pub_dir / "prot_matrix_diann.tsv", sep = '\t', index=False)
     
     #######################
     # 3. RT/IM prediction #
     #######################
-    if PredictRTIM:
+    if predict_rt_im:
         logging.info("Predicting precursor RTs (and IMs)") 
-        if min_runs_model == 0:
-            min_runs_model = len(ms_files) // 2
-        rt_dict, rt_segments = collect_model_data(rt_mat,  
-                                                  min_runs_model,
-                                                  lib_df_uniq_prec,
-                                                  data_type="rt")
-        rt_mat_pred, model_accs = modeling_and_prediction(rt_dict, rt_segments, rt_mat, 
-                                                          lib_df_uniq_prec, 
-                                                          data_type="rt", 
-                                                          out_dir=out_int_dir, 
-                                                          save_model=True,
-                                                          save_plot=save_supplements)
-        rt_mat_pred = adjust_prediction_outliers(rt_mat_pred, rt_mat, n_iter=5, save_plot=False)
-        if save_supplements:
-            rt_mat_pred.to_csv(out_rt_dir / "rt_mat_after_prediction.csv")
+        
+        config = ModelConfig(
+            coordinate_label="RT",
+            max_segments=30,
+            min_run_fraction=min_runs_model_frac,
+            adjustment_mode="clip",
+        )
+        
+        _, _, _, rt_prediction = run_rt_prediction(
+            rt_mat=rt_mat,
+            lib_df_uniq_prec=lib_df_uniq_prec,
+            refine_spline_fn=refine_spline,
+            calc_spline_vectorized_fn=calc_spline_vectorized,
+            out_dir=out_rt_dir,
+            config=config,
+            run_validation=validate_rt_im,
+            save_plots=save_supplements and validate_rt_im,
+        )
+        rt_mat_pred = rt_prediction.final_coordinate_matrix
         
         if is_tims:
-            im_dict, im_segments = collect_model_data(im_mat,  
-                                                      min_runs_model,
-                                                      lib_df_uniq_prec,
-                                                      data_type="im")
-            im_mat_pred, _ = modeling_and_prediction(im_dict, im_segments, im_mat, 
-                                                     lib_df_uniq_prec, 
-                                                     data_type="im",
-                                                     out_dir=out_int_dir, 
-                                                     save_model=True,
-                                                     save_plot=save_supplements)
-            if save_supplements:
-                im_mat_pred.to_csv(Path(out_im_dir) / "im_mat_after_prediction.csv")
+            config = ModelConfig(
+                coordinate_label="IM",
+                max_segments=5,
+                min_run_fraction=min_runs_model_frac,
+                adjustment_mode="median",
+            )
+            _, _, _, im_prediction = run_im_prediction(
+                im_mat=im_mat,
+                lib_df_uniq_prec=lib_df_uniq_prec,
+                fit_fn=refine_spline,
+                predict_fn=calc_spline_vectorized,
+                out_dir=out_im_dir,
+                config=config,
+                run_validation=validate_rt_im,
+                save_plots=save_supplements and validate_rt_im,
+            )
+            im_mat_pred = im_prediction.final_coordinate_matrix
     
         # combine together
         prec_rt_info = rt_mat_pred.add_suffix('_RT')
@@ -175,16 +231,16 @@ def process_id_results(id_file,
             prec_rt_info = pd.concat([prec_rt_info, im_mat.add_suffix('_IM')], axis=1) 
     
     #############################################
-    # 4. Choose precursors for mass calibration #
+    # 5. Choose precursors for mass calibration #
     #############################################
-    if min_runs_cal == 0:
-        min_runs_cal = len(ms_files)
+    min_runs_cal = int(np.ceil(min_runs_cal_frac * len(ms_files)))
     id_df_cal = id_df.loc[id_df['Q.Value'] < max_qvalue_cal, ['Precursor.Id', 'Run', 'Q.Value']]
     q_mat_cal = id_df_cal.pivot(index='Precursor.Id', columns='Run', values='Q.Value')
     q_mat_cal = q_mat_cal[(q_mat_cal.shape[1] - q_mat_cal.isna().sum(axis=1)) >= min_runs_cal]
     logging.info(f"{len(q_mat_cal)} precursors with Q-values < {max_qvalue_cal} are detected in at least (>=) {min_runs_cal} runs")
     q_means = q_mat_cal.mean(axis=1, numeric_only=True)
-    mass_cal_precs = q_means.nsmallest(max_mass_cal).index.values
+    q_means_topN = q_means.nsmallest(max_mass_cal)
+    mass_cal_precs = q_means_topN.index.values
     logging.info(f"The top {len(mass_cal_precs)} (ordered by average Q-value) of them are selected for mass calibration\n")
     
     # mark precursors used for calibration
@@ -192,224 +248,40 @@ def process_id_results(id_file,
     lib_df_uniq_prec.loc[lib_df_uniq_prec['Precursor.Id'].isin(mass_cal_precs), 'mass_cal'] = 1
     lib_df_uniq_prec = lib_df_uniq_prec.set_index('Precursor.Id').reindex(prec_rt_info.index)
     prec_rt_info = pd.concat([prec_rt_info, lib_df_uniq_prec['mass_cal']], axis=1)    
-    prec_rt_info.to_csv(out_int_dir / "prec_rt_info.csv")
     
-    #########################################
-    # 5. determine the number of XIC points #
-    #########################################
-    logging.info("Determining the number of data points to extract for an XIC")
-    # 
-    cycle_time = get_cycle_time(ms_files[0], out_dir=out_int_dir)
-    logging.info(f"Cycle time: {cycle_time} ({(cycle_time*60):3g} seconds)") 
-    average_model_acc = np.mean(model_accs)
-    average_model_acc_n_points = int(np.round(average_model_acc / cycle_time))
-    logging.info(f"Average RT prediction accuracy in terms of the number of data points in XICs: {average_model_acc_n_points}")
-    #
-    MinXICPoints = max(21, average_model_acc_n_points * 4 + 1)
-    if args.n_xic_points == 0:
-        args.n_xic_points = MinXICPoints
-    elif args.n_xic_points < MinXICPoints and args.n_xic_points > 0:
-        logging.warning(f"WARNING: the provided number ({args.n_xic_points}) of data points to extract for an XIC may be too small")
-        args.n_xic_points = MinXICPoints
-    logging.info(f"Number of data points to extract for a XIC set to: {args.n_xic_points}\n")
     
-    return prec_rt_info
-
-
-def collect_model_data(mat, 
-                       min_runs_model,
-                       lib_df_uniq_prec, 
-                       data_type="rt", # or "im"
-                       trim_pct=5, 
-                       max_segments=30, 
-                       min_points_per_bin=20,
-                       ):
-            
-    ######################################################
-    # Choose precursors for building RT prediction model #
-    ######################################################
-    # only keep precursors without missing values
-    #mat = mat[mat.isna().sum(axis=1) == 0]
-    logging.info(f"Precursors detected in at least (>=) {min_runs_model} runs are used for building {data_type.upper()} prediction model.")
-    mat = mat[(mat.shape[1] - mat.isna().sum(axis=1)) >= min_runs_model]
-    mat_stat = calculate_mat_stats(mat)
+    ###########################################
+    # 6. Choose precursors for quantification #
+    ###########################################
+    if min_runs_quant == 0:
+        min_runs_quant = 3
+    non_missing_pct_lower = 0.0
+    non_missing_pct_upper = 1.0
+    min_runs_quant = max(min_runs_quant, len(ms_files) * non_missing_pct_lower)
+    logging.info(f"Filtering precursors detected in at least (>=) {min_runs_quant} runs and with a non-missing percentaget between {non_missing_pct_lower*100}% and {non_missing_pct_upper*100}% for re-quantification")
+    rt_mat_f = rt_mat[(n_runs_detected >= min_runs_quant) & (n_runs_detected < len(ms_files) * non_missing_pct_upper)]
+    logging.info(f"{len(rt_mat_f)} precursors are included for re-quantification")
     
-    # filtering based on CV of RTs
-    logging.info(f"Filtering out precursors with the highest CVs of {data_type.upper()}s across runs ({trim_pct}%).")
-    high = mat_stat['CV'].quantile(1-trim_pct / 100)
-    mat = mat.loc[mat_stat['CV'] < high, :]
+    # filter and save new library
+    combined_precs = rt_mat_f.index.union(q_means_topN.index).values
+    lib_df = lib_df[lib_df['Precursor.Id'].isin(combined_precs)]
+    lib_file_filtered = out_int_dir / 'speclib_filtered.parquet'
+    lib_df.to_parquet(lib_file_filtered, index=False)
+    logging.info(f"Filtered spectral library saved to {lib_file_filtered}\n")
     
-    # get rt in library
-    lib_df_uniq_prec_sub = lib_df_uniq_prec[lib_df_uniq_prec['Precursor.Id'].isin(mat.index)]
-    if data_type == "rt":
-        lib_df_uniq_prec_sub = lib_df_uniq_prec_sub.sort_values(by='RT', ascending = True)
-    elif data_type == "im":
-        lib_df_uniq_prec_sub = lib_df_uniq_prec_sub.sort_values(by='IM', ascending = True)
-    lib_df_uniq_prec_sub.set_index('Precursor.Id', inplace=True, drop=False)
+    prec_rt_info['re_quan'] = 0
     
-    # sort to the same order
-    mat = mat.loc[lib_df_uniq_prec_sub['Precursor.Id'].values]
-    n_segments = min(max_segments, max(1, int(2.0 * np.sqrt(len(mat) / min_points_per_bin))))
-    logging.info(f"Using {len(mat)} precursors")
-    
-    # get RT data for each run
-    data_dict = {}
-    for run in mat.columns:
-        data_dict[run] = list(zip(lib_df_uniq_prec_sub[f'{data_type.upper()}'], mat[run]))
-        data_dict[run] = [
-            (iRT, expRT)
-            for iRT, expRT in zip(lib_df_uniq_prec_sub[f'{data_type.upper()}'], mat[run])
-            if pd.notna(expRT)
-        ]
-        
-    return data_dict, n_segments
-
-
-def calculate_mat_stats(mat, axis=1):
-    mat_stat = pd.DataFrame({'mean': mat.mean(axis=axis),
-                             'median': mat.median(axis=axis),
-                             'std': mat.std(axis=axis)})
-    # calculate CVs
-    mat_stat = mat_stat.assign(CV = mat_stat['std'] / mat_stat['mean'])
-    
-    return mat_stat
+    #prec_rt_info.loc[combined_precs, 're_quan'] = 1
+    prec_rt_info.loc[rt_mat_f.index.values, 're_quan'] = 1
+    prec_rt_info.to_csv(out_int_dir / "prec_rt_info.tsv", sep = '\t')
     
 
-def modeling_and_prediction(data_dict, 
-                            n_segments, 
-                            mat, 
-                            lib_df_uniq_prec, 
-                            data_type, 
-                            out_dir,
-                            save_plot=True,
-                            save_model=True):
-
-    models = {}
-    model_accs = []
-    mat_pred = mat.copy()
-    for run_name in data_dict.keys():
-        # build the model for predicting RT from iRT
-        logging.info(f"Building {data_type.upper()} prediction model for run {run_name}")
-        model_data = data_dict[run_name]
-        x, y = convert_to_arrays(model_data)
-        model_coeff, model_points = refine_spline(x, y, n_segments)
-        models[run_name] = {"coeff": model_coeff, "points": model_points}
-        delta_percentile=0.8
-        model_acc = check_model_accuracy(model_data, model_coeff, model_points, delta_percentile)
-        logging.info(f"{data_type.upper()} prediction accuracy for {delta_percentile * 100}% precursors: {model_acc:.4g}")
-        model_accs.append(model_acc)
-        if save_plot:
-            plot_out_dir = out_dir / f'{data_type}_prediction'
-            spline_fitting_plot(model_data, model_coeff, 
-                                model_points, model_acc, 
-                                show_window=False, model=data_type.upper(), 
-                                out_dir=plot_out_dir, run_name=run_name,
-                                save_plot=save_plot)
-            
-        # predict RT for precursors with no RT        
-        # Identify missing RTs
-        missing_mask = mat[run_name].isna()
-        missing_prec_ids = mat.index[missing_mask]
-        
-        # Get matching library values (dropping ones not found)
-        lib_series = lib_df_uniq_prec.set_index('Precursor.Id')[data_type.upper()]
-        lib_subset = lib_series.reindex(missing_prec_ids).dropna()
-        
-        # Vectorized prediction
-        x_vals = lib_subset.values.astype(np.float32)
-        predicted_rts = calc_spline_vectorized(model_coeff, model_points, x_vals)
-        
-        # Batch update
-        mat_pred.loc[lib_subset.index, run_name] = predicted_rts
     
-    if save_model:
-        json_file = out_dir / f'{data_type}_models.json'
-        with open(json_file, "w") as f:
-            json.dump(models, f, indent=4, default=convert_ndarray)
-        logging.info(f"{data_type.upper()} prediction models saved to {json_file}\n")
-    
-    return mat_pred, model_accs
+    return prec_rt_info, missing_status
 
 
-def adjust_prediction_outliers(mat_pred, mat, n_iter, save_plot=True, out_dir="", figsize=(9, 3)):
-    # calculate reference RT deviation range from actual matrix
-    ## medians of each row
-    mat_stat = calculate_mat_stats(mat)
-    ## diffs with row medians
-    mat_median_diff = mat.sub(mat_stat['median'].values, axis=0)
-    ## min and max of diffs
-    median_diff = mat_median_diff.values.flatten()
-    diff_max = np.nanmax(median_diff)
-    diff_min = np.nanmin(median_diff)
-    logging.info(f"Min and max RT differences across runs before RT prediction: {diff_min:.4g}, {diff_max:.4g}")
-    
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=figsize, sharey=True)
-    ax1.hist(mat_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
-    ax1.set_ylabel("Frequency")
-    ax1.set_title("Before prediction")
-    
-    logging.info("Adjusting RT prediction outliers\n")
-    initial_n_iter = n_iter
-    while n_iter > 0:
-        # compute prediction deviation from row median
-        mat_pred_stat = calculate_mat_stats(mat_pred)
-        mat_pred_median_diff = mat_pred.sub(mat_pred_stat['median'].values, axis=0)
-        pred_median_diff = mat_pred_median_diff.values.flatten()
-        
-        if n_iter == initial_n_iter:
-            ax2.hist(mat_pred_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
-            ax2.set_title("After prediction")
-            
-        if np.all(pred_median_diff <= diff_max) and np.all(pred_median_diff >= diff_min):
-            break
-
-        # clip values to allowed range
-        mat_pred_median_diff_masked = mat_pred_median_diff.mask((mat_pred_median_diff > diff_max) | (mat_pred_median_diff < diff_min), 0.0)
-        mat_pred = mat_pred_median_diff_masked.add(mat_pred_stat['median'].values, axis=0)
-        
-        n_iter -= 1
-    
-    mat_pred_stat = calculate_mat_stats(mat_pred)
-    mat_pred_median_diff = mat_pred.sub(mat_pred_stat['median'].values, axis=0)
-    ax3.hist(mat_pred_median_diff.stack(), bins=50, color='steelblue', edgecolor='black')
-    ax3.set_title("After prediction and outlier adjustment")
-    fig.supxlabel("RT differences across runs compared with median RT")
-    plt.tight_layout()
-    
-    if save_plot:
-        plt.savefig(Path(out_dir) / "rt_diff_histogram.pdf")
-        plt.close()
-    
-    return mat_pred
-
-
-# Convert NumPy arrays to lists
-def convert_ndarray(obj):
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
-    
-# 
-def get_prec_prot_relation(lib_file, out_dir):
-    prec_prot_df = pd.read_parquet(lib_file, columns=['Precursor.Id', 
-                                                      'Protein.Ids', 
-                                                      'Protein.Group',
-                                                      'Protein.Names', 
-                                                      'Genes'])
-    prec_prot_df = prec_prot_df.drop_duplicates(ignore_index=True)
-    n_duplicated = prec_prot_df['Precursor.Id'].duplicated().sum()
-    if n_duplicated > 0:
-        logging.info(f"Found cases in which one precursor was assigned to multiple proteins. Total number: {n_duplicated}")
-        prec_prot_df = prec_prot_df.drop_duplicates(subset=['Precursor.Id'], ignore_index=True)
-    prec_prot_df.to_csv(Path(out_dir) / "prec_prot_relation.csv", index=False)
-    
-    return prec_prot_df
-
-# 
-def get_prot_prec_pep_info(report_file):
-    
-    # report_file = r"C:\Users\yfu\Downloads\miss_dia_test_data\quant_ums\jumpdia_gui\jump_dia_report.parquet"
-    df = pd.read_parquet(report_file, columns=['Protein.Group', 'Precursor.Id', 'Stripped.Sequence'])
+def get_prot_prec_pep_info(df):
+    df['Stripped.Sequence'] = df['Precursor.Id'].apply(get_aas)
     #
     prot_pep_info = df.drop(columns='Precursor.Id').drop_duplicates(ignore_index=True)
     prot_pep_info_grouped = prot_pep_info.groupby('Protein.Group', as_index=False).agg({'Stripped.Sequence': lambda x: ', '.join(x)})
@@ -426,113 +298,145 @@ def get_prot_prec_pep_info(report_file):
     return prot_prec_pep_info
     
     
-def calculate_protein_coverage(prot_prec_pep_info, fasta_files): 
-    prot_prec_pep_info.insert(1, 'Protein.Group.Rep', prot_prec_pep_info['Protein.Group'].str.split(pat=';', n=1, expand=True)[0])
-    #
-    prot_fas_info = extract_prot_info_from_FASTAs(fasta_files, prot_prec_pep_info['Protein.Group.Rep'].values.tolist())
-    #prot_fas_info.drop(columns=['Protein.Name','Database'], inplace = True)
-    prot_fas_info.rename(columns={"Protein.Id": "Protein.Group.Rep"}, inplace = True)
-    prot_fas_info = prot_fas_info.drop_duplicates(subset=['Protein.Group.Rep'], ignore_index=True)
-    #
-    prot_prec_pep_info = prot_fas_info.merge(prot_prec_pep_info, how = 'right')
-    prot_prec_pep_info.drop(columns=['Protein.Group.Rep'], inplace = True)
-    #
-    (prot_prec_pep_info['Peptide.Positions'], 
-     prot_prec_pep_info['Coverage.Percentage']) = map_peptides(prot_prec_pep_info['Sequence'].tolist(), 
-                                                               prot_prec_pep_info['Peptides'].tolist())
+# def calculate_protein_coverage(prot_prec_pep_info, fasta_files): 
+#     prot_prec_pep_info.insert(1, 'Protein.Group.Rep', prot_prec_pep_info['Protein.Group'].str.split(pat=';', n=1, expand=True)[0])
+#     #
+#     prot_fas_info = extract_prot_info_from_FASTAs(fasta_files, prot_prec_pep_info['Protein.Group.Rep'].values.tolist())
+#     #prot_fas_info.drop(columns=['Protein.Name','Database'], inplace = True)
+#     prot_fas_info.rename(columns={"Protein.Id": "Protein.Group.Rep"}, inplace = True)
+#     prot_fas_info = prot_fas_info.drop_duplicates(subset=['Protein.Group.Rep'], ignore_index=True)
+#     #
+#     prot_prec_pep_info = prot_fas_info.merge(prot_prec_pep_info, how = 'right')
+#     prot_prec_pep_info.drop(columns=['Protein.Group.Rep'], inplace = True)
+#     #
+#     (prot_prec_pep_info['Peptide.Positions'], 
+#      prot_prec_pep_info['Coverage.Percentage']) = map_peptides(prot_prec_pep_info['Sequence'].tolist(), 
+#                                                                prot_prec_pep_info['Peptides'].tolist())
     
-    return prot_prec_pep_info
+#     return prot_prec_pep_info
 
 
-def map_peptides(protein_seqs, peptide_seqs):
-    results_positions = []
-    results_coverage = []
+# def map_peptides(protein_seqs, peptide_seqs):
+#     results_positions = []
+#     results_coverage = []
 
-    for protein, peptides_str in zip(protein_seqs, peptide_seqs):
-        if type(protein) == str:
-            peptides = peptides_str.split(', ')
-            positions = []
-            covered = set()
+#     for protein, peptides_str in zip(protein_seqs, peptide_seqs):
+#         if type(protein) == str:
+#             peptides = peptides_str.split(', ')
+#             positions = []
+#             covered = set()
     
-            for peptide in peptides:
-                # Use while loop to find all occurrences
-                start = 0
-                while True:
-                    idx = protein.find(peptide, start)
-                    if idx == -1:
-                        break
-                    end = idx + len(peptide)
-                    positions.append((idx + 1, end))  # 1-based position
-                    covered.update(range(idx, end))
-                    start = idx + 1
+#             for peptide in peptides:
+#                 # Use while loop to find all occurrences
+#                 start = 0
+#                 while True:
+#                     idx = protein.find(peptide, start)
+#                     if idx == -1:
+#                         break
+#                     end = idx + len(peptide)
+#                     positions.append((idx + 1, end))  # 1-based position
+#                     covered.update(range(idx, end))
+#                     start = idx + 1
     
-            coverage_rate = len(covered) / len(protein) if protein else 0
-            results_positions.append(positions)
-            results_coverage.append(np.round(coverage_rate*100, 2))
-        else:
-            results_positions.append([])
-            results_coverage.append(0.0)
+#             coverage_rate = len(covered) / len(protein) if protein else 0
+#             results_positions.append(positions)
+#             results_coverage.append(np.round(coverage_rate*100, 2))
+#         else:
+#             results_positions.append([])
+#             results_coverage.append(0.0)
 
-    return results_positions, results_coverage
-
-
-def extract_from_single_fasta(fasta_file, protein_ids, extract_sequence=True):
-    logging.info(f"Extracting protein information from FASTA file: {fasta_file}")
-    
-    prot_info = {}
-
-    with open(fasta_file) as fasta:
-        records = list(SeqIO.parse(fasta, 'fasta'))
-        
-        for record in records:
-            header = record.description
-            temp = header.split(" ", 1)
-            prot_id = temp[0].split("|")[1]
-
-            if prot_id in protein_ids:
-                prot_data = {
-                    'Accession.Number': temp[0],
-                    'Protein.Description': temp[1] if len(temp) > 1 else ''
-                }
-                if extract_sequence:
-                    prot_data['Sequence'] = str(record.seq)
-                
-                prot_info[prot_id] = prot_data
-
-    return prot_info
+#     return results_positions, results_coverage
 
 
-def extract_prot_info_from_FASTAs(fasta_files, protein_ids, extract_sequence=True, out_file=0):
-    # Prepare dictionary to collect all protein info
-    collected_info = {}
+# def extract_from_single_fasta(fasta_file, protein_ids, extract_sequence=True):
+#     logging.info(f"Extracting protein information from FASTA file: {fasta_file}")
 
-    for protein_id in protein_ids:
-        collected_info[protein_id] = {
-            'Accession.Number': '',
-            'Protein.Description': '',
-            'Sequence': '' if extract_sequence else ''
-        }
+#     prot_info = {}
+#     with open(fasta_file) as fasta:
+#         records = list(SeqIO.parse(fasta, 'fasta'))
 
-    if len(fasta_files) == 1:
-        prot_info = extract_from_single_fasta(fasta_files[0], protein_ids, extract_sequence)
-    else:
-        prot_info = {}
-        for fasta_file in fasta_files:
-            temp_info = extract_from_single_fasta(fasta_file, protein_ids, extract_sequence)
-            prot_info.update(temp_info)
+#         for record in records:
+#             header = record.description
+#             temp = header.split(" ", 1)
+#             prot_id = temp[0].split("|")[1]
+#             if prot_id in protein_ids:
+#                 prot_data = {
+#                     'Accession.Number': temp[0],
+#                     'Protein.Description': temp[1] if len(temp) > 1 else ''
+#                 }
+#                 if extract_sequence:
+#                     prot_data['Sequence'] = str(record.seq)
 
-    # Update collected_info with found proteins
-    for prot_id, info in prot_info.items():
-        collected_info[prot_id] = info
+#                 prot_info[prot_id] = prot_data
+#     return prot_info
 
-    # Build DataFrame
-    prot_info_df = pd.DataFrame.from_dict(collected_info, orient='index').reset_index()
-    prot_info_df.rename(columns={'index': 'Protein.Id'}, inplace=True)
 
-    # Final DataFrame
-    prot_info_final = prot_info_df
+# def extract_prot_info_from_FASTAs(fasta_files, protein_ids, extract_sequence=True, out_file=0):
+#     collected_info = {}
+#     for protein_id in protein_ids:
+#         collected_info[protein_id] = {
+#             'Accession.Number': '',
+#             'Protein.Description': '',
+#             'Sequence': '' if extract_sequence else ''
+#         }
+#     if len(fasta_files) == 1:
+#         prot_info = extract_from_single_fasta(fasta_files[0], protein_ids, extract_sequence)
+#     else:
+#         prot_info = {}
+#         for fasta_file in fasta_files:
+#             temp_info = extract_from_single_fasta(fasta_file, protein_ids, extract_sequence)
+#             prot_info.update(temp_info)
 
-    if out_file != 0:
-        prot_info_final.to_csv(out_file, index=False)
+#     for prot_id, info in prot_info.items():
+#         collected_info[prot_id] = info
 
-    return prot_info_final
+#     prot_info_df = pd.DataFrame.from_dict(collected_info, orient='index').reset_index()
+#     prot_info_df.rename(columns={'index': 'Protein.Id'}, inplace=True)
+
+#     if out_file != 0:
+#         prot_info_df.to_csv(out_file, index=False)
+#     return prot_info_df
+
+
+# def add_all_protein_names(df, fasta_files, id_col='Protein.Ids', extract_sequence=False, out_file=0):
+#     """
+#     Splits semicolon-separated ids in `id_col`, looks up every individual id
+#     in the given FASTA file(s), and adds an 'Protein.Names.All' column with
+#     all corresponding protein names joined by ';' (in the same order as
+#     the ids in id_col).
+#     """
+#     # 1. Collect every individual protein id from the (possibly multi-id) column
+#     split_ids = df[id_col].astype(str).str.split(';')
+#     all_ids = set(pid for sublist in split_ids for pid in sublist)
+
+#     # 2. Extract info for all of them at once
+#     prot_info_df = extract_prot_info_from_FASTAs(
+#         fasta_files, all_ids, extract_sequence=extract_sequence
+#     )
+
+#     # 3. Build id -> name lookup.
+#     #    'Accession.Number' looks like 'sp|P14550|AK1A1_HUMAN' -> take last field
+#     #    Fall back to '' if not found in the FASTA.
+#     def name_from_accession(acc):
+#         if not acc:
+#             return ''
+#         parts = acc.split('|')
+#         return parts[-1] if len(parts) > 1 else acc
+
+#     id_to_name = dict(
+#         zip(prot_info_df['Protein.Id'], prot_info_df['Accession.Number'].apply(name_from_accession))
+#     )
+
+#     # 4. Map back onto each row, preserving id order, joined by ';'
+#     def lookup_names(id_string):
+#         ids = str(id_string).split(';')
+#         names = [id_to_name.get(pid, '') for pid in ids]
+#         return ';'.join(names)
+
+#     df = df.copy()
+#     df['Protein.Names.All'] = df[id_col].apply(lookup_names)
+
+#     if out_file != 0:
+#         df.to_csv(out_file, index=False)
+
+#     return df

@@ -546,6 +546,7 @@ def load_timsTOF_d(bruker_d_folder_name):
                                                  mobility_scan_max_index)
 
     frames = timsrust_pyo3.FrameReader(bruker_d_folder_name)
+    n_frames = len(frames)
 
     ms1_spectra = np.empty(len(ms1_frames_df), dtype=object)
     ms2_spectra = np.empty(len(ms2_frames_df), dtype=object)
@@ -553,8 +554,16 @@ def load_timsTOF_d(bruker_d_folder_name):
     ms1_idx = 0
     ms2_idx = 0
     rt_conversion = 1.0 / 60.0
-
-    for frame in progress_bar(frames, ShowProgress, InterProgress):
+    skipped_frames = []
+    
+    for i in progress_bar(range(n_frames), ShowProgress, InterProgress):
+        try:
+            frame = frames.read_frame(i)
+        except OSError:# as e:
+            skipped_frames.append(i)
+            #logging.info(f"Warning: skipping corrupt frame index {i} in {bruker_d_folder_name}: {e}")
+            continue
+    #for frame in progress_bar(frames, ShowProgress, InterProgress):
         rt              = np.float32(frame.rt * rt_conversion)
         tof_indices     = np.asarray(frame.tof_indices,  dtype=np.uint32)
         scan_offsets    = np.asarray(frame.scan_offsets, dtype=np.intp)
@@ -611,7 +620,12 @@ def load_timsTOF_d(bruker_d_folder_name):
                 spec.window_high     = float(mz_window_high[j])
                 ms2_spectra[ms2_idx] = spec
                 ms2_idx += 1
-
+    
+    if skipped_frames:
+        logging.info(f"Warning: skipped {len(skipped_frames)} corrupt frame(s) in "
+                     f"{bruker_d_folder_name}: indices {skipped_frames[:20]}"
+                     f"{' ...' if len(skipped_frames) > 20 else ''}")
+    
     del frames
     return ms1_spectra[:ms1_idx], ms2_spectra[:ms2_idx]
 

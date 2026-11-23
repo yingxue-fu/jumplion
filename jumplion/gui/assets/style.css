@@ -7,7 +7,7 @@
     padding: 2rem 0.5rem 1rem 1rem;
     z-index: 1050;
     transition: width 0.3s ease-in-out;
-    background-color: #EEEDE9;
+    background-color: var(--bs-tertiary-bg);
   }
 
   /* when the user hovers on the sidebar, expand it */
@@ -21,7 +21,7 @@
     width: 100%;
     overflow: hidden;
     white-space: nowrap;
-    color: #40484E;
+    color: var(--bs-body-color);
   }
 
   /* fix the width of the icons */
@@ -54,7 +54,7 @@
 }
 
 .nav-link.active{
-  color: #40484E !important;
+  color: var(--bs-body-color) !important;
 }
 
 .nav-link.active:hover{
@@ -77,4 +77,14 @@
   flex-direction: row;
   column-gap: 20px;
   align-items: center;
+}
+
+/* Freeze the Precursors page's tab labels just below the sticky top bar
+ * while the tab content scrolls underneath. 56px must match TOPBAR_HEIGHT
+ * in gui/precs.py. */
+.nav-tabs {
+  position: sticky;
+  top: 56px;
+  z-index: 1020;
+  background-color: var(--bs-body-bg, #fff);
 }

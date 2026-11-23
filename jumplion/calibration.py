@@ -1,5 +1,5 @@
 # builtin
-from typing import List, Tuple
+from typing import Any, Tuple
 from pathlib import Path
 # external
 import numpy as np
@@ -12,6 +12,8 @@ import seaborn as sns
 # local
 from jumplion.utils import E
 
+
+############################## Mass calibration model #########################
 def split_into_rt_bins(
         sorted_rt_values, 
         max_num_bins=1, 
@@ -434,16 +436,6 @@ def im_error_plot(df, run_name="", bins=100, s=30, save_plot=True, out_dir=""):
         plt.show()
     
 ############################ RT/IM spline modeling ############################
-def convert_to_arrays(data):
-    x = np.array([p[0] for p in data])
-    y = np.array([p[1] for p in data])
-    return x, y
-
-
-def flip_map(data: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
-    return [(p[1], p[0]) for p in data]
-
-
 @njit
 def PAVA(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     n = len(x)
@@ -617,78 +609,28 @@ def refine_spline(x: np.ndarray, y: np.ndarray, segments: int) -> tuple:
     return coefficients, knot_points
     
 
-def check_model_accuracy(data, coeff, points, delta_percentile=0.8):
-    
-    # calculate difference between experimental and predicted  
-    delta = [abs(pair[1] - calc_spline(coeff, points, pair[0])) for pair in data]
-    # sort delta in ascending order (from small to large)
-    delta.sort()
-    # 
-    acc = delta[int(delta_percentile * len(delta))]
-    
-    return acc
 
-    
-def spline_fitting_plot(
-        data: List[Tuple[float, float]], 
-        coefficients: np.ndarray, 
-        knot_points: np.ndarray,
-        window,
-        show_window,
-        model,
-        out_dir,
-        run_name,
-        figsize=(6, 6),
-        save_plot=True
-        ):
-    
-    x, y = convert_to_arrays(data)
-    y_pava = PAVA(x, y)
-    x_spline = np.linspace(min(x), max(x), 500)
-    y_spline = np.array([calc_spline(coefficients, knot_points, xi) for xi in x_spline])
+# ---------------------------------------------------------------------
+# Simple linear model 
+# ---------------------------------------------------------------------
+def fit_linear_model(x: np.ndarray, y: np.ndarray, n_segments: int = 1) -> Tuple[Any, Any]:
+    """Fit y = a + b*x.
 
-    # Create the grid layout
-    fig = plt.figure(figsize=figsize)
-    gs = GridSpec(4, 4, figure=fig)
-    ax_main = fig.add_subplot(gs[1:, :-1])  # Main scatter and spline plot
-    ax_x_hist = fig.add_subplot(gs[0, :-1], sharex=ax_main)  # Histogram for x
-    ax_y_hist = fig.add_subplot(gs[1:, -1], sharey=ax_main)  # Histogram for y
+    The validation framework passes n_segments for API compatibility.
+    """
+    x = np.asarray(x, dtype=float).reshape(-1)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    if x.size != y.size:
+        raise ValueError("x and y must have the same length")
+    if x.size < 2:
+        raise ValueError("At least two points are required for linear fit")
 
-    # Scatter plot of original data
-    ax_main.scatter(x, y, label='Original Data', color='blue', alpha=0.5)
-    ax_main.plot(x, y_pava, label='PAVA Data', color='orange', linestyle='--')
-    ax_main.plot(x_spline, y_spline, label='Spline Fit', color='red')
+    b, a = np.polyfit(x, y, deg=1)
+    coeff = {"intercept": float(a), "slope": float(b)}
+    points = None
+    return coeff, points
 
-    if show_window:
-        ax_main.plot(x_spline, y_spline + window, label='Margin', color='pink', linestyle='--')
-        ax_main.plot(x_spline, y_spline - window, color='pink', linestyle='--')
 
-    ax_main.scatter(knot_points, 
-                    [calc_spline(coefficients, knot_points, k) for k in knot_points], 
-                    label='Knot Points', color='green', marker='x')
-
-    ax_main.set_xlabel(f'library i{model}')
-    ax_main.set_ylabel(f'experiment {model}')
-    ax_main.set_title(f'Model for predicting {model} from i{model}')
-    ax_main.legend()
-    ax_main.grid(True)
-
-    # Histogram on the x-axis
-    ax_x_hist.hist(x, bins=len(knot_points), color='gray', alpha=0.5)
-    ax_x_hist.set_ylabel('Count')
-    ax_x_hist.yaxis.set_visible(True)
-
-    # Histogram on the y-axis
-    ax_y_hist.hist(y, bins=len(knot_points), orientation='horizontal', color='gray', alpha=0.5)
-    ax_y_hist.set_xlabel('Count')
-    ax_y_hist.xaxis.set_visible(True)
-    
-    plt.setp(ax_x_hist.get_xticklabels(), visible=False)
-    plt.setp(ax_y_hist.get_yticklabels(), visible=False)
-    plt.tight_layout()
-    
-    if save_plot:
-        plt.savefig(Path(out_dir) / f'{run_name}_{model}_fitting_plot.png')
-        plt.close()
-    else:
-        plt.show()
+def predict_linear_model(coeff: Any, points: Any, x_values: np.ndarray) -> np.ndarray:
+    x_values = np.asarray(x_values, dtype=float).reshape(-1)
+    return coeff["intercept"] + coeff["slope"] * x_values

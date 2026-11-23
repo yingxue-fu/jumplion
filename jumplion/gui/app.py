@@ -4,11 +4,19 @@ import logging
 import dash
 import dash_bootstrap_components as dbc
 
-app = dash.Dash(__name__, 
-                title="JUMPlion",
+# Light/dark Bootstrap themes offered by the top-bar theme switch, paired
+# with the matching Plotly figure templates (loaded via load_figure_template
+# in gui/precs.py).
+THEME_LIGHT = dbc.themes.ZEPHYR
+THEME_DARK = dbc.themes.DARKLY
+PLOTLY_TEMPLATE_LIGHT = "vizro"
+PLOTLY_TEMPLATE_DARK = "vizro_dark"
+
+app = dash.Dash(__name__,
+                title="JUMPlion Viewer",
                 assets_folder="assets",
                 suppress_callback_exceptions=True,
-                external_stylesheets=[dbc.themes.SANDSTONE, 
+                external_stylesheets=[THEME_LIGHT,
                                       dbc.icons.FONT_AWESOME]
                 )
 

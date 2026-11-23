@@ -1,0 +1,10 @@
+Eigen (https://eigen.tuxfamily.org) is licensed under the Mozilla Public
+License 2.0 (MPL2). See https://www.mozilla.org/MPL/2.0/
+
+This directory vendors a trimmed copy of the Eigen/ header-only linear
+algebra library (Core, LU, Cholesky, QR, SVD, Geometry, Eigenvalues,
+Householder, Jacobi + the dense OrderingMethods used by them). The
+sparse-matrix solver backends (Cholmod/KLU/Pardiso/PaStiX/SPQR/SuperLU/
+UmfPack/Metis support) were removed since this project only uses dense
+matrices -- if you need those, re-copy the Eigen/ directory from
+https://gitlab.com/libeigen/eigen unmodified.

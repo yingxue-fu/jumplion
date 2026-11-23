@@ -335,3 +335,110 @@ def lfqbench_plot(valid_prots, species_list, colors,
         )
     
     return ratio_intensity_fig, ratio_dist_fig
+
+
+def _safe_parse_vector(value):
+    """
+    Parse semicolon-separated XIC vectors stored as strings.
+    Empty, NA, or non-numeric tokens become NaN.
+    """
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return np.array([], dtype=float)
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return np.asarray(value, dtype=float)
+
+    s = str(value).strip()
+    if not s or s.lower() in {"nan", "na", "none"}:
+        return np.array([], dtype=float)
+
+    out = []
+    for token in s.split(";"):
+        token = token.strip()
+        try:
+            out.append(float(token))
+        except (TypeError, ValueError):
+            out.append(np.nan)
+    return np.asarray(out, dtype=float)
+    
+
+def cosine_similarity_vectors(observed, expected, min_pairs: int = 2) -> float:
+    """
+    Cosine similarity between observed and expected ion-intensity vectors.
+
+    Both vectors are aligned by position. Non-finite pairs are removed.
+    The expected vector is NOT re-scaled using the observed signal; cosine is
+    scale-invariant by construction.
+
+    Returns NaN when fewer than min_pairs valid channels remain or either
+    vector has zero norm.
+    """
+    x = _safe_parse_vector(observed)
+    w = _safe_parse_vector(expected)
+
+    if len(x) == 0 or len(w) == 0:
+        return np.nan
+
+    n = min(len(x), len(w))
+    x = x[:n]
+    w = w[:n]
+
+    ok = np.isfinite(x) & np.isfinite(w)
+    if ok.sum() < min_pairs:
+        return np.nan
+
+    x = np.asarray(x[ok], dtype=float)
+    w = np.asarray(w[ok], dtype=float)
+
+    nx = np.linalg.norm(x)
+    nw = np.linalg.norm(w)
+
+    if nx <= 0 or nw <= 0:
+        return np.nan
+
+    return float(np.dot(x, w) / (nx * nw))
+
+
+def topk_cosine_similarity(
+    observed,
+    expected,
+    k: int = 5,
+    min_pairs: int = 2,
+) -> float:
+    """
+    Cosine similarity using the top-k expected channels.
+
+    Useful for MS2 because a small number of strong library fragments can
+    dominate precursor identity, while very weak tail fragments contribute
+    little reliable information.
+    """
+    x = _safe_parse_vector(observed)
+    w = _safe_parse_vector(expected)
+
+    if len(x) == 0 or len(w) == 0:
+        return np.nan
+
+    n = min(len(x), len(w))
+    x = x[:n]
+    w = w[:n]
+
+    ok = np.isfinite(x) & np.isfinite(w)
+    if ok.sum() < min_pairs:
+        return np.nan
+
+    x = x[ok]
+    w = w[ok]
+
+    kk = min(k, len(w))
+    if kk < min_pairs:
+        return np.nan
+
+    order = np.argsort(w)[::-1][:kk]
+    xx = x[order]
+    ww = w[order]
+
+    nx = np.linalg.norm(xx)
+    nw = np.linalg.norm(ww)
+    if nx <= 0 or nw <= 0:
+        return np.nan
+
+    return float(np.dot(xx, ww) / (nx * nw))
