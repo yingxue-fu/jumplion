@@ -1,9 +1,10 @@
 <p align="center" style="margin-bottom: 0px !important;">
-  <img src="jumplion/gui/assets/logo.png" width="100" height="100">
+  <img src="https://raw.githubusercontent.com/yingxue-fu/jumplion/main/jumplion/gui/assets/logo.png" width="100" height="100">
 </p>
 <h1 align="center" style="margin-top: -7px; font-size: 24px">JUMPlion</h1>
 
 <p align="center">
+  <a href="https://pypi.org/project/jumplion/"><img alt="PyPI" src="https://img.shields.io/pypi/v/jumplion"></a>
   <a href="https://www.python.org/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue"></a>
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-green"></a>
 </p>
@@ -16,7 +17,12 @@ JUMPlion can be installed via `pip` and is compatible with both Windows and Linu
 conda create -n jumplion python=3.12
 conda activate jumplion
 conda install mono # Required on Linux for reading Thermo .raw files; skip this step on Windows
-# A C++ compiler is required to build the native MaxLFQ extension (MSVC Build Tools on Windows, GCC on Linux)
+# Installs a prebuilt wheel from PyPI (no compiler needed; Python 3.12/3.13, Windows, Linux, macOS)
+pip install "jumplion[gui]"
+```
+
+Building from source (only if no wheel matches your platform) requires a C++17 compiler: Visual Studio Build Tools 2019 or newer on Windows, GCC 8 or newer on Linux:
+```bash
 pip install "jumplion[gui] @ git+https://github.com/yingxue-fu/jumplion.git"
 ```
 

@@ -12,9 +12,15 @@ authors = [
 description = "A software for DIA-MS quantification"
 readme = "README.md"
 license = "Apache-2.0"
+keywords = ["proteomics", "DIA", "mass spectrometry", "single-cell", "quantification"]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: C++",
   "Operating System :: OS Independent",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
 [project.scripts]
@@ -34,9 +40,12 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["jumplion*"]  # Only include jumplion package
-exclude = ["tests*"]       # Explicitly exclude nbs
 
 [tool.setuptools.dynamic]
 version = {attr = "jumplion.__version__"}
 dependencies = {file = ["requirements/requirements.txt"]}
 optional-dependencies.gui = { file = ["requirements/requirements_gui.txt"] }
+
+[tool.cibuildwheel]
+build = "cp312-* cp313-*"
+skip = "*-musllinux_* *-win32 *_i686"
