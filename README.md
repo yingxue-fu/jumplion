@@ -49,13 +49,6 @@ out_dir = jumplion_results
 ```
 `out_dir` is optional. If it is left out, results are written to `jumplion_results` in the folder that contains the parameter file (or in the current directory when no parameter file is used). A relative `out_dir` is resolved against the folder that contains the parameter file. Any parameter can also be given on the command line, where it overrides the parameter file, for example `jumplion jumplion.params --mass-calibration 0`.
 
-#### Quick start with the demo data
-1. Download the demo inputs (see [**Demo**](#demo)).
-2. Run `jumplion --gen-params jumplion.params`.
-3. In `jumplion.params`, set `input_runs`, `prec_ids` and `spec_lib` to the demo files. Optionally, set `out_dir` to the folder for the results.
-4. Run `jumplion jumplion.params`.
-5. When it finishes, the quantification tables are in `<out_dir>/publication` (`jumplion_results/publication` by default) (see [**Outputs**](#outputs)).
-
 ### Results viewer
 After JUMPlion analysis, intermediate results such as the extracted XICs and XIC quantities can be examined in the JUMPlion viewer GUI, which can be launched from the terminal:
 ```bash
@@ -117,16 +110,6 @@ The spectral library provides the information needed to extract XICs from raw da
 | `Protein.Group`, `Protein.Ids`, `Protein.Names`, `Genes` | Protein annotation of each precursor |
 
 Decoy precursors (an `isDecoy`/`Decoy` column) are removed automatically.   
-
-### Demo
-To test run JUMPlion using demo data, you can download all required inputs from the following link:
-https://drive.google.com/drive/folders/1Ew8SVq0riDzyl5rywLWcTfUmfcPSglld?usp=drive_link
-
-The data are derived from the following published study:
-Wang, J., Huang, Y., Lu, F., et al. Benchmarking informatics workflows for data-independent acquisition single-cell proteomics. Nature Communications 16, 10276 (2025).
-https://doi.org/10.1038/s41467-025-65174-4
-
-The expected runtime for the demo on a standard desktop computer is approximately 15 minutes.
 
 ### Outputs
 All results are written to `out_dir`, which is organized into two folders:  
